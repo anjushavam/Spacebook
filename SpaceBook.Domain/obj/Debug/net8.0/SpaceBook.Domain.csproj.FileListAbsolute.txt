@@ -9,3 +9,15 @@ C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Do
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\refint\SpaceBook.Domain.dll
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.pdb
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\ref\SpaceBook.Domain.dll
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\bin\Debug\net8.0\SpaceBook.Domain.deps.json
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\bin\Debug\net8.0\SpaceBook.Domain.dll
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\bin\Debug\net8.0\SpaceBook.Domain.pdb
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.AssemblyInfoInputs.cache
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.AssemblyInfo.cs
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.csproj.CoreCompileInputs.cache
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.sourcelink.json
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.dll
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\refint\SpaceBook.Domain.dll
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.pdb
+C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\ref\SpaceBook.Domain.dll

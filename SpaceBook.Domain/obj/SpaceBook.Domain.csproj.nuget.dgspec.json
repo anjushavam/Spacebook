@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {}
+    "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {}
   },
   "projects": {
-    "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {
+    "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj",
+        "projectUniqueName": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj",
         "projectName": "SpaceBook.Domain",
-        "projectPath": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj",
-        "packagesPath": "C:\\Users\\AnjushaVijayan\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Domain\\obj\\",
+        "projectPath": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj",
+        "packagesPath": "C:\\Users\\AmirthaGovindasamy\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\AnjushaVijayan\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\AmirthaGovindasamy\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"

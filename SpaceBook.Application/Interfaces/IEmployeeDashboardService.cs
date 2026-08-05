@@ -9,4 +9,6 @@ public interface IEmployeeDashboardService
     Task<AvailabilityCalendarDto> GetAvailabilityAsync(DateOnly date);
 
     Task<List<MyBookingDto>> GetMyBookingsAsync(int employeeId);
+
+    Task<List<RecentReservationDto>> GetRecentReservationsAsync(int employeeId);
 }

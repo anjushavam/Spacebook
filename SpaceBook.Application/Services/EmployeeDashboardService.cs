@@ -16,6 +16,11 @@ public class EmployeeDashboardService : IEmployeeDashboardService
     {
         return await _repository.GetDashboardAsync(employeeId);
     }
+
+    public async Task<List<RecentReservationDto>> GetRecentReservationsAsync(int employeeId)
+{
+    return await _repository.GetRecentReservationsAsync(employeeId);
+}
  
     public async Task<AvailabilityCalendarDto> GetAvailabilityAsync(DateOnly date)
     {
