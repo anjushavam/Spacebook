@@ -97,4 +97,33 @@ public async Task<IActionResult> GetMyBookings()
         });
     }
 }
+[HttpGet("recentreservations")]
+public async Task<IActionResult> GetRecentReservations()
+{
+    try
+    {
+        var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (employeeIdClaim == null)
+        {
+            return Unauthorized(new
+            {
+                Message = "Invalid token."
+            });
+        }
+
+        int employeeId = int.Parse(employeeIdClaim.Value);
+
+        var result = await _dashboardService.GetRecentReservationsAsync(employeeId);
+
+        return Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new
+        {
+            Message = ex.Message
+        });
+    }
+}
 }
