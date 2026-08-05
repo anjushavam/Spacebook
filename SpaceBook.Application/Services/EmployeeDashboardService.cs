@@ -1,0 +1,29 @@
+using SpaceBook.Application.DTOs.Employee;
+using SpaceBook.Application.Interfaces;
+ 
+namespace SpaceBook.Application.Services;
+ 
+public class EmployeeDashboardService : IEmployeeDashboardService
+{
+    private readonly IEmployeeDashboardRepository _repository;
+ 
+    public EmployeeDashboardService(IEmployeeDashboardRepository repository)
+    {
+        _repository = repository;
+    }
+ 
+    public async Task<EmployeeDashboardDto> GetDashboardAsync(int employeeId)
+    {
+        return await _repository.GetDashboardAsync(employeeId);
+    }
+ 
+    public async Task<AvailabilityCalendarDto> GetAvailabilityAsync(DateOnly date)
+    {
+        return await _repository.GetAvailabilityAsync(date);
+    }
+
+    public async Task<List<MyBookingDto>> GetMyBookingsAsync(int employeeId)
+    {
+        return await _repository.GetMyBookingsAsync(employeeId);
+    }
+}

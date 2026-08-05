@@ -1,0 +1,6 @@
+@SpaceBook.API_HostAddress = http://localhost:5263
+
+GET {{SpaceBook.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

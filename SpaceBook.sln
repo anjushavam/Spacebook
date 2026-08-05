@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceBook.API", "SpaceBook.API\SpaceBook.API.csproj", "{65681D21-A825-4941-B20D-943B2F14F664}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceBook.Application", "SpaceBook.Application\SpaceBook.Application.csproj", "{BC7D1392-BCC0-439F-B628-EEC7AE9B34EE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceBook.Domain", "SpaceBook.Domain\SpaceBook.Domain.csproj", "{8C9E358E-8E4E-4F12-9B01-0E8A1A95A862}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceBook.Infrastructure", "SpaceBook.Infrastructure\SpaceBook.Infrastructure.csproj", "{F107917A-F676-4A5C-8C3A-2CB5A1F20AE8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{65681D21-A825-4941-B20D-943B2F14F664}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65681D21-A825-4941-B20D-943B2F14F664}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65681D21-A825-4941-B20D-943B2F14F664}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65681D21-A825-4941-B20D-943B2F14F664}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BC7D1392-BCC0-439F-B628-EEC7AE9B34EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC7D1392-BCC0-439F-B628-EEC7AE9B34EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC7D1392-BCC0-439F-B628-EEC7AE9B34EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC7D1392-BCC0-439F-B628-EEC7AE9B34EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C9E358E-8E4E-4F12-9B01-0E8A1A95A862}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C9E358E-8E4E-4F12-9B01-0E8A1A95A862}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C9E358E-8E4E-4F12-9B01-0E8A1A95A862}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C9E358E-8E4E-4F12-9B01-0E8A1A95A862}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F107917A-F676-4A5C-8C3A-2CB5A1F20AE8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F107917A-F676-4A5C-8C3A-2CB5A1F20AE8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F107917A-F676-4A5C-8C3A-2CB5A1F20AE8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F107917A-F676-4A5C-8C3A-2CB5A1F20AE8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
