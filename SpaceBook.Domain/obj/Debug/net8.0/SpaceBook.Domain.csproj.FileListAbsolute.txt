@@ -9,3 +9,4 @@ C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Do
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\refint\SpaceBook.Domain.dll
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.pdb
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\ref\SpaceBook.Domain.dll
+C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Domain\obj\Debug\net8.0\SpaceBook.Domain.sourcelink.json

@@ -131,3 +131,4 @@ C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.API\bin\Debug\net8.0\Microsoft.Ident
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.API\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.API\bin\Debug\net8.0\System.Formats.Asn1.dll
 C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.API\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
+C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.API\obj\Debug\net8.0\SpaceBook.API.sourcelink.json
