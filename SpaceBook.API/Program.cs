@@ -24,6 +24,12 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
+
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
+builder.Services.AddScoped<IReportService, ReportService>();
+
+builder.Services.AddScoped<IEmployeeBookingRepository, EmployeeBookingRepository>();
+builder.Services.AddScoped<IEmployeeBookingService, EmployeeBookingService>();
  
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
@@ -62,12 +68,32 @@ builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<
     IEmployeeDashboardRepository,
     EmployeeDashboardRepository>();
+builder.Services.AddScoped<INotificationRepository,
+    NotificationRepository>();
+builder.Services.AddScoped<MissedCheckInService>();    
  
 builder.Services.AddScoped<
     IEmployeeDashboardService,
     EmployeeDashboardService>();
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddScoped<
+    IEmployeeCheckInService,
+    EmployeeCheckInService>();
+ 
+builder.Services.AddScoped<
+    IEmployeeCheckInRepository,
+    EmployeeCheckInRepository>();
+    builder.Services.AddScoped<
+
+    IMissedCheckInRepository,
+
+    MissedCheckInRepository>();
+ 
+builder.Services.AddScoped<
+
+    MissedCheckInService>();
+ 
  
 builder.Services.AddSwaggerGen(c =>
 {

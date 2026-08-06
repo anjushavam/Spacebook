@@ -15,4 +15,11 @@ public interface IRoomService
     Task UpdateAsync(int roomId, UpdateRoomDto dto);
 
     Task DeleteAsync(int roomId);
+
+    Task<bool> UpdateRoomStatusAsync(
+        int roomId,
+        bool isBlocked);
+
+    // Add this
+    Task BulkCreateAsync(BulkCreateRoomDto dto);
 }

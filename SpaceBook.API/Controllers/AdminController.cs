@@ -6,7 +6,7 @@ namespace SpaceBook.API.Controllers;
  
 [ApiController]
 [Route("api/admin")]
-[Authorize(Roles="Admin")]
+[Authorize(Roles = "Admin")]
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _service;
@@ -16,6 +16,7 @@ public class AdminController : ControllerBase
         _service = service;
     }
  
+    // GET: api/admin/dashboard
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
     {

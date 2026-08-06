@@ -96,76 +96,90 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
     // Availability Calendar API
     // ==========================
 
-    public async Task<AvailabilityCalendarDto> GetAvailabilityAsync(DateOnly date)
-    {
-        var result = new AvailabilityCalendarDto
-        {
-            Date = date
-        };
+    // ==========================
+// Availability Calendar API
+// ==========================
 
-        var rooms = await _context.Rooms
-            .Include(r => r.RoomType)
-            .AsNoTracking()
+public async Task<AvailabilityCalendarDto> GetAvailabilityAsync(
+    DateOnly date,
+    int? roomTypeId)
+{
+    var result = new AvailabilityCalendarDto
+    {
+        Date = date
+    };
+
+    var roomsQuery = _context.Rooms
+        .Include(r => r.RoomType)
+        .AsNoTracking()
+        .AsQueryable();
+
+    // Filter by Room Type if selected
+    if (roomTypeId.HasValue)
+    {
+        roomsQuery = roomsQuery.Where(r => r.RoomTypeId == roomTypeId.Value);
+    }
+
+    var rooms = await roomsQuery.ToListAsync();
+
+    foreach (var room in rooms)
+    {
+        var bookings = await _context.Bookings
+            .Where(b =>
+                b.RoomId == room.RoomId &&
+                b.BookingDate == date &&
+                b.Status != "Cancelled" &&
+                b.Status != "Rejected")
             .ToListAsync();
 
-        foreach (var room in rooms)
+        List<TimeSlotDto> slots = new();
+
+        TimeOnly start = new TimeOnly(8, 0);
+
+        while (start < new TimeOnly(18, 0))
         {
-            var bookings = await _context.Bookings
-                .Where(b =>
-                    b.RoomId == room.RoomId &&
-                    b.BookingDate == date &&
-                    b.Status != "Cancelled" &&
-                    b.Status != "Rejected")
-                .ToListAsync();
+            TimeOnly end = start.AddHours(1);
 
-            List<TimeSlotDto> slots = new();
+            bool isBooked = bookings.Any(b =>
+                b.StartTime < end &&
+                b.EndTime > start);
 
-            TimeOnly start = new TimeOnly(8, 0);
-
-            while (start < new TimeOnly(18, 0))
+            slots.Add(new TimeSlotDto
             {
-                TimeOnly end = start.AddHours(1);
-
-                bool isBooked = bookings.Any(b =>
-                    b.StartTime < end &&
-                    b.EndTime > start);
-
-                slots.Add(new TimeSlotDto
-                {
-                    StartTime = start,
-                    EndTime = end,
-                    IsBooked = isBooked
-                });
-
-                start = end;
-            }
-
-            var booking = bookings
-                .OrderBy(b => b.StartTime)
-                .FirstOrDefault();
-
-            result.Rooms.Add(new RoomAvailabilityDto
-            {
-                RoomId = room.RoomId,
-                RoomName = room.RoomName,
-                RoomType = room.RoomType!.TypeName,
-                Module = room.Module,
-                Capacity = room.Capacity,
-                Status = booking == null ? "Available" : "Booked",
-                AvailableSlots = slots.Count(x => !x.IsBooked),
-                TimeSlots = slots,
-                CurrentBooking = booking == null ? null : new BookingPreviewDto
-                {
-                    Purpose = booking.Purpose,
-                    StartTime = booking.StartTime,
-                    EndTime = booking.EndTime,
-                    Status = booking.Status
-                }
+                StartTime = start,
+                EndTime = end,
+                IsBooked = isBooked
             });
+
+            start = end;
         }
 
-        return result;
+        var booking = bookings
+            .OrderBy(b => b.StartTime)
+            .FirstOrDefault();
+
+        result.Rooms.Add(new RoomAvailabilityDto
+        {
+            RoomId = room.RoomId,
+            RoomName = room.RoomName,
+            RoomType = room.RoomType!.TypeName,
+            Module = room.Module,
+            Capacity = room.Capacity,
+            Status = booking == null ? "Available" : "Booked",
+            AvailableSlots = slots.Count(x => !x.IsBooked),
+            TimeSlots = slots,
+            CurrentBooking = booking == null ? null : new BookingPreviewDto
+            {
+                Purpose = booking.Purpose,
+                StartTime = booking.StartTime,
+                EndTime = booking.EndTime,
+                Status = booking.Status
+            }
+        });
     }
+
+    return result;
+}
 
     // ==========================
     // My Bookings API

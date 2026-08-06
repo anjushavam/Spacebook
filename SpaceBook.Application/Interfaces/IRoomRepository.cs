@@ -25,4 +25,9 @@ public interface IRoomRepository
 
     // Exists
     Task<bool> ExistsAsync(int roomId);
+
+    Task<bool> UpdateRoomStatusAsync(
+    int roomId,
+    bool isBlocked);
+    
 }
