@@ -1,22 +1,19 @@
 INSERT INTO Employees
 (
-    EmployeeId,
-    RoleId,
-    Name,
     Email,
+    RoleId,
     PasswordHash,
-    Department,
     IsActive
 )
 VALUES
-('105524', 1, 'Aarav Sharma', 'aarav.sharma@company.com', 'Admin@123', 'Administration', TRUE),
+('aarav.sharma@company.com', 1, 'Admin@123', TRUE),
 
-('105525', 2, 'Diya Nair', 'diya.nair@company.com', 'Employee@123', 'Human Resources', TRUE),
+('diya.nair@company.com', 2, 'Diya@123', TRUE),
 
-('105526', 2, 'Rahul Verma', 'rahul.verma@company.com', 'Employee@123', 'Information Technology', TRUE),
+('rahul.verma@company.com', 2, 'Rahul@123', TRUE),
 
-('105527', 2, 'Sneha Iyer', 'sneha.iyer@company.com', 'Employee@123', 'Finance', TRUE),
+('sneha.iyer@company.com', 2, 'Sneha@123', TRUE),
 
-('105528', 2, 'Arjun Patel', 'arjun.patel@company.com', 'Employee@123', 'Operations', TRUE);
+('arjun.patel@company.com', 2, 'Arjun@123', TRUE);
 
 SELECT * FROM Employees;

@@ -1,20 +1,11 @@
 CREATE TABLE Employees
 (
-    EmployeeId VARCHAR(20) PRIMARY KEY,
+    Email VARCHAR(150) PRIMARY KEY,
 
     RoleId INT NOT NULL,
 
-    Name VARCHAR(100)
-        NOT NULL,
-
-    Email VARCHAR(150)
-        NOT NULL
-        UNIQUE,
-
     PasswordHash TEXT
         NOT NULL,
-
-    Department VARCHAR(100),
 
     IsActive BOOLEAN
         NOT NULL
@@ -30,4 +21,6 @@ CREATE TABLE Employees
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
+
+SET datestyle = 'SQL, MDY'; 
 
