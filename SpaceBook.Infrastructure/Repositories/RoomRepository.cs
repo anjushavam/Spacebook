@@ -171,4 +171,21 @@ public class RoomRepository : IRoomRepository
             r.RoomId == roomId &&
             r.Status != "Blocked");
     }
+
+    public async Task<bool> UpdateRoomStatusAsync(
+    int roomId,
+    bool isBlocked)
+{
+    var room = await _context.Rooms
+        .FirstOrDefaultAsync(r => r.RoomId == roomId);
+
+    if (room == null)
+        return false;
+
+    room.IsBlocked = isBlocked;
+
+    await _context.SaveChangesAsync();
+
+    return true;
+}
 }

@@ -2684,19 +2684,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\AmirthaGovindasamy\\.nuget\\packages\\": {}
+    "C:\\Users\\AnjushaVijayan\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj",
+      "projectUniqueName": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj",
       "projectName": "SpaceBook.Infrastructure",
-      "projectPath": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj",
-      "packagesPath": "C:\\Users\\AmirthaGovindasamy\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Infrastructure\\obj\\",
+      "projectPath": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj",
+      "packagesPath": "C:\\Users\\AnjushaVijayan\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Infrastructure\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\AmirthaGovindasamy\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\AnjushaVijayan\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -2708,11 +2708,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Application\\SpaceBook.Application.csproj": {
-              "projectPath": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Application\\SpaceBook.Application.csproj"
+            "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Application\\SpaceBook.Application.csproj": {
+              "projectPath": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Application\\SpaceBook.Application.csproj"
             },
-            "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {
-              "projectPath": "C:\\Users\\AmirthaGovindasamy\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj"
+            "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {
+              "projectPath": "C:\\Users\\AnjushaVijayan\\SpaceBook\\SpaceBook.Domain\\SpaceBook.Domain.csproj"
             }
           }
         }

@@ -21,6 +21,11 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(x => x.EmployeeId)
                .HasColumnName("employeeid");
 
+        builder.Property(x => x.MeetingTitle)
+               .HasColumnName("meetingtitle")
+               .HasMaxLength(200)
+               .IsRequired();
+
         builder.Property(x => x.Purpose)
                .HasColumnName("purpose")
                .HasMaxLength(255)
@@ -53,10 +58,12 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
 
         builder.HasOne(x => x.Room)
                .WithMany(x => x.Bookings)
-               .HasForeignKey(x => x.RoomId);
+               .HasForeignKey(x => x.RoomId)
+               .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.Employee)
                .WithMany(x => x.Bookings)
-               .HasForeignKey(x => x.EmployeeId);
+               .HasForeignKey(x => x.EmployeeId)
+               .OnDelete(DeleteBehavior.Restrict);
     }
 }

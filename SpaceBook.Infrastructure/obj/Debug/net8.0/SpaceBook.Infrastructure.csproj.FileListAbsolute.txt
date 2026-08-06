@@ -37,3 +37,4 @@ C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Infrastructure\obj\Debug\net8.0\
 C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Infrastructure\obj\Debug\net8.0\SpaceBook.Infrastructure.pdb
 C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Infrastructure\obj\Debug\net8.0\SpaceBook.Infrastructure.genruntimeconfig.cache
 C:\Users\AmirthaGovindasamy\SpaceBook\SpaceBook.Infrastructure\obj\Debug\net8.0\ref\SpaceBook.Infrastructure.dll
+C:\Users\AnjushaVijayan\SpaceBook\SpaceBook.Infrastructure\obj\Debug\net8.0\SpaceBook.Infrastructure.sourcelink.json

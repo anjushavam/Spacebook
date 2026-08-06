@@ -13,20 +13,24 @@ public class RoomService : IRoomService
         _roomRepository = roomRepository;
     }
 
+
     public async Task<RoomDashboardDto> GetDashboardAsync()
     {
         return await _roomRepository.GetDashboardAsync();
     }
+
 
     public async Task<IEnumerable<RoomDto>> GetAllAsync(RoomFilterDto filter)
     {
         return await _roomRepository.GetAllAsync(filter);
     }
 
+
     public async Task<RoomDetailsDto?> GetByIdAsync(int roomId)
     {
         return await _roomRepository.GetByIdAsync(roomId);
     }
+
 
     public async Task CreateAsync(CreateRoomDto dto)
     {
@@ -39,13 +43,22 @@ public class RoomService : IRoomService
             Status = dto.Status
         };
 
-        await _roomRepository.AddAsync(room, dto.FacilityIds);
+        await _roomRepository.AddAsync(
+            room,
+            dto.FacilityIds);
     }
 
-    public async Task UpdateAsync(int roomId, UpdateRoomDto dto)
+
+    public async Task UpdateAsync(
+        int roomId,
+        UpdateRoomDto dto)
     {
-        if (!await _roomRepository.ExistsAsync(roomId))
-            throw new Exception("Room not found.");
+        var existingRoom = await _roomRepository
+            .GetByIdAsync(roomId);
+
+        if (existingRoom == null)
+            throw new KeyNotFoundException("Room not found.");
+
 
         var room = new Room
         {
@@ -57,14 +70,49 @@ public class RoomService : IRoomService
             Status = dto.Status
         };
 
-        await _roomRepository.UpdateAsync(room, dto.FacilityIds);
+
+        await _roomRepository.UpdateAsync(
+            room,
+            dto.FacilityIds);
     }
+
 
     public async Task DeleteAsync(int roomId)
     {
-        if (!await _roomRepository.ExistsAsync(roomId))
-            throw new Exception("Room not found.");
+        var exists = await _roomRepository
+            .ExistsAsync(roomId);
+
+        if (!exists)
+            throw new KeyNotFoundException("Room not found.");
+
 
         await _roomRepository.DeleteAsync(roomId);
     }
+
+
+    public async Task<bool> UpdateRoomStatusAsync(
+        int roomId,
+        bool isBlocked)
+    {
+        return await _roomRepository
+            .UpdateRoomStatusAsync(
+                roomId,
+                isBlocked);
+    }
+    public async Task BulkCreateAsync(BulkCreateRoomDto dto)
+{
+    for (int i = 1; i <= dto.Count; i++)
+    {
+        var room = new Room
+        {
+            RoomTypeId = dto.RoomTypeId,
+            RoomName = $"Room-{i:D2}",
+            Capacity = dto.Capacity,
+            Module = dto.Module,
+            Status = dto.Status
+        };
+ 
+        await _roomRepository.AddAsync(room, dto.FacilityIds);
+    }
+}
 }

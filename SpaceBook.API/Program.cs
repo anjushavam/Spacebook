@@ -24,7 +24,15 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
- 
+
+builder.Services.AddScoped<
+    IMissedCheckInRepository,
+    MissedCheckInRepository>();
+
+builder.Services.AddScoped<
+    MissedCheckInService>();
+
+    
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
 {
@@ -55,10 +63,28 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
 builder.Services.AddScoped<IRoomService, RoomService>();
-builder.Services.AddScoped<IRoomRepository, RoomRepository>();
-builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IEmployeeBookingRepository, EmployeeBookingRepository>();
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
+builder.Services.AddScoped<IReportService, ReportService>();
+
+builder.Services.AddScoped<
+    IEmployeeCheckInService,
+    EmployeeCheckInService>();
+
+builder.Services.AddScoped<
+    IEmployeeCheckInRepository,
+    EmployeeCheckInRepository>();
+
+builder.Services.AddScoped<
+    INotificationRepository,
+    NotificationRepository>();
+
+builder.Services.AddScoped<MissedCheckInService>();
+
+
+builder.Services.AddScoped<IEmployeeBookingService, EmployeeBookingService>();
 builder.Services.AddScoped<
     IEmployeeDashboardRepository,
     EmployeeDashboardRepository>();

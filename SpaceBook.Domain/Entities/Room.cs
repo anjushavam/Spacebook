@@ -17,6 +17,7 @@ public class Room
     public RoomType? RoomType { get; set; }
  
     public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+    public bool IsBlocked { get; set; } = false;
  
     public ICollection<RoomFacility> RoomFacilities { get; set; } = new List<RoomFacility>();
 }

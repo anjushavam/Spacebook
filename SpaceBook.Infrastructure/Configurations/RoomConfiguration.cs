@@ -48,5 +48,8 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
         builder.HasMany(x => x.Bookings)
                .WithOne(x => x.Room)
                .HasForeignKey(x => x.RoomId);
+
+       builder.Property(r => r.IsBlocked)
+       .HasColumnName("isblocked");        
     }
 }
