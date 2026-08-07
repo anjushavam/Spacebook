@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpaceBook.Application.DTOs.Admin;
 using SpaceBook.Application.Interfaces;
+using SpaceBook.Application.DTOs.Employee;
 
 namespace SpaceBook.API.Controllers;
 
@@ -31,25 +32,40 @@ public class AdminNotificationController : ControllerBase
             {
                 var message = n.Message ?? string.Empty;
 
-                // Dynamically derive a clean title based on message content
-                string title = "Missed Check-in";
-                if (message.Contains("approved", StringComparison.OrdinalIgnoreCase) ||
-                    message.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
+                // Default fallback title
+                string title = "Notification";
+
+                // 1. Check for Missed Check-in FIRST to avoid matching the word "booking" in missed check-in alerts
+                if (message.Contains("missed check-in", StringComparison.OrdinalIgnoreCase) ||
+                    message.Contains("missed", StringComparison.OrdinalIgnoreCase))
+                {
+                    title = "Missed Check-in";
+                }
+                // 2. Check for Approval / Confirmation
+                else if (message.Contains("approved", StringComparison.OrdinalIgnoreCase) ||
+                         message.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
                 {
                     title = "Booking Approved";
                 }
+                // 3. Check for Rejection / Cancellation
                 else if (message.Contains("rejected", StringComparison.OrdinalIgnoreCase) ||
                          message.Contains("cancelled", StringComparison.OrdinalIgnoreCase))
                 {
                     title = "Booking Cancelled";
                 }
+                // 4. Check for New Booking Requests
                 else if (message.Contains("requested", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("pending", StringComparison.OrdinalIgnoreCase))
+                         message.Contains("submitted", StringComparison.OrdinalIgnoreCase) ||
+                         message.Contains("new booking", StringComparison.OrdinalIgnoreCase) ||
+                         message.Contains("pending", StringComparison.OrdinalIgnoreCase) ||
+                         message.Contains("booked", StringComparison.OrdinalIgnoreCase) ||
+                         message.Contains("booking", StringComparison.OrdinalIgnoreCase) ||
+                         message.Contains("reserved", StringComparison.OrdinalIgnoreCase))
                 {
                     title = "Booking Request";
                 }
 
-                // Ensure n.CreatedAt is not default (0001-01-01)
+                // Ensure n.CreatedAt is valid
                 var createdDate = n.CreatedAt == default ? DateTime.UtcNow : n.CreatedAt;
 
                 // Map DB Entity (n.CreatedAt) to NotificationDto (CreatedOn)
@@ -62,7 +78,9 @@ public class AdminNotificationController : ControllerBase
                     CreatedOn = createdDate,
                     TimeAgo = GetTimeAgo(createdDate)
                 };
-            }).ToList();
+            })
+            .OrderByDescending(x => x.NotificationId) // Ensure newest notifications appear first
+            .ToList();
 
             return Ok(response);
         }

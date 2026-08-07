@@ -1,3 +1,4 @@
+using SpaceBook.Application.DTOs.Employee;
 namespace SpaceBook.Application.DTOs.Admin;
  
 public class AdminDashboardDto

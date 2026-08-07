@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SpaceBook.Application.DTOs.Admin;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Infrastructure.Data;
+using SpaceBook.Application.DTOs.Employee;
  
 namespace SpaceBook.Infrastructure.Repositories;
  

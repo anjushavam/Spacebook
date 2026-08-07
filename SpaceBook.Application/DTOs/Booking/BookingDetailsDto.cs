@@ -4,6 +4,8 @@ public class BookingDetailsDto
 {
     public int BookingId { get; set; }
 
+    public int EmployeeId { get; set; }
+
     public string MeetingTitle { get; set; } = string.Empty;
 
     public string Purpose { get; set; } = string.Empty;
