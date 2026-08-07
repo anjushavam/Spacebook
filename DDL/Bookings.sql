@@ -2,11 +2,11 @@ CREATE TABLE Bookings
 (
     BookingId SERIAL PRIMARY KEY,
 
-    RoomNumber INT NOT NULL,
+    RoomNumber VARCHAR(100) NOT NULL,
 
-    Email VARCHAR(150) NOT NULL,
+    EmployeeId INT NOT NULL,
 
-    MeetingTitle VARCHAR(150)
+    MeetingTitle VARCHAR(200)
         NOT NULL,
 
     ParticipantCount INT
@@ -28,26 +28,21 @@ CREATE TABLE Bookings
 
     Status VARCHAR(20)
         NOT NULL
-        DEFAULT 'Booked'
-        CHECK (Status IN ('Booked','Cancelled','Rescheduled')),
+        DEFAULT 'Pending'
+        CHECK (Status IN ('Pending', 'Approved', 'Rejected', 'Cancelled')),
 
-    CONSTRAINT CK_Booking_Time
-        CHECK (StartTime < EndTime),
-
-    CONSTRAINT FK_Booking_Room
+    CONSTRAINT FK_Bookings_Rooms
         FOREIGN KEY (RoomNumber)
         REFERENCES Rooms(RoomNumber)
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
-    CONSTRAINT FK_Booking_Employee
-        FOREIGN KEY (Email)
-        REFERENCES Employees(Email)
+    CONSTRAINT FK_Bookings_Employees
+        FOREIGN KEY (EmployeeId)
+        REFERENCES Employees(EmployeeId)
         ON UPDATE CASCADE
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT,
+
+    CONSTRAINT CHK_Booking_Time
+        CHECK (EndTime > StartTime)
 );
-
-SET datestyle = 'SQL, MDY'; 
-
-
-

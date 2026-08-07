@@ -1,35 +1,30 @@
 INSERT INTO RoomFacilities
-(RoomNumber, FacilityId)
+(
+    RoomNumber,
+    FacilityId
+)
 VALUES
 
--- Training Room
-(101, 1),
+('CB-05-E01-001', 1),
 
--- Conference Room
-(102, 2),
+('CB-05-E01-002', 2),
 
--- Discussion Room 1
-(201, 2),
-(201, 3),
+('CB-05-E02-001', 2),
+('CB-05-E02-001', 3),
 
--- Discussion Room 2
-(202, 2),
-(202, 3),
+('CB-05-E02-002', 2),
+('CB-05-E02-002', 3),
 
--- Discussion Room 3
-(203, 2),
-(203, 3),
+('CB-05-E02-003', 2),
+('CB-05-E02-003', 3),
 
--- Discussion Room 4
-(204, 2),
-(204, 3),
+('CB-05-E02-004', 2),
+('CB-05-E02-004', 3),
 
--- Discussion Room 5
-(205, 2),
-(205, 3),
+('CB-05-E02-005', 2),
+('CB-05-E02-005', 3),
 
--- Discussion Room 6
-(206, 2),
-(206, 3);
+('CB-05-E02-006', 2),
+('CB-05-E02-006', 3);
 
 SELECT * FROM RoomFacilities;

@@ -6,4 +6,3 @@ CREATE TABLE Facilities
         NOT NULL
         UNIQUE
 );
-

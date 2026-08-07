@@ -1,7 +1,7 @@
-INSERT INTO Facilities(FacilityName)
+INSERT INTO Facilities (FacilityName)
 VALUES
 ('Projector'),
-('Whiteboard'),
-('TV Display');
+('TV'),
+('Whiteboard');
 
 SELECT * FROM Facilities;

@@ -1,10 +1,14 @@
 CREATE TABLE Employees
 (
-    Email VARCHAR(150) PRIMARY KEY,
+    EmployeeId SERIAL PRIMARY KEY,
 
     RoleId INT NOT NULL,
 
-    PasswordHash TEXT
+    Email VARCHAR(100)
+        NOT NULL
+        UNIQUE,
+
+    PasswordHash VARCHAR(255)
         NOT NULL,
 
     IsActive BOOLEAN
@@ -15,12 +19,10 @@ CREATE TABLE Employees
         NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT FK_Employee_Role
+    CONSTRAINT FK_Employees_Roles
         FOREIGN KEY (RoleId)
         REFERENCES Roles(RoleId)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT
 );
 
-SET datestyle = 'SQL, MDY'; 
+
 

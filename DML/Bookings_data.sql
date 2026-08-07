@@ -1,24 +1,23 @@
 INSERT INTO Bookings
 (
     RoomNumber,
-    Email,
+    EmployeeId,
     MeetingTitle,
     ParticipantCount,
     BookingDate,
     StartTime,
-    EndTime,
-    Status
+    EndTime
 )
 VALUES
 
-(101, 'diya.nair@company.com', 'Employee Training', 30, '2026-08-10', '09:00', '11:00', 'Booked'),
+('CB-05-E01-001', 2, 'Employee Training', 30, '2026-08-10', '09:00', '11:00'),
 
-(102, 'rahul.verma@company.com', 'Quarterly Review', 15, '2026-08-10', '11:30', '12:30', 'Booked'),
+('CB-05-E01-002', 3, 'Quarterly Review', 15, '2026-08-10', '11:30', '12:30'),
 
-(201, 'sneha.iyer@company.com', 'Project Discussion', 6, '2026-08-11', '10:00', '11:00', 'Rescheduled'),
+('CB-05-E02-001', 4, 'Project Discussion', 6, '2026-08-11', '10:00', '11:00'),
 
-(203, 'arjun.patel@company.com', 'Client Meeting', 8, '2026-08-11', '14:00', '15:00', 'Booked'),
+('CB-05-E02-003', 5, 'Client Meeting', 8, '2026-08-11', '14:00', '15:00'),
 
-(205, 'diya.nair@company.com', 'Sprint Planning', 7, '2026-08-12', '15:30', '16:30', 'Cancelled');
+('CB-05-E02-005', 2, 'Sprint Planning', 7, '2026-08-12', '15:30', '16:30');
 
 SELECT * FROM Bookings;

@@ -1,20 +1,20 @@
 CREATE TABLE RoomFacilities
 (
-    RoomNumber INT NOT NULL,
+    RoomNumber VARCHAR(100) NOT NULL,
 
     FacilityId INT NOT NULL,
 
     CONSTRAINT PK_RoomFacilities
-        PRIMARY KEY(RoomNumber, FacilityId),
+        PRIMARY KEY (RoomNumber, FacilityId),
 
-    CONSTRAINT FK_RoomFacilities_Room
-        FOREIGN KEY(RoomNumber)
+    CONSTRAINT FK_RoomFacilities_Rooms
+        FOREIGN KEY (RoomNumber)
         REFERENCES Rooms(RoomNumber)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
-    CONSTRAINT FK_RoomFacilities_Facility
-        FOREIGN KEY(FacilityId)
+    CONSTRAINT FK_RoomFacilities_Facilities
+        FOREIGN KEY (FacilityId)
         REFERENCES Facilities(FacilityId)
         ON UPDATE CASCADE
         ON DELETE CASCADE

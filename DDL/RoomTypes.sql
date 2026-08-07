@@ -6,4 +6,3 @@ CREATE TABLE RoomTypes
         NOT NULL
         UNIQUE
 );
-

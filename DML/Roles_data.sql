@@ -1,4 +1,3 @@
---Test
 INSERT INTO Roles (RoleName)
 VALUES
 ('Admin'),

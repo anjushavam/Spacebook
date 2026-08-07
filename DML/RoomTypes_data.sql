@@ -1,7 +1,7 @@
-INSERT INTO RoomTypes(TypeName)
+INSERT INTO RoomTypes (TypeName)
 VALUES
+('Training'),
 ('Conference'),
-('Discussion'),
-('Training');
+('Discussion');
 
 SELECT * FROM RoomTypes;
