@@ -1,4 +1,5 @@
-INSERT INTO Roles(RoleName)
+--Test
+INSERT INTO Roles (RoleName)
 VALUES
 ('Admin'),
 ('Employee');
