@@ -6,15 +6,11 @@ INSERT INTO Employees
     IsActive
 )
 VALUES
-(1, 'admin@company.com', 'hashed_admin_password', TRUE),
+(1, 'admin@valuemomentum.com', 'Admin@123', TRUE),
 
-(2, 'diya.nair@company.com', 'hashed_password_1', TRUE),
-
-(2, 'rahul.verma@company.com', 'hashed_password_2', TRUE),
-
-(2, 'sneha.iyer@company.com', 'hashed_password_3', TRUE),
-
-(2, 'arjun.patel@company.com', 'hashed_password_4', TRUE);
+(2, 'john.david@valuemomentum.com', 'John@123', TRUE);
 
 SELECT * FROM Employees;
+
+
 
