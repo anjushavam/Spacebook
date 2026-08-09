@@ -15,7 +15,7 @@ CREATE TABLE Employees
         NOT NULL
         DEFAULT TRUE,
 
-    CreatedOn TIMESTAMP
+    CreatedOn TIMESTAMPTZ
         NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
@@ -23,6 +23,9 @@ CREATE TABLE Employees
         FOREIGN KEY (RoleId)
         REFERENCES Roles(RoleId)
 );
+
+SET TIME ZONE 'Asia/Kolkata';
+SET datestyle = 'SQL, MDY'; 
 
 
 

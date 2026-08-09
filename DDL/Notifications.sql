@@ -13,7 +13,7 @@ CREATE TABLE Notifications
         NOT NULL
         DEFAULT FALSE,
 
-    CreatedAt TIMESTAMP
+    CreatedAt TIMESTAMPTZ
         NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
@@ -29,3 +29,6 @@ CREATE TABLE Notifications
         ON UPDATE CASCADE
         ON DELETE CASCADE
 );
+
+SET TIME ZONE 'Asia/Kolkata';
+SET datestyle = 'SQL, MDY'; 

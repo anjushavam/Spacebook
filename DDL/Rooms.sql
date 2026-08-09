@@ -15,7 +15,7 @@ CREATE TABLE Rooms
     Module VARCHAR(100)
         NOT NULL,
 
-    Status VARCHAR(20)
+    Status VARCHAR(100)
         NOT NULL
         DEFAULT 'Available'
         CHECK (Status IN ('Available', 'Booked', 'Maintenance')),

@@ -22,14 +22,14 @@ CREATE TABLE Bookings
     EndTime TIME
         NOT NULL,
 
-    BookedOn TIMESTAMP
+    BookedOn TIMESTAMPTZ
         NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
     Status VARCHAR(20)
         NOT NULL
         DEFAULT 'Pending'
-        CHECK (Status IN ('Pending', 'Approved', 'Rejected', 'Cancelled')),
+        CHECK (Status IN ('Pending', 'Approved', 'Rejected')),
 
     CONSTRAINT FK_Bookings_Rooms
         FOREIGN KEY (RoomNumber)
@@ -46,3 +46,6 @@ CREATE TABLE Bookings
     CONSTRAINT CHK_Booking_Time
         CHECK (EndTime > StartTime)
 );
+
+SET TIME ZONE 'Asia/Kolkata';
+SET datestyle = 'SQL, MDY'; 
