@@ -22,12 +22,19 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // ===========================
 // CORS
 // ===========================
+// ===========================
+// CORS
+// ===========================
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173")
+            .WithOrigins(
+                "http://localhost:5173", 
+                "https://your-frontend-domain.vercel.app" // Replace with your actual Vercel frontend URL
+            )
+            .SetIsOriginAllowed(origin => true) // Optional: Use this temporarily if you want to allow all origins seamlessly during deployment testing
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
