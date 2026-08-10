@@ -3261,11 +3261,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\VikashDurairaj\\backend-spacebook\\Spacebook\\SpaceBook.API\\SpaceBook.API.csproj",
+      "projectUniqueName": "C:\\Users\\VikashDurairaj\\backend-spacebook\\spacebook\\SpaceBook.API\\SpaceBook.API.csproj",
       "projectName": "SpaceBook.API",
-      "projectPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\Spacebook\\SpaceBook.API\\SpaceBook.API.csproj",
+      "projectPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\spacebook\\SpaceBook.API\\SpaceBook.API.csproj",
       "packagesPath": "C:\\Users\\VikashDurairaj\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\Spacebook\\SpaceBook.API\\obj\\",
+      "outputPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\spacebook\\SpaceBook.API\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\VikashDurairaj\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -3280,11 +3280,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\VikashDurairaj\\backend-spacebook\\Spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj": {
-              "projectPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\Spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj"
+            "C:\\Users\\VikashDurairaj\\backend-spacebook\\spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj": {
+              "projectPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj"
             },
-            "C:\\Users\\VikashDurairaj\\backend-spacebook\\Spacebook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj": {
-              "projectPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\Spacebook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj"
+            "C:\\Users\\VikashDurairaj\\backend-spacebook\\spacebook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj": {
+              "projectPath": "C:\\Users\\VikashDurairaj\\backend-spacebook\\spacebook\\SpaceBook.Infrastructure\\SpaceBook.Infrastructure.csproj"
             }
           }
         }
