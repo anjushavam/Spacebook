@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -51,9 +50,8 @@ builder.Services.AddCors(options =>
     {
         policy
             .WithOrigins(
-                "http://localhost:5173"
-                // Add your Vercel frontend URL here later
-                // "https://your-frontend.vercel.app"
+                "http://localhost:5173",
+                "https://spacebook211-jbh3egxpv-dvikash211-5241s-projects.vercel.app"
             )
             .AllowAnyHeader()
             .AllowAnyMethod();
@@ -211,9 +209,6 @@ var app = builder.Build();
 // Swagger
 // =====================================================
 
-// Enable Swagger in all environments.
-// This makes it accessible on Render as well.
-
 app.UseSwagger();
 app.UseSwaggerUI();
 
@@ -222,7 +217,7 @@ app.UseSwaggerUI();
 // =====================================================
 
 // Render handles HTTPS at the proxy level.
-// Redirect is kept here for local development.
+// Redirect is used only for local development.
 
 if (app.Environment.IsDevelopment())
 {
@@ -253,4 +248,3 @@ app.MapControllers();
 // =====================================================
 
 app.Run();
-
