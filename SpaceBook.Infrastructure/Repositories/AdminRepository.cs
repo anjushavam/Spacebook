@@ -29,12 +29,14 @@ public class AdminRepository : IAdminRepository
         dashboard.PendingApprovals = await _context.Bookings
             .CountAsync(x => x.Status == "Pending");
  
-        var totalBookings = await _context.Bookings.CountAsync();
- 
-        dashboard.Utilization =
-            dashboard.TotalRooms == 0
-            ? 0
-            : Math.Round((double)totalBookings / dashboard.TotalRooms * 100, 2);
+        // Fixed: Use today's bookings count instead of total lifetime bookings, 
+        // and cap utilization at 100% max.
+        double utilization = dashboard.TotalRooms == 0 
+            ? 0 
+            : ((double)dashboard.TodayBookings / dashboard.TotalRooms) * 100;
+
+        utilization = Math.Min(utilization, 100.0);
+        dashboard.Utilization = Math.Round(utilization, 2);
  
         dashboard.PendingApprovalList =
             await _context.Bookings
