@@ -1,3 +1,4 @@
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // =====================================================
 // Disable configuration file reload on change
-// This prevents FileSystemWatcher / inotify issues on Render
+// Prevents FileSystemWatcher / inotify issues on Render
 // =====================================================
 
 foreach (var source in builder.Configuration.Sources)
@@ -31,10 +32,10 @@ foreach (var source in builder.Configuration.Sources)
 builder.Services.AddControllers();
 
 // =====================================================
-// PostgreSQL
+// PostgreSQL / Entity Framework Core
 // =====================================================
 
-builder.Services.AddDbContext(options =>
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection")
     )
@@ -210,17 +211,23 @@ var app = builder.Build();
 // Swagger
 // =====================================================
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Enable Swagger in all environments.
+// This makes it accessible on Render as well.
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 // =====================================================
 // HTTPS
 // =====================================================
 
-app.UseHttpsRedirection();
+// Render handles HTTPS at the proxy level.
+// Redirect is kept here for local development.
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // =====================================================
 // CORS
@@ -246,3 +253,4 @@ app.MapControllers();
 // =====================================================
 
 app.Run();
+
