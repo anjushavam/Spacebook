@@ -11,41 +11,81 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Controllers
+// =====================================================
+// Disable configuration file reload on change
+// This prevents FileSystemWatcher / inotify issues on Render
+// =====================================================
+
+foreach (var source in builder.Configuration.Sources)
+{
+    if (source is Microsoft.Extensions.Configuration.Json.JsonConfigurationSource jsonSource)
+    {
+        jsonSource.ReloadOnChange = false;
+    }
+}
+
+// =====================================================
+// Controllers
+// =====================================================
+
 builder.Services.AddControllers();
 
+// =====================================================
 // PostgreSQL
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+// =====================================================
 
-// ===========================
+builder.Services.AddDbContext(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    )
+);
+
+// =====================================================
 // CORS
-// ===========================
+// =====================================================
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173")
+            .WithOrigins(
+                "http://localhost:5173"
+                // Add your Vercel frontend URL here later
+                // "https://your-frontend.vercel.app"
+            )
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
 
-// Dependency Injection
+// =====================================================
+// Dependency Injection - Authentication
+// =====================================================
+
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 
-builder.Services.AddScoped<IMissedCheckInRepository, MissedCheckInRepository>();
-builder.Services.AddScoped<MissedCheckInService>();
+// =====================================================
+// Dependency Injection - Check In
+// =====================================================
 
+builder.Services.AddScoped<IMissedCheckInRepository, MissedCheckInRepository>();
+builder.Services.AddScoped<IEmployeeCheckInRepository, EmployeeCheckInRepository>();
+builder.Services.AddScoped<IEmployeeCheckInService, EmployeeCheckInService>();
+
+// =====================================================
 // JWT Authentication
+// =====================================================
+
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme =
+        JwtBearerDefaults.AuthenticationScheme;
+
+    options.DefaultChallengeScheme =
+        JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
@@ -60,7 +100,10 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["Jwt:Audience"],
 
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+            Encoding.UTF8.GetBytes(
+                builder.Configuration["Jwt:Key"]!
+            )
+        ),
 
         ClockSkew = TimeSpan.Zero
     };
@@ -68,36 +111,59 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// =====================================================
+// Admin
+// =====================================================
+
 builder.Services.AddScoped<IAdminRepository, AdminRepository>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+
+// =====================================================
+// Room
+// =====================================================
 
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
 builder.Services.AddScoped<IRoomService, RoomService>();
 
+// =====================================================
+// Notification
+// =====================================================
+
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// =====================================================
+// Booking
+// =====================================================
 
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
+// =====================================================
+// Employee Booking
+// =====================================================
+
 builder.Services.AddScoped<IEmployeeBookingRepository, EmployeeBookingRepository>();
 builder.Services.AddScoped<IEmployeeBookingService, EmployeeBookingService>();
+
+// =====================================================
+// Reports
+// =====================================================
 
 builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
-builder.Services.AddScoped<IEmployeeCheckInRepository, EmployeeCheckInRepository>();
-builder.Services.AddScoped<IEmployeeCheckInService, EmployeeCheckInService>();
-
-builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+// =====================================================
+// Employee Dashboard
+// =====================================================
 
 builder.Services.AddScoped<IEmployeeDashboardRepository, EmployeeDashboardRepository>();
 builder.Services.AddScoped<IEmployeeDashboardService, EmployeeDashboardService>();
 
-// Example fix inside Program.cs if explicit file providers are used:
-builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
-builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false);
+// =====================================================
 // Swagger
+// =====================================================
+
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
@@ -134,26 +200,49 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// =====================================================
+// Build Application
+// =====================================================
+
 var app = builder.Build();
 
-// Middleware
+// =====================================================
+// Swagger
+// =====================================================
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// =====================================================
+// HTTPS
+// =====================================================
+
 app.UseHttpsRedirection();
 
-// ===========================
-// Enable CORS
-// ===========================
+// =====================================================
+// CORS
+// =====================================================
+
 app.UseCors("AllowReactApp");
 
-app.UseAuthentication();
+// =====================================================
+// Authentication & Authorization
+// =====================================================
 
+app.UseAuthentication();
 app.UseAuthorization();
 
+// =====================================================
+// Controllers
+// =====================================================
+
 app.MapControllers();
+
+// =====================================================
+// Run
+// =====================================================
 
 app.Run();
