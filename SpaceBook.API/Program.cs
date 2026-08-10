@@ -9,20 +9,22 @@ using SpaceBook.Infrastructure.Data;
 using SpaceBook.Infrastructure.Repositories;
 using System.Text;
 
-var builder = WebApplication.CreateBuilder(args);
-
 // =====================================================
-// Disable configuration file reload on change
+// Render / Linux configuration
+// Disable configuration file reload BEFORE creating builder
 // Prevents FileSystemWatcher / inotify issues on Render
 // =====================================================
 
-foreach (var source in builder.Configuration.Sources)
-{
-    if (source is Microsoft.Extensions.Configuration.Json.JsonConfigurationSource jsonSource)
-    {
-        jsonSource.ReloadOnChange = false;
-    }
-}
+Environment.SetEnvironmentVariable(
+    "DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE",
+    "false"
+);
+
+// =====================================================
+// Create Builder
+// =====================================================
+
+var builder = WebApplication.CreateBuilder(args);
 
 // =====================================================
 // Controllers
@@ -34,10 +36,18 @@ builder.Services.AddControllers();
 // PostgreSQL / Entity Framework Core
 // =====================================================
 
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "DefaultConnection is not configured."
+    );
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    )
+    options.UseNpgsql(connectionString)
 );
 
 // =====================================================
@@ -78,6 +88,31 @@ builder.Services.AddScoped<IEmployeeCheckInService, EmployeeCheckInService>();
 // JWT Authentication
 // =====================================================
 
+var jwtKey = builder.Configuration["Jwt:Key"];
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException(
+        "Jwt:Key is not configured."
+    );
+}
+
+if (string.IsNullOrWhiteSpace(jwtIssuer))
+{
+    throw new InvalidOperationException(
+        "Jwt:Issuer is not configured."
+    );
+}
+
+if (string.IsNullOrWhiteSpace(jwtAudience))
+{
+    throw new InvalidOperationException(
+        "Jwt:Audience is not configured."
+    );
+}
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme =
@@ -88,24 +123,24 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
+    options.TokenValidationParameters =
+        new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
 
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
 
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(
-                builder.Configuration["Jwt:Key"]!
-            )
-        ),
+            IssuerSigningKey =
+                new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(jwtKey)
+                ),
 
-        ClockSkew = TimeSpan.Zero
-    };
+            ClockSkew = TimeSpan.Zero
+        };
 });
 
 builder.Services.AddAuthorization();
@@ -173,30 +208,37 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1"
     });
 
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "Enter JWT Token",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+    // JWT Bearer
+    c.AddSecurityDefinition("Bearer",
+        new OpenApiSecurityScheme
         {
-            new OpenApiSecurityScheme
+            Description =
+                "Enter JWT token. Example: Bearer {token}",
+
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        });
+
+    c.AddSecurityRequirement(
+        new OpenApiSecurityRequirement
+        {
             {
-                Reference = new OpenApiReference
+                new OpenApiSecurityScheme
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
+                    Reference =
+                        new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "Bearer"
+                        }
+                },
+                Array.Empty<string>()
+            }
+        });
 });
 
 // =====================================================
@@ -217,7 +259,7 @@ app.UseSwaggerUI();
 // =====================================================
 
 // Render handles HTTPS at the proxy level.
-// Redirect is used only for local development.
+// Only redirect locally.
 
 if (app.Environment.IsDevelopment())
 {
