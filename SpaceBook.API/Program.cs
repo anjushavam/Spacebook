@@ -94,6 +94,9 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IEmployeeDashboardRepository, EmployeeDashboardRepository>();
 builder.Services.AddScoped<IEmployeeDashboardService, EmployeeDashboardService>();
 
+// Example fix inside Program.cs if explicit file providers are used:
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false);
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 
