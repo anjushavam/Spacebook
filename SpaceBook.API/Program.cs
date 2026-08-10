@@ -11,13 +11,6 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Disable reloadOnChange to fix Linux inotify limit crashes on Render containers
-builder.Configuration.Sources.Clear();
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false)
-    .AddEnvironmentVariables();
-
 // Add Controllers
 builder.Services.AddControllers();
 
@@ -29,6 +22,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // ===========================
 // CORS
 // ===========================
+// ===========================
+// CORS
+// ===========================
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
@@ -36,9 +32,9 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:5173", 
-                "https://spacebook211.vercel.app" // Ensure exact match without trailing slash
+                "https://spacebook211.vercel.app/" // Replace with your actual Vercel frontend URL
             )
-            .SetIsOriginAllowed(origin => true) // Optional: allows seamless testing during deployment
+            .SetIsOriginAllowed(origin => true) // Optional: Use this temporarily if you want to allow all origins seamlessly during deployment testing
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -100,9 +96,14 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IEmployeeCheckInRepository, EmployeeCheckInRepository>();
 builder.Services.AddScoped<IEmployeeCheckInService, EmployeeCheckInService>();
 
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+
 builder.Services.AddScoped<IEmployeeDashboardRepository, EmployeeDashboardRepository>();
 builder.Services.AddScoped<IEmployeeDashboardService, EmployeeDashboardService>();
 
+// Example fix inside Program.cs if explicit file providers are used:
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false);
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 
@@ -142,14 +143,17 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Middleware - Enable Swagger in production/development so Render health/docs work properly if needed
-app.UseSwagger();
-app.UseSwaggerUI();
+// Middleware
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseHttpsRedirection();
 
 // ===========================
-// Enable CORS (Must be before Authentication & Routing)
+// Enable CORS
 // ===========================
 app.UseCors("AllowReactApp");
 
