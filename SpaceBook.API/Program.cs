@@ -32,7 +32,7 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:5173", 
-                "https://your-frontend-domain.vercel.app" // Replace with your actual Vercel frontend URL
+                "https://spacebook211.vercel.app/" // Replace with your actual Vercel frontend URL
             )
             .SetIsOriginAllowed(origin => true) // Optional: Use this temporarily if you want to allow all origins seamlessly during deployment testing
             .AllowAnyHeader()
