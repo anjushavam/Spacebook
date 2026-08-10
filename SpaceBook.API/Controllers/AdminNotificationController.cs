@@ -24,51 +24,20 @@ public class AdminNotificationController : ControllerBase
     {
         try
         {
-            // Fetch raw entity records from database repository first
-            var notifications = await _notificationRepository.GetAllAsync();
+            // Fetch only admin-specific request records instead of all notifications
+            var notifications = await _notificationRepository.GetAdminNotificationsAsync();
 
             // Perform mapping in memory to prevent EF Core expression tree translation errors
             var response = notifications.Select(n =>
             {
                 var message = n.Message ?? string.Empty;
 
-                // Default fallback title
-                string title = "Notification";
+                // Default fallback title for admin view
+                string title = string.IsNullOrEmpty(n.Title) ? "Booking Request" : n.Title;
 
-                // 1. Check for Missed Check-in FIRST to avoid matching the word "booking" in missed check-in alerts
-                if (message.Contains("missed check-in", StringComparison.OrdinalIgnoreCase) ||
-                    message.Contains("missed", StringComparison.OrdinalIgnoreCase))
-                {
-                    title = "Missed Check-in";
-                }
-                // 2. Check for Approval / Confirmation
-                else if (message.Contains("approved", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
-                {
-                    title = "Booking Approved";
-                }
-                // 3. Check for Rejection / Cancellation
-                else if (message.Contains("rejected", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("cancelled", StringComparison.OrdinalIgnoreCase))
-                {
-                    title = "Booking Cancelled";
-                }
-                // 4. Check for New Booking Requests
-                else if (message.Contains("requested", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("submitted", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("new booking", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("pending", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("booked", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("booking", StringComparison.OrdinalIgnoreCase) ||
-                         message.Contains("reserved", StringComparison.OrdinalIgnoreCase))
-                {
-                    title = "Booking Request";
-                }
+                // Ensure n.CreatedOn / CreatedAt is valid
+                var createdDate = n.CreatedOn == default ? DateTime.UtcNow : n.CreatedOn;
 
-                // Ensure n.CreatedAt is valid
-                var createdDate = n.CreatedAt == default ? DateTime.UtcNow : n.CreatedAt;
-
-                // Map DB Entity (n.CreatedAt) to NotificationDto (CreatedOn)
                 return new NotificationDto
                 {
                     NotificationId = n.NotificationId,
@@ -76,13 +45,34 @@ public class AdminNotificationController : ControllerBase
                     Message = message,
                     IsRead = n.IsRead,
                     CreatedOn = createdDate,
-                    TimeAgo = GetTimeAgo(createdDate)
+                    TimeAgo = string.IsNullOrEmpty(n.TimeAgo) ? GetTimeAgo(createdDate) : n.TimeAgo
                 };
             })
             .OrderByDescending(x => x.NotificationId) // Ensure newest notifications appear first
             .ToList();
 
             return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // PATCH: api/admin/notifications/read-all
+    [HttpPatch("read-all")]
+    public async Task<IActionResult> MarkAllAsRead()
+    {
+        try
+        {
+            // Marks unread requests as read in the database
+            await _notificationRepository.MarkAllAsReadAsync(0);
+
+            return Ok(new { message = "All admin notifications marked as read." });
         }
         catch (Exception ex)
         {

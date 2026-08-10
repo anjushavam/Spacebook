@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using SpaceBook.Application.DTOs.Admin;
+using SpaceBook.Application.DTOs.Employee;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
 using SpaceBook.Infrastructure.Data;
-using SpaceBook.Application.DTOs.Employee;
 
 namespace SpaceBook.Infrastructure.Repositories;
 
@@ -16,7 +16,7 @@ public class NotificationRepository : INotificationRepository
         _context = context;
     }
 
-    // Get notifications for a specific employee
+    // Employees see only their own notifications linked by EmployeeId
     public async Task<List<NotificationDto>> GetEmployeeNotificationsAsync(int employeeId)
     {
         var list = await _context.Notifications
@@ -37,12 +37,34 @@ public class NotificationRepository : INotificationRepository
         }).ToList();
     }
 
+    // Admins see action items (requests, submissions)
+    public async Task<List<NotificationDto>> GetAdminNotificationsAsync()
+    {
+        var list = await _context.Notifications
+            .AsNoTracking()
+            .Where(n => n.Message.ToLower().Contains("request") || 
+                        n.Message.ToLower().Contains("submitted") ||
+                        n.Message.ToLower().Contains("pending"))
+            .OrderByDescending(n => n.CreatedAt)
+            .Take(50)
+            .ToListAsync();
+
+        return list.Select(n => new NotificationDto
+        {
+            NotificationId = n.NotificationId,
+            Title = "Booking Request",
+            Message = n.Message,
+            IsRead = n.IsRead,
+            CreatedOn = n.CreatedAt,
+            TimeAgo = FormatTimeAgo(n.CreatedAt)
+        }).ToList();
+    }
+
     public async Task<List<NotificationDto>> GetNotificationsForUserAsync(int employeeId)
     {
         return await GetEmployeeNotificationsAsync(employeeId);
     }
 
-    // Get all notifications (Admin)
     public async Task<List<NotificationDto>> GetAllAsync()
     {
         var list = await _context.Notifications
@@ -62,7 +84,6 @@ public class NotificationRepository : INotificationRepository
         }).ToList();
     }
 
-    // Mark all unread notifications as read for an employee
     public async Task MarkAllAsReadAsync(int employeeId)
     {
         var unread = await _context.Notifications
@@ -77,28 +98,25 @@ public class NotificationRepository : INotificationRepository
         await _context.SaveChangesAsync();
     }
 
-    // Add a new notification entity
     public async Task AddAsync(Notification notification)
     {
         await _context.Notifications.AddAsync(notification);
     }
 
-    // Save DbContext changes
     public async Task SaveChangesAsync()
     {
         await _context.SaveChangesAsync();
     }
 
-    // Helper: Infer title from message context
     private static string DeriveTitle(string message)
     {
         if (string.IsNullOrWhiteSpace(message)) return "Notification";
-        if (message.Contains("confirm", StringComparison.OrdinalIgnoreCase) || message.Contains("reserv", StringComparison.OrdinalIgnoreCase)) return "Booking confirmed";
-        if (message.Contains("remind", StringComparison.OrdinalIgnoreCase) || message.Contains("start", StringComparison.OrdinalIgnoreCase)) return "Reminder";
-        return "Policy update";
+        if (message.Contains("approve", StringComparison.OrdinalIgnoreCase) || message.Contains("confirm", StringComparison.OrdinalIgnoreCase)) return "Booking Approved";
+        if (message.Contains("reject", StringComparison.OrdinalIgnoreCase) || message.Contains("cancel", StringComparison.OrdinalIgnoreCase)) return "Booking Cancelled";
+        if (message.Contains("missed", StringComparison.OrdinalIgnoreCase)) return "Missed Check-in";
+        return "Notification";
     }
 
-    // Helper: Relative time string formatter
     private static string FormatTimeAgo(DateTime created)
     {
         var span = DateTime.UtcNow - created;
