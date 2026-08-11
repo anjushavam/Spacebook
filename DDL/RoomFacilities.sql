@@ -1,8 +1,13 @@
 CREATE TABLE RoomFacilities
 (
-    RoomNumber VARCHAR(100) NOT NULL,
+    RoomNumber VARCHAR(100),
 
-    FacilityId INT NOT NULL,
+    FacilityId INT,
+
+    RecordIngestedBy VARCHAR(100),
+    RecordIngestedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    RecordModifiedBy VARCHAR(100),
+    RecordModifiedOn TIMESTAMPTZ,
 
     CONSTRAINT PK_RoomFacilities
         PRIMARY KEY (RoomNumber, FacilityId),
@@ -20,3 +25,5 @@ CREATE TABLE RoomFacilities
         ON DELETE CASCADE
 );
 
+SET TIME ZONE 'Asia/Kolkata';
+SET datestyle = 'SQL, MDY';

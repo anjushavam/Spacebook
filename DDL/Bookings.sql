@@ -6,30 +6,27 @@ CREATE TABLE Bookings
 
     EmployeeId INT NOT NULL,
 
-    MeetingTitle VARCHAR(200)
-        NOT NULL,
+    MeetingTitle VARCHAR(200) NOT NULL,
 
     ParticipantCount INT
-        NOT NULL
         CHECK (ParticipantCount > 0),
 
-    BookingDate DATE
-        NOT NULL,
+    BookingDate DATE NOT NULL,
 
-    StartTime TIME
-        NOT NULL,
+    StartTime TIME NOT NULL,
 
-    EndTime TIME
-        NOT NULL,
+    EndTime TIME NOT NULL,
 
-    BookedOn TIMESTAMPTZ
-        NOT NULL
-        DEFAULT CURRENT_TIMESTAMP,
+    BookedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
     Status VARCHAR(20)
-        NOT NULL
         DEFAULT 'Pending'
-        CHECK (Status IN ('Pending', 'Approved', 'Rejected')),
+        CHECK (Status IN ('Pending', 'Approved', 'Rejected','Cancelled')),
+
+    RecordIngestedBy VARCHAR(100),
+    RecordIngestedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    RecordModifiedBy VARCHAR(100),
+    RecordModifiedOn TIMESTAMPTZ,
 
     CONSTRAINT FK_Bookings_Rooms
         FOREIGN KEY (RoomNumber)
@@ -48,4 +45,5 @@ CREATE TABLE Bookings
 );
 
 SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY'; 
+SET datestyle = 'SQL, MDY';
+

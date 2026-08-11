@@ -1,7 +1,12 @@
-INSERT INTO RoomTypes (TypeName)
+INSERT INTO RoomTypes
+(
+    RoomTypeId,
+    TypeName,
+    RecordIngestedBy
+)
 VALUES
-('Training'),
-('Conference'),
-('Discussion');
+(1, 'Conference', '105508'),
+(2, 'Discussion', '105508'),
+(3, 'Training', '105508');
 
 SELECT * FROM RoomTypes;

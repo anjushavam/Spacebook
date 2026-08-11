@@ -4,18 +4,23 @@ CREATE TABLE Notifications
 
     EmployeeId INT NOT NULL,
 
+    EmployeeName VARCHAR(100) NOT NULL,
+
     BookingId INT NOT NULL,
 
-    Message VARCHAR(500)
-        NOT NULL,
+    Message VARCHAR(500) NOT NULL,
 
-    IsRead BOOLEAN
-        NOT NULL
-        DEFAULT FALSE,
+    IsRead BOOLEAN DEFAULT FALSE,
 
-    CreatedAt TIMESTAMPTZ
-        NOT NULL
-        DEFAULT CURRENT_TIMESTAMP,
+    CreatedAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    RecordIngestedBy VARCHAR(100),
+
+    RecordIngestedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    RecordModifiedBy VARCHAR(100),
+
+    RecordModifiedOn TIMESTAMPTZ,
 
     CONSTRAINT FK_Notifications_Employees
         FOREIGN KEY (EmployeeId)
@@ -31,4 +36,4 @@ CREATE TABLE Notifications
 );
 
 SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY'; 
+SET datestyle = 'SQL, MDY';

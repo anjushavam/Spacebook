@@ -4,21 +4,20 @@ CREATE TABLE Rooms
 
     RoomTypeId INT NOT NULL,
 
-    RoomName VARCHAR(100)
-        NOT NULL
-        UNIQUE,
+    RoomName VARCHAR(100) UNIQUE,
 
-    Capacity INT
-        NOT NULL
-        CHECK (Capacity > 0),
+    Capacity INT CHECK (Capacity > 0),
 
-    Module VARCHAR(100)
-        NOT NULL,
+    Module VARCHAR(100),
 
-    Status VARCHAR(100)
-        NOT NULL
+    Status VARCHAR(20)
         DEFAULT 'Available'
         CHECK (Status IN ('Available', 'Booked', 'Maintenance')),
+
+    RecordIngestedBy VARCHAR(100),
+    RecordIngestedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    RecordModifiedBy VARCHAR(100),
+    RecordModifiedOn TIMESTAMPTZ,
 
     CONSTRAINT FK_Rooms_RoomTypes
         FOREIGN KEY (RoomTypeId)
@@ -26,3 +25,6 @@ CREATE TABLE Rooms
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
+
+SET TIME ZONE 'Asia/Kolkata';
+SET datestyle = 'SQL, MDY';

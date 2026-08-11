@@ -1,6 +1,11 @@
-INSERT INTO Roles (RoleName)
+INSERT INTO Roles
+(
+    RoleId,
+    RoleName,
+    RecordIngestedBy
+)
 VALUES
-('Admin'),
-('Employee');
+(1, 'Admin', '105508'),
+(2, 'Employee', '105508');
 
 SELECT * FROM Roles;

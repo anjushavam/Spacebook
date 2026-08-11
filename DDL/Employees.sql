@@ -1,33 +1,28 @@
 CREATE TABLE Employees
 (
-    EmployeeId SERIAL PRIMARY KEY,
+    EmployeeId INT PRIMARY KEY,
+
+    EmployeeName VARCHAR(100) NOT NULL,
 
     RoleId INT NOT NULL,
 
-    Email VARCHAR(100)
-        NOT NULL
-        UNIQUE,
+    Email VARCHAR(150) NOT NULL UNIQUE,
 
-    PasswordHash VARCHAR(255)
-        NOT NULL,
+    PasswordHash VARCHAR(255) NOT NULL,
 
-    IsActive BOOLEAN
-        NOT NULL
-        DEFAULT TRUE,
+    IsActive BOOLEAN DEFAULT TRUE,
 
-    CreatedOn TIMESTAMPTZ
-        NOT NULL
-        DEFAULT CURRENT_TIMESTAMP,
+    RecordIngestedBy VARCHAR(100),
+    RecordIngestedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    RecordModifiedBy VARCHAR(100),
+    RecordModifiedOn TIMESTAMPTZ,
 
     CONSTRAINT FK_Employees_Roles
         FOREIGN KEY (RoleId)
         REFERENCES Roles(RoleId)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
 );
 
 SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY'; 
-
-
-
-
-
+SET datestyle = 'SQL, MDY';
