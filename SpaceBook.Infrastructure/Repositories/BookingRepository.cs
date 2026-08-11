@@ -15,28 +15,32 @@ public class BookingRepository : IBookingRepository
         _context = context;
     }
 
-
+    // =========================================================
     // Dashboard
+    // =========================================================
+
     public async Task<BookingDashboardDto> GetDashboardAsync()
     {
         return new BookingDashboardDto
         {
             PendingRequests =
                 await _context.Bookings
-                .CountAsync(x => x.Status == "Pending"),
+                    .CountAsync(x => x.Status == "Pending"),
 
             Confirmed =
                 await _context.Bookings
-                .CountAsync(x => x.Status == "Approved"),
+                    .CountAsync(x => x.Status == "Approved"),
 
             Cancelled =
                 await _context.Bookings
-                .CountAsync(x => x.Status == "Cancelled")
+                    .CountAsync(x => x.Status == "Cancelled")
         };
     }
 
-
+    // =========================================================
     // Get All Bookings
+    // =========================================================
+
     public async Task<IEnumerable<BookingDto>> GetAllAsync(
         BookingFilterDto filter)
     {
@@ -45,7 +49,6 @@ public class BookingRepository : IBookingRepository
             .Include(x => x.Employee)
             .AsQueryable();
 
-
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             query = query.Where(x =>
@@ -53,13 +56,11 @@ public class BookingRepository : IBookingRepository
                 x.Room!.RoomName.Contains(filter.Search));
         }
 
-
         if (!string.IsNullOrWhiteSpace(filter.Status))
         {
             query = query.Where(x =>
                 x.Status == filter.Status);
         }
-
 
         return await query
             .OrderByDescending(x => x.BookedOn)
@@ -77,9 +78,10 @@ public class BookingRepository : IBookingRepository
             .ToListAsync();
     }
 
-
-
+    // =========================================================
     // Get Booking By Id
+    // =========================================================
+
     public async Task<BookingDetailsDto?> GetByIdAsync(
         int bookingId)
     {
@@ -90,26 +92,43 @@ public class BookingRepository : IBookingRepository
             .Select(x => new BookingDetailsDto
             {
                 BookingId = x.BookingId,
+
+                // IMPORTANT:
+                // This was missing before.
+                // It is required for employee notifications.
+                EmployeeId = x.EmployeeId,
+
+                MeetingTitle = x.MeetingTitle,
+
                 Purpose = x.Purpose,
+
                 ParticipantCount = x.ParticipantCount,
+
                 RoomName = x.Room!.RoomName,
+
                 EmployeeName = x.Employee!.Name,
+
                 BookingDate = x.BookingDate,
+
                 StartTime = x.StartTime,
+
                 EndTime = x.EndTime,
-                Status = x.Status
+
+                Status = x.Status,
+
+                BookedOn = x.BookedOn
             })
             .FirstOrDefaultAsync();
     }
 
-
-
+    // =========================================================
     // Approve Booking
+    // =========================================================
+
     public async Task ApproveAsync(int bookingId)
     {
         var booking =
             await _context.Bookings.FindAsync(bookingId);
-
 
         if (booking != null)
         {
@@ -119,14 +138,14 @@ public class BookingRepository : IBookingRepository
         }
     }
 
-
-
+    // =========================================================
     // Reject Booking
+    // =========================================================
+
     public async Task RejectAsync(int bookingId)
     {
         var booking =
             await _context.Bookings.FindAsync(bookingId);
-
 
         if (booking != null)
         {
@@ -136,14 +155,14 @@ public class BookingRepository : IBookingRepository
         }
     }
 
-
-
+    // =========================================================
     // Delete Booking
+    // =========================================================
+
     public async Task DeleteAsync(int bookingId)
     {
         var booking =
             await _context.Bookings.FindAsync(bookingId);
-
 
         if (booking != null)
         {
@@ -153,19 +172,21 @@ public class BookingRepository : IBookingRepository
         }
     }
 
-
-
+    // =========================================================
     // Check Booking Exists
+    // =========================================================
+
     public async Task<bool> ExistsAsync(int bookingId)
     {
         return await _context.Bookings
             .AnyAsync(x => x.BookingId == bookingId);
     }
 
-
-
+    // =========================================================
     // Check Room Availability
     // Prevent Double Booking
+    // =========================================================
+
     public async Task<bool> IsRoomAvailableAsync(
         int roomId,
         DateOnly bookingDate,
@@ -174,20 +195,17 @@ public class BookingRepository : IBookingRepository
     {
         return !await _context.Bookings.AnyAsync(b =>
             b.RoomId == roomId &&
-
             b.BookingDate == bookingDate &&
-
             b.Status != "Cancelled" &&
-
             startTime < b.EndTime &&
-
             endTime > b.StartTime
         );
     }
 
-
-
+    // =========================================================
     // Create Booking
+    // =========================================================
+
     public async Task AddAsync(
         Booking booking)
     {
