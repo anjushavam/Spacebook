@@ -33,10 +33,15 @@ public class NotificationRepository : INotificationRepository
         return list.Select(n => new NotificationDto
         {
             NotificationId = n.NotificationId,
+
             Title = DeriveTitle(n.Message),
+
             Message = n.Message,
+
             IsRead = n.IsRead,
+
             CreatedOn = n.CreatedAt,
+
             TimeAgo = FormatTimeAgo(n.CreatedAt)
         }).ToList();
     }
@@ -60,10 +65,15 @@ public class NotificationRepository : INotificationRepository
         return list.Select(n => new NotificationDto
         {
             NotificationId = n.NotificationId,
+
             Title = "Booking Request",
+
             Message = n.Message,
+
             IsRead = n.IsRead,
+
             CreatedOn = n.CreatedAt,
+
             TimeAgo = FormatTimeAgo(n.CreatedAt)
         }).ToList();
     }
@@ -93,10 +103,15 @@ public class NotificationRepository : INotificationRepository
         return list.Select(n => new NotificationDto
         {
             NotificationId = n.NotificationId,
+
             Title = DeriveTitle(n.Message),
+
             Message = n.Message,
+
             IsRead = n.IsRead,
+
             CreatedOn = n.CreatedAt,
+
             TimeAgo = FormatTimeAgo(n.CreatedAt)
         }).ToList();
     }
@@ -140,7 +155,7 @@ public class NotificationRepository : INotificationRepository
     }
 
     // =========================================================
-    // Derive Notification Title
+    // Notification Title
     // =========================================================
 
     private static string DeriveTitle(string message)
@@ -150,18 +165,13 @@ public class NotificationRepository : INotificationRepository
             return "Notification";
         }
 
-        // Approval
         if (message.Contains(
                 "approve",
-                StringComparison.OrdinalIgnoreCase) ||
-            message.Contains(
-                "confirm",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Booking Approved";
         }
 
-        // Rejection
         if (message.Contains(
                 "reject",
                 StringComparison.OrdinalIgnoreCase))
@@ -169,7 +179,6 @@ public class NotificationRepository : INotificationRepository
             return "Booking Rejected";
         }
 
-        // Cancellation
         if (message.Contains(
                 "cancel",
                 StringComparison.OrdinalIgnoreCase))
@@ -177,12 +186,21 @@ public class NotificationRepository : INotificationRepository
             return "Booking Cancelled";
         }
 
-        // Missed check-in
         if (message.Contains(
                 "missed",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Missed Check-in";
+        }
+
+        if (message.Contains(
+                "request",
+                StringComparison.OrdinalIgnoreCase) ||
+            message.Contains(
+                "submitted",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Booking Request";
         }
 
         return "Notification";
@@ -194,13 +212,15 @@ public class NotificationRepository : INotificationRepository
 
     private static string FormatTimeAgo(DateTime created)
     {
-        var utcCreated = created.Kind == DateTimeKind.Unspecified
-            ? DateTime.SpecifyKind(
-                created,
-                DateTimeKind.Utc)
-            : created.ToUniversalTime();
+        var utcCreated =
+            created.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(
+                    created,
+                    DateTimeKind.Utc)
+                : created.ToUniversalTime();
 
-        var span = DateTime.UtcNow - utcCreated;
+        var span =
+            DateTime.UtcNow - utcCreated;
 
         if (span.TotalSeconds < 60)
         {

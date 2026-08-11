@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SpaceBook.Application.DTOs.Employee;
 using SpaceBook.Application.Interfaces;
 
 namespace SpaceBook.API.Controllers;
@@ -89,7 +88,8 @@ public class EmployeeNotificationController : ControllerBase
 
             return Ok(new
             {
-                message = "All notifications marked as read."
+                message =
+                    "All notifications marked as read."
             });
         }
         catch (Exception ex)

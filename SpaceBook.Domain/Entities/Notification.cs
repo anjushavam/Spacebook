@@ -14,7 +14,6 @@ public class Notification
 
     public DateTime CreatedAt { get; set; }
 
-
     public Employee? Employee { get; set; }
 
     public Booking? Booking { get; set; }

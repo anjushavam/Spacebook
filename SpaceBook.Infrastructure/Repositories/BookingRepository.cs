@@ -93,9 +93,8 @@ public class BookingRepository : IBookingRepository
             {
                 BookingId = x.BookingId,
 
-                // IMPORTANT:
-                // This was missing before.
-                // It is required for employee notifications.
+                // IMPORTANT
+                // This is required for employee notifications.
                 EmployeeId = x.EmployeeId,
 
                 MeetingTitle = x.MeetingTitle,
@@ -184,7 +183,6 @@ public class BookingRepository : IBookingRepository
 
     // =========================================================
     // Check Room Availability
-    // Prevent Double Booking
     // =========================================================
 
     public async Task<bool> IsRoomAvailableAsync(
@@ -206,8 +204,7 @@ public class BookingRepository : IBookingRepository
     // Create Booking
     // =========================================================
 
-    public async Task AddAsync(
-        Booking booking)
+    public async Task AddAsync(Booking booking)
     {
         await _context.Bookings.AddAsync(booking);
 
