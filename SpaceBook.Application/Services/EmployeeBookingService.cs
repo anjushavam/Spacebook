@@ -17,7 +17,6 @@ public class EmployeeBookingService : IEmployeeBookingService
         _notificationRepository = notificationRepository;
     }
 
-
     // =========================================================
     // Create Booking
     // =========================================================
@@ -29,10 +28,8 @@ public class EmployeeBookingService : IEmployeeBookingService
         // Validate time
         if (request.StartTime >= request.EndTime)
         {
-            throw new Exception(
-                "End time must be after start time.");
+            throw new Exception("End time must be after start time.");
         }
-
 
         // Check availability
         bool isAvailable =
@@ -42,96 +39,79 @@ public class EmployeeBookingService : IEmployeeBookingService
                 request.StartTime,
                 request.EndTime);
 
-
         if (!isAvailable)
         {
             throw new Exception(
                 "Room is already booked for the selected time.");
         }
 
-
-        // ---------------------------------------------------------
-        // Resolve Purpose and Meeting Title
-        // ---------------------------------------------------------
-
+        // Resolve purpose
         string resolvedPurpose =
             !string.IsNullOrWhiteSpace(request.Purpose)
                 ? request.Purpose
-                : (!string.IsNullOrWhiteSpace(request.MeetingTitle)
+                : !string.IsNullOrWhiteSpace(request.MeetingTitle)
                     ? request.MeetingTitle
-                    : "Reserved Workspace");
+                    : "Reserved Workspace";
 
-
+        // Resolve meeting title
         string resolvedTitle =
             !string.IsNullOrWhiteSpace(request.MeetingTitle)
                 ? request.MeetingTitle
                 : resolvedPurpose;
 
-
-        // ---------------------------------------------------------
-        // Create Booking
-        // ---------------------------------------------------------
-
+        // Create booking
         var booking = new Booking
         {
             RoomId = request.RoomId,
-
             EmployeeId = employeeId,
-
             MeetingTitle = resolvedTitle,
-
             Purpose = resolvedPurpose,
-
             ParticipantCount = request.ParticipantCount,
-
             BookingDate = request.BookingDate,
-
             StartTime = request.StartTime,
-
             EndTime = request.EndTime,
-
             BookedOn = DateTime.UtcNow,
-
             Status = "Pending"
         };
 
-
         try
         {
-            // Save booking first.
-            // This generates BookingId.
+            // -------------------------------------------------
+            // STEP 1: Save booking first
+            // This generates BookingId
+            // -------------------------------------------------
+
             await _bookingRepository.CreateBookingAsync(booking);
 
+            await _bookingRepository.SaveChangesAsync();
 
-            // ---------------------------------------------------------
-            // Create Admin Notification
-            // ---------------------------------------------------------
+            // At this point:
+            // booking.BookingId contains the real database ID
+
+            // -------------------------------------------------
+            // STEP 2: Create admin notification
+            // -------------------------------------------------
 
             var adminNotification = new Notification
             {
-                // Employee who submitted the booking
                 EmployeeId = employeeId,
-
-                // IMPORTANT:
-                // Connect notification to the booking
                 BookingId = booking.BookingId,
 
                 Message =
                     $"New booking request submitted for {resolvedTitle}.",
 
                 IsRead = false,
-
                 CreatedAt = DateTime.UtcNow
             };
-
 
             await _notificationRepository.AddAsync(
                 adminNotification);
 
+            // -------------------------------------------------
+            // STEP 3: Save notification
+            // -------------------------------------------------
 
-            // Save both Booking and Notification
-            await _bookingRepository.SaveChangesAsync();
-
+            await _notificationRepository.SaveChangesAsync();
 
             return booking.BookingId;
         }
@@ -142,7 +122,6 @@ public class EmployeeBookingService : IEmployeeBookingService
                 ex);
         }
     }
-
 
     // =========================================================
     // View Booking
@@ -157,7 +136,6 @@ public class EmployeeBookingService : IEmployeeBookingService
             employeeId);
     }
 
-
     // =========================================================
     // Cancel Booking
     // =========================================================
@@ -171,35 +149,28 @@ public class EmployeeBookingService : IEmployeeBookingService
                 bookingId,
                 employeeId);
 
-
         if (result)
         {
             var adminNotification = new Notification
             {
                 EmployeeId = employeeId,
-
                 BookingId = bookingId,
 
                 Message =
                     $"Booking #{bookingId} was cancelled by employee.",
 
                 IsRead = false,
-
                 CreatedAt = DateTime.UtcNow
             };
-
 
             await _notificationRepository.AddAsync(
                 adminNotification);
 
-
-            await _bookingRepository.SaveChangesAsync();
+            await _notificationRepository.SaveChangesAsync();
         }
-
 
         return result;
     }
-
 
     // =========================================================
     // Update / Reschedule Booking
@@ -217,47 +188,29 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "End time must be after start time.");
         }
 
-
-        // ---------------------------------------------------------
-        // Get Existing Booking
-        // ---------------------------------------------------------
-
+        // Get existing booking
         var existingBooking =
             await _bookingRepository.GetBookingByIdAsync(
                 bookingId,
                 employeeId);
 
-
         if (existingBooking == null)
         {
-            throw new Exception(
-                "Booking not found.");
+            throw new Exception("Booking not found.");
         }
 
-
-        // ---------------------------------------------------------
-        // SLA Check
-        // Cannot update within 1 hour
-        // ---------------------------------------------------------
-
+        // SLA check
         var bookingStartDateTime =
-            existingBooking.BookingDate
-                .ToDateTime(existingBooking.StartTime);
+            existingBooking.BookingDate.ToDateTime(
+                existingBooking.StartTime);
 
-
-        if (
-            DateTime.Now >=
-            bookingStartDateTime.AddHours(-1))
+        if (DateTime.Now >= bookingStartDateTime.AddHours(-1))
         {
             throw new Exception(
                 "Booking cannot be rescheduled within 1 hour before start time.");
         }
 
-
-        // ---------------------------------------------------------
-        // Check New Slot Availability
-        // ---------------------------------------------------------
-
+        // Check new slot availability
         bool isAvailable =
             await _bookingRepository.IsRoomAvailableAsync(
                 request.RoomId,
@@ -266,17 +219,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                 request.EndTime,
                 bookingId);
 
-
         if (!isAvailable)
         {
             throw new Exception(
                 "Room is already booked for the selected time.");
         }
-
-
-        // ---------------------------------------------------------
-        // Update Booking
-        // ---------------------------------------------------------
 
         bool updated =
             await _bookingRepository.UpdateBookingAsync(
@@ -284,35 +231,28 @@ public class EmployeeBookingService : IEmployeeBookingService
                 employeeId,
                 request);
 
-
         if (updated)
         {
             var adminNotification = new Notification
             {
                 EmployeeId = employeeId,
-
                 BookingId = bookingId,
 
                 Message =
                     $"Booking #{bookingId} was rescheduled by employee.",
 
                 IsRead = false,
-
                 CreatedAt = DateTime.UtcNow
             };
-
 
             await _notificationRepository.AddAsync(
                 adminNotification);
 
-
-            await _bookingRepository.SaveChangesAsync();
+            await _notificationRepository.SaveChangesAsync();
         }
-
 
         return updated;
     }
-
 
     // =========================================================
     // Search Available Rooms
