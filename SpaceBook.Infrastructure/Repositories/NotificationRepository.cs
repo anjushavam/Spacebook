@@ -16,8 +16,12 @@ public class NotificationRepository : INotificationRepository
         _context = context;
     }
 
-    // Employees see only their own notifications linked by EmployeeId
-    public async Task<List<NotificationDto>> GetEmployeeNotificationsAsync(int employeeId)
+    // =========================================================
+    // Employee Notifications
+    // =========================================================
+
+    public async Task<List<NotificationDto>> GetEmployeeNotificationsAsync(
+        int employeeId)
     {
         var list = await _context.Notifications
             .AsNoTracking()
@@ -37,14 +41,18 @@ public class NotificationRepository : INotificationRepository
         }).ToList();
     }
 
-    // Admins see action items (requests, submissions)
+    // =========================================================
+    // Admin Notifications
+    // =========================================================
+
     public async Task<List<NotificationDto>> GetAdminNotificationsAsync()
     {
         var list = await _context.Notifications
             .AsNoTracking()
-            .Where(n => n.Message.ToLower().Contains("request") || 
-                        n.Message.ToLower().Contains("submitted") ||
-                        n.Message.ToLower().Contains("pending"))
+            .Where(n =>
+                n.Message.ToLower().Contains("request") ||
+                n.Message.ToLower().Contains("submitted") ||
+                n.Message.ToLower().Contains("pending"))
             .OrderByDescending(n => n.CreatedAt)
             .Take(50)
             .ToListAsync();
@@ -60,10 +68,19 @@ public class NotificationRepository : INotificationRepository
         }).ToList();
     }
 
-    public async Task<List<NotificationDto>> GetNotificationsForUserAsync(int employeeId)
+    // =========================================================
+    // Generic User Notifications
+    // =========================================================
+
+    public async Task<List<NotificationDto>> GetNotificationsForUserAsync(
+        int employeeId)
     {
         return await GetEmployeeNotificationsAsync(employeeId);
     }
+
+    // =========================================================
+    // Get All Notifications
+    // =========================================================
 
     public async Task<List<NotificationDto>> GetAllAsync()
     {
@@ -84,44 +101,127 @@ public class NotificationRepository : INotificationRepository
         }).ToList();
     }
 
+    // =========================================================
+    // Mark Employee Notifications As Read
+    // =========================================================
+
     public async Task MarkAllAsReadAsync(int employeeId)
     {
-        var unread = await _context.Notifications
-            .Where(n => n.EmployeeId == employeeId && !n.IsRead)
+        var unreadNotifications = await _context.Notifications
+            .Where(n =>
+                n.EmployeeId == employeeId &&
+                !n.IsRead)
             .ToListAsync();
 
-        foreach (var item in unread)
+        foreach (var notification in unreadNotifications)
         {
-            item.IsRead = true;
+            notification.IsRead = true;
         }
 
         await _context.SaveChangesAsync();
     }
+
+    // =========================================================
+    // Add Notification
+    // =========================================================
 
     public async Task AddAsync(Notification notification)
     {
         await _context.Notifications.AddAsync(notification);
     }
 
+    // =========================================================
+    // Save Changes
+    // =========================================================
+
     public async Task SaveChangesAsync()
     {
         await _context.SaveChangesAsync();
     }
 
+    // =========================================================
+    // Derive Notification Title
+    // =========================================================
+
     private static string DeriveTitle(string message)
     {
-        if (string.IsNullOrWhiteSpace(message)) return "Notification";
-        if (message.Contains("approve", StringComparison.OrdinalIgnoreCase) || message.Contains("confirm", StringComparison.OrdinalIgnoreCase)) return "Booking Approved";
-        if (message.Contains("reject", StringComparison.OrdinalIgnoreCase) || message.Contains("cancel", StringComparison.OrdinalIgnoreCase)) return "Booking Cancelled";
-        if (message.Contains("missed", StringComparison.OrdinalIgnoreCase)) return "Missed Check-in";
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return "Notification";
+        }
+
+        // Approval
+        if (message.Contains(
+                "approve",
+                StringComparison.OrdinalIgnoreCase) ||
+            message.Contains(
+                "confirm",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Booking Approved";
+        }
+
+        // Rejection
+        if (message.Contains(
+                "reject",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Booking Rejected";
+        }
+
+        // Cancellation
+        if (message.Contains(
+                "cancel",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Booking Cancelled";
+        }
+
+        // Missed check-in
+        if (message.Contains(
+                "missed",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Missed Check-in";
+        }
+
         return "Notification";
     }
 
+    // =========================================================
+    // Time Ago
+    // =========================================================
+
     private static string FormatTimeAgo(DateTime created)
     {
-        var span = DateTime.UtcNow - created;
-        if (span.TotalMinutes < 60) return $"{Math.Max(1, (int)span.TotalMinutes)}M\nAGO";
-        if (span.TotalHours < 24) return $"{(int)span.TotalHours}H\nAGO";
-        return $"{(int)span.TotalDays}D\nAGO";
+        var utcCreated = created.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(
+                created,
+                DateTimeKind.Utc)
+            : created.ToUniversalTime();
+
+        var span = DateTime.UtcNow - utcCreated;
+
+        if (span.TotalSeconds < 60)
+        {
+            return "Just now";
+        }
+
+        if (span.TotalMinutes < 60)
+        {
+            return $"{(int)span.TotalMinutes}m ago";
+        }
+
+        if (span.TotalHours < 24)
+        {
+            return $"{(int)span.TotalHours}h ago";
+        }
+
+        if (span.TotalDays < 7)
+        {
+            return $"{(int)span.TotalDays}d ago";
+        }
+
+        return utcCreated.ToString("MMM dd, yyyy");
     }
 }
