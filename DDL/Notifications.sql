@@ -4,8 +4,6 @@ CREATE TABLE Notifications
 
     EmployeeId INT NOT NULL,
 
-    EmployeeName VARCHAR(100) NOT NULL,
-
     BookingId INT NOT NULL,
 
     Message VARCHAR(500) NOT NULL,
@@ -26,13 +24,13 @@ CREATE TABLE Notifications
         FOREIGN KEY (EmployeeId)
         REFERENCES Employees(EmployeeId)
         ON UPDATE CASCADE
-        ON DELETE CASCADE,
+        ON DELETE RESTRICT,
 
     CONSTRAINT FK_Notifications_Bookings
         FOREIGN KEY (BookingId)
         REFERENCES Bookings(BookingId)
         ON UPDATE CASCADE
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
 );
 
 SET TIME ZONE 'Asia/Kolkata';
