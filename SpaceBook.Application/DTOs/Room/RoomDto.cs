@@ -13,4 +13,6 @@ public class RoomDto
     public string Module { get; set; } = string.Empty;
 
     public string Status { get; set; } = string.Empty;
+
+    public List<string> Facilities { get; set; } = new();
 }

@@ -17,8 +17,10 @@ public class RoomController : ControllerBase
         _roomService = roomService;
     }
 
-
+    // =========================================================
     // GET: api/admin/rooms/dashboard
+    // =========================================================
+
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard()
     {
@@ -27,9 +29,10 @@ public class RoomController : ControllerBase
         return Ok(result);
     }
 
-
+    // =========================================================
     // GET: api/admin/rooms
-    // Supports filtering
+    // =========================================================
+
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] RoomFilterDto filter)
@@ -39,8 +42,10 @@ public class RoomController : ControllerBase
         return Ok(rooms);
     }
 
-
+    // =========================================================
     // GET: api/admin/rooms/{id}
+    // =========================================================
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -57,22 +62,26 @@ public class RoomController : ControllerBase
         return Ok(room);
     }
 
-
+    // =========================================================
     // POST: api/admin/rooms
-    [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromBody] CreateRoomDto dto)
+    // =========================================================
+
+   [HttpPost]
+public async Task<IActionResult> Create(
+    [FromBody] CreateRoomDto dto)
+{
+    await _roomService.CreateAsync(dto);
+
+    return Ok(new
     {
-        await _roomService.CreateAsync(dto);
+        message = "Room created successfully."
+    });
+}
 
-        return Ok(new
-        {
-            message = "Room created successfully."
-        });
-    }
-
-
+    // =========================================================
     // PUT: api/admin/rooms/{id}
+    // =========================================================
+
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(
         int id,
@@ -86,8 +95,10 @@ public class RoomController : ControllerBase
         });
     }
 
-
+    // =========================================================
     // DELETE: api/admin/rooms/{id}
+    // =========================================================
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -99,9 +110,10 @@ public class RoomController : ControllerBase
         });
     }
 
-
+    // =========================================================
     // PATCH: api/admin/rooms/{id}/status
-    // Block / Unblock room
+    // =========================================================
+
     [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateRoomStatus(
         int id,
@@ -111,7 +123,6 @@ public class RoomController : ControllerBase
             id,
             dto.IsBlocked);
 
-
         if (!result)
         {
             return NotFound(new
@@ -120,7 +131,6 @@ public class RoomController : ControllerBase
             });
         }
 
-
         return Ok(new
         {
             message = dto.IsBlocked
@@ -128,14 +138,20 @@ public class RoomController : ControllerBase
                 : "Room unblocked successfully."
         });
     }
-[HttpPost("bulk")]
-public async Task<IActionResult> BulkCreateRooms([FromBody] BulkCreateRoomDto dto)
-{
-    await _roomService.BulkCreateAsync(dto);
- 
-    return Ok(new
+
+    // =========================================================
+    // POST: api/admin/rooms/bulk
+    // =========================================================
+
+    [HttpPost("bulk")]
+    public async Task<IActionResult> BulkCreateRooms(
+        [FromBody] BulkCreateRoomDto dto)
     {
-        message = $"{dto.Count} rooms created successfully."
-    });
-}
+        await _roomService.BulkCreateAsync(dto);
+
+        return Ok(new
+        {
+            message = $"{dto.Count} rooms created successfully."
+        });
+    }
 }
