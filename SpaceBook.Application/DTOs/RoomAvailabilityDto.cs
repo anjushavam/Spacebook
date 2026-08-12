@@ -13,6 +13,8 @@ public class RoomAvailabilityDto
     public string Module { get; set; } = string.Empty;
  
     public int Capacity { get; set; }
+
+    public List<string> Facilities { get; set; } = new();
  
     public string Status { get; set; } = string.Empty;
  

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SpaceBook.Application.DTOs.Employee;
 using SpaceBook.Application.Interfaces;
-using SpaceBook.Infrastructure.Data; // 👈 Matches your ApplicationDbContext namespace
+using SpaceBook.Infrastructure.Data;
 using SpaceBook.Application.DTOs.Admin;
 
 namespace SpaceBook.Infrastructure.Repositories;
@@ -55,8 +55,14 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 BookingId = x.BookingId,
                 Purpose = !string.IsNullOrWhiteSpace(x.Purpose)
                     ? x.Purpose
-                    : (!string.IsNullOrWhiteSpace(x.MeetingTitle) ? x.MeetingTitle : "Reserved Workspace"),
-                RoomName = x.Room != null ? x.Room.RoomName : $"Room {x.RoomId}",
+                    : (!string.IsNullOrWhiteSpace(x.MeetingTitle)
+                        ? x.MeetingTitle
+                        : "Reserved Workspace"),
+
+                RoomName = x.Room != null
+                    ? x.Room.RoomName
+                    : $"Room {x.RoomId}",
+
                 StartTime = x.StartTime,
                 EndTime = x.EndTime,
                 Status = x.Status
@@ -72,6 +78,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         };
     }
 
+    // Employee Availability Calendar
     public async Task<AvailabilityCalendarDto> GetAvailabilityAsync(
         DateOnly date,
         int? roomTypeId)
@@ -81,21 +88,28 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             Date = date
         };
 
+        // Load Room Type + Room Facilities + Facility
         var roomsQuery = _context.Rooms
             .Include(r => r.RoomType)
+            .Include(r => r.RoomFacilities)
+                .ThenInclude(rf => rf.Facility)
             .AsNoTracking()
             .AsQueryable();
 
+        // Filter by room type if provided
         if (roomTypeId.HasValue)
         {
-            roomsQuery = roomsQuery.Where(r => r.RoomTypeId == roomTypeId.Value);
+            roomsQuery = roomsQuery
+                .Where(r => r.RoomTypeId == roomTypeId.Value);
         }
 
         var rooms = await roomsQuery.ToListAsync();
 
         foreach (var room in rooms)
         {
+            // Get bookings for this room on the selected date
             var bookings = await _context.Bookings
+                .AsNoTracking()
                 .Where(b =>
                     b.RoomId == room.RoomId &&
                     b.BookingDate == date &&
@@ -103,10 +117,13 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     b.Status != "Rejected")
                 .ToListAsync();
 
+            // Create time slots from 08:00 to 18:00
             List<TimeSlotDto> slots = new();
-            TimeOnly start = new TimeOnly(8, 0);
 
-            while (start < new TimeOnly(18, 0))
+            TimeOnly start = new TimeOnly(8, 0);
+            TimeOnly endOfDay = new TimeOnly(18, 0);
+
+            while (start < endOfDay)
             {
                 TimeOnly end = start.AddHours(1);
 
@@ -124,29 +141,59 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 start = end;
             }
 
+            // Get the first booking for the room
             var booking = bookings
                 .OrderBy(b => b.StartTime)
                 .FirstOrDefault();
 
+            // Get facilities assigned to this room
+            var facilities = room.RoomFacilities
+                .Where(rf => rf.Facility != null)
+                .Select(rf => rf.Facility.FacilityName)
+                .ToList();
+
+            // Add room to response
             result.Rooms.Add(new RoomAvailabilityDto
             {
                 RoomId = room.RoomId,
+
                 RoomName = room.RoomName,
-                RoomType = room.RoomType != null ? room.RoomType.TypeName : "Conference",
+
+                RoomType = room.RoomType != null
+                    ? room.RoomType.TypeName
+                    : "Conference",
+
                 Module = room.Module,
+
                 Capacity = room.Capacity,
-                Status = booking == null ? "Available" : "Booked",
+
+                // NEW: Facilities
+                Facilities = facilities,
+
+                Status = booking == null
+                    ? "Available"
+                    : "Booked",
+
                 AvailableSlots = slots.Count(x => !x.IsBooked),
+
                 TimeSlots = slots,
-                CurrentBooking = booking == null ? null : new BookingPreviewDto
-                {
-                    Purpose = !string.IsNullOrWhiteSpace(booking.Purpose)
-                        ? booking.Purpose
-                        : (!string.IsNullOrWhiteSpace(booking.MeetingTitle) ? booking.MeetingTitle : "Reserved Workspace"),
-                    StartTime = booking.StartTime,
-                    EndTime = booking.EndTime,
-                    Status = booking.Status
-                }
+
+                CurrentBooking = booking == null
+                    ? null
+                    : new BookingPreviewDto
+                    {
+                        Purpose = !string.IsNullOrWhiteSpace(booking.Purpose)
+                            ? booking.Purpose
+                            : (!string.IsNullOrWhiteSpace(booking.MeetingTitle)
+                                ? booking.MeetingTitle
+                                : "Reserved Workspace"),
+
+                        StartTime = booking.StartTime,
+
+                        EndTime = booking.EndTime,
+
+                        Status = booking.Status
+                    }
             });
         }
 
@@ -164,10 +211,17 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             .Select(x => new MyBookingDto
             {
                 BookingId = x.BookingId,
-                RoomName = x.Room != null ? x.Room.RoomName : $"Room {x.RoomId}",
+
+                RoomName = x.Room != null
+                    ? x.Room.RoomName
+                    : $"Room {x.RoomId}",
+
                 Purpose = !string.IsNullOrWhiteSpace(x.Purpose)
                     ? x.Purpose
-                    : (!string.IsNullOrWhiteSpace(x.MeetingTitle) ? x.MeetingTitle : "Reserved Workspace"),
+                    : (!string.IsNullOrWhiteSpace(x.MeetingTitle)
+                        ? x.MeetingTitle
+                        : "Reserved Workspace"),
+
                 BookingDate = x.BookingDate,
                 StartTime = x.StartTime,
                 EndTime = x.EndTime,
@@ -176,7 +230,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             .ToListAsync();
     }
 
-    public async Task<List<RecentReservationDto>> GetRecentReservationsAsync(int employeeId)
+    public async Task<List<RecentReservationDto>> GetRecentReservationsAsync(
+        int employeeId)
     {
         return await _context.Bookings
             .AsNoTracking()
@@ -190,7 +245,11 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             .Select(x => new RecentReservationDto
             {
                 BookingId = x.BookingId,
-                RoomName = x.Room != null ? x.Room.RoomName : $"Room {x.RoomId}",
+
+                RoomName = x.Room != null
+                    ? x.Room.RoomName
+                    : $"Room {x.RoomId}",
+
                 BookingDate = x.BookingDate,
                 StartTime = x.StartTime,
                 EndTime = x.EndTime,
