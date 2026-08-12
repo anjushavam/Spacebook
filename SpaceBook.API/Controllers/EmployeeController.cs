@@ -322,6 +322,36 @@ public async Task<IActionResult> UpdateBooking(
         });
     }
 }
+
+// Get Rooms By Module
+[HttpGet("rooms")]
+public async Task<IActionResult> GetRoomsByModule(
+    [FromQuery] string module)
+{
+    try
+    {
+        if (string.IsNullOrWhiteSpace(module))
+        {
+            return BadRequest(new
+            {
+                Message = "Module is required."
+            });
+        }
+
+        var rooms = await _employeeBookingService
+            .GetRoomsByModuleAsync(module);
+
+        return Ok(rooms);
+    }
+    catch (Exception ex)
+    {
+        return BadRequest(new
+        {
+            Message = ex.Message
+        });
+    }
+}
+
 // Search Available Rooms
 [HttpPost("searchrooms")]
 public async Task<IActionResult> SearchAvailableRooms(

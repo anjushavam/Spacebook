@@ -9,24 +9,37 @@ public interface IRoomRepository
     Task<RoomDashboardDto> GetDashboardAsync();
 
     // Get all rooms
-    Task<IEnumerable<RoomDto>> GetAllAsync(RoomFilterDto filter);
+    Task<IEnumerable<RoomDto>> GetAllAsync(
+        RoomFilterDto filter);
 
     // Get room by id
-    Task<RoomDetailsDto?> GetByIdAsync(int roomId);
+    Task<RoomDetailsDto?> GetByIdAsync(
+        int roomId);
+
+    // Get rooms by module
+    Task<List<RoomDetailsDto>> GetRoomsByModuleAsync(
+        string module);
 
     // Create
-    Task AddAsync(Room room, List<int> facilityIds);
+    Task AddAsync(
+        Room room,
+        List<int> facilityIds);
 
     // Update
-    Task UpdateAsync(Room room, List<int> facilityIds);
+    Task UpdateAsync(
+        Room room,
+        List<int> facilityIds);
 
     // Delete
-    Task DeleteAsync(int roomId);
+    Task DeleteAsync(
+        int roomId);
 
     // Exists
-    Task<bool> ExistsAsync(int roomId);
+    Task<bool> ExistsAsync(
+        int roomId);
 
+    // Update status
     Task<bool> UpdateRoomStatusAsync(
-    int roomId,
-    bool isBlocked);
+        int roomId,
+        bool isBlocked);
 }

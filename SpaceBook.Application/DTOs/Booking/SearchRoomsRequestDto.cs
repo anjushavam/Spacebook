@@ -1,16 +1,18 @@
+namespace SpaceBook.Application.DTOs.Booking;
+
 public class SearchRoomsRequestDto
 {
-    public string Module { get; set; } = string.Empty;
+    public string? Module { get; set; }
 
-    public int RoomTypeId { get; set; }
+    public int? RoomTypeId { get; set; }
 
-    public int ParticipantCount { get; set; }
+    public int? ParticipantCount { get; set; }
 
-    public List<int> FacilityIds { get; set; } = new();
+    public List<int>? FacilityIds { get; set; }
 
-    public DateOnly BookingDate { get; set; }
+    public DateOnly? BookingDate { get; set; }
 
-    public TimeOnly StartTime { get; set; }
+    public TimeOnly? StartTime { get; set; }
 
-    public TimeOnly EndTime { get; set; }
+    public TimeOnly? EndTime { get; set; }
 }

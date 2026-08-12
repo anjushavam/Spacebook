@@ -25,13 +25,12 @@ public class EmployeeBookingService : IEmployeeBookingService
         int employeeId,
         CreateBookingRequestDto request)
     {
-        // Validate time
         if (request.StartTime >= request.EndTime)
         {
-            throw new Exception("End time must be after start time.");
+            throw new Exception(
+                "End time must be after start time.");
         }
 
-        // Check availability
         bool isAvailable =
             await _bookingRepository.IsRoomAvailableAsync(
                 request.RoomId,
@@ -45,7 +44,6 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Room is already booked for the selected time.");
         }
 
-        // Resolve purpose
         string resolvedPurpose =
             !string.IsNullOrWhiteSpace(request.Purpose)
                 ? request.Purpose
@@ -53,13 +51,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                     ? request.MeetingTitle
                     : "Reserved Workspace";
 
-        // Resolve meeting title
         string resolvedTitle =
             !string.IsNullOrWhiteSpace(request.MeetingTitle)
                 ? request.MeetingTitle
                 : resolvedPurpose;
 
-        // Create booking
         var booking = new Booking
         {
             RoomId = request.RoomId,
@@ -76,21 +72,9 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         try
         {
-            // -------------------------------------------------
-            // STEP 1: Save booking first
-            // This generates BookingId
-            // -------------------------------------------------
-
             await _bookingRepository.CreateBookingAsync(booking);
 
             await _bookingRepository.SaveChangesAsync();
-
-            // At this point:
-            // booking.BookingId contains the real database ID
-
-            // -------------------------------------------------
-            // STEP 2: Create admin notification
-            // -------------------------------------------------
 
             var adminNotification = new Notification
             {
@@ -107,10 +91,6 @@ public class EmployeeBookingService : IEmployeeBookingService
             await _notificationRepository.AddAsync(
                 adminNotification);
 
-            // -------------------------------------------------
-            // STEP 3: Save notification
-            // -------------------------------------------------
-
             await _notificationRepository.SaveChangesAsync();
 
             return booking.BookingId;
@@ -122,6 +102,7 @@ public class EmployeeBookingService : IEmployeeBookingService
                 ex);
         }
     }
+
 
     // =========================================================
     // View Booking
@@ -135,6 +116,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             bookingId,
             employeeId);
     }
+
 
     // =========================================================
     // Cancel Booking
@@ -172,6 +154,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         return result;
     }
 
+
     // =========================================================
     // Update / Reschedule Booking
     // =========================================================
@@ -181,14 +164,12 @@ public class EmployeeBookingService : IEmployeeBookingService
         int employeeId,
         UpdateBookingRequestDto request)
     {
-        // Validate time
         if (request.StartTime >= request.EndTime)
         {
             throw new Exception(
                 "End time must be after start time.");
         }
 
-        // Get existing booking
         var existingBooking =
             await _bookingRepository.GetBookingByIdAsync(
                 bookingId,
@@ -196,10 +177,10 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         if (existingBooking == null)
         {
-            throw new Exception("Booking not found.");
+            throw new Exception(
+                "Booking not found.");
         }
 
-        // SLA check
         var bookingStartDateTime =
             existingBooking.BookingDate.ToDateTime(
                 existingBooking.StartTime);
@@ -210,7 +191,6 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Booking cannot be rescheduled within 1 hour before start time.");
         }
 
-        // Check new slot availability
         bool isAvailable =
             await _bookingRepository.IsRoomAvailableAsync(
                 request.RoomId,
@@ -254,6 +234,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         return updated;
     }
 
+
     // =========================================================
     // Search Available Rooms
     // =========================================================
@@ -261,7 +242,77 @@ public class EmployeeBookingService : IEmployeeBookingService
     public async Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
         SearchRoomsRequestDto request)
     {
+        bool hasModule =
+            !string.IsNullOrWhiteSpace(request.Module);
+
+        bool hasRoomType =
+            request.RoomTypeId.HasValue &&
+            request.RoomTypeId.Value > 0;
+
+        bool hasParticipantCount =
+            request.ParticipantCount.HasValue &&
+            request.ParticipantCount.Value > 0;
+
+        bool hasBookingDate =
+            request.BookingDate.HasValue;
+
+        bool hasStartTime =
+            request.StartTime.HasValue;
+
+        bool hasEndTime =
+            request.EndTime.HasValue;
+
+        bool hasFacilities =
+            request.FacilityIds != null &&
+            request.FacilityIds.Any(id => id > 0);
+
+        if (!hasModule &&
+            !hasRoomType &&
+            !hasParticipantCount &&
+            !hasBookingDate &&
+            !hasStartTime &&
+            !hasEndTime &&
+            !hasFacilities)
+        {
+            throw new Exception(
+                "Please provide at least one search criterion.");
+        }
+
+        if (hasStartTime &&
+            hasEndTime &&
+            request.StartTime!.Value >= request.EndTime!.Value)
+        {
+            throw new Exception(
+                "End time must be after start time.");
+        }
+
         return await _bookingRepository.SearchAvailableRoomsAsync(
             request);
+    }
+
+
+    // =========================================================
+    // Get Rooms By Module
+    // =========================================================
+    //
+    // Used when the employee selects only:
+    //
+    // Module 2
+    //
+    // This allows the UI to immediately get rooms belonging
+    // to that module.
+    // =========================================================
+
+    public async Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
+        string module)
+    {
+        if (string.IsNullOrWhiteSpace(module))
+        {
+            throw new Exception(
+                "Module is required.");
+        }
+
+        return await _bookingRepository.GetRoomsByModuleAsync(
+            module);
     }
 }

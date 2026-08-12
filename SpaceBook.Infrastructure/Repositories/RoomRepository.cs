@@ -188,4 +188,33 @@ public class RoomRepository : IRoomRepository
 
     return true;
 }
+// =========================================================
+// Get Rooms By Module
+// =========================================================
+
+public async Task<List<RoomDetailsDto>> GetRoomsByModuleAsync(
+    string module)
+{
+    return await _context.Rooms
+        .Include(r => r.RoomFacilities)
+            .ThenInclude(rf => rf.Facility)
+        .Where(r =>
+            r.Status != "Blocked" &&
+            !r.IsBlocked &&
+            r.Module == module)
+        .Select(r => new RoomDetailsDto
+        {
+            RoomId = r.RoomId,
+            RoomTypeId = r.RoomTypeId,
+            RoomName = r.RoomName,
+            Capacity = r.Capacity,
+            Module = r.Module,
+            Status = r.Status,
+
+            Facilities = r.RoomFacilities
+                .Select(rf => rf.Facility!.FacilityName)
+                .ToList()
+        })
+        .ToListAsync();
+}
 }

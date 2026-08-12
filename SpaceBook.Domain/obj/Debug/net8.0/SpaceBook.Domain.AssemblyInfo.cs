@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SpaceBook.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0469b2e350066a25cf7934c3d1fb7641cf079e53")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+be77ddae0762a2a98d8535002ab4927afc6e8d5d")]
 [assembly: System.Reflection.AssemblyProductAttribute("SpaceBook.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SpaceBook.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
