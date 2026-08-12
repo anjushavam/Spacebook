@@ -9,8 +9,7 @@ public interface IEmployeeBookingRepository
     // Create Booking
     // =========================================================
 
-    Task CreateBookingAsync(
-        Booking booking);
+    Task CreateBookingAsync(Booking booking);
 
 
     // =========================================================
@@ -27,7 +26,6 @@ public interface IEmployeeBookingRepository
     // =========================================================
     // Check Room Availability
     // Exclude Existing Booking
-    // Used while editing/rescheduling
     // =========================================================
 
     Task<bool> IsRoomAvailableAsync(
@@ -68,15 +66,6 @@ public interface IEmployeeBookingRepository
 
     // =========================================================
     // Search Available Rooms
-    //
-    // Supports partial criteria:
-    // Module
-    // Room Type
-    // Capacity
-    // Facilities
-    // Date
-    // Start Time
-    // End Time
     // =========================================================
 
     Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
@@ -85,11 +74,6 @@ public interface IEmployeeBookingRepository
 
     // =========================================================
     // Get Rooms By Module
-    //
-    // Example:
-    // "Module 2"
-    //
-    // Returns rooms belonging to the selected module.
     // =========================================================
 
     Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
