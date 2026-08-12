@@ -17,7 +17,7 @@ VALUES
 (105533, 'Shreenithiy Karthikeyan', 2, 'Shreenithiy.Karthikeyan@valuemomentum.com', 'Shreenithiy@123', TRUE, '105508'),
 (105517, 'Anu Balakrishnan', 2, 'Anu.Balakrishnan@valuemomentum.com', 'Anu@123', TRUE, '105508'),
 (105715, 'Bharathi Ravi', 2, 'Bharathi.Ravi@valuemomentum.com', 'Bharathi@123', TRUE, '105508'),
-(105508, 'Vikash Durairaj', 1, 'Vikash.Durairaj@valuemomentum.com','Vikash@123', TRUE, '105508'),
+(105508, 'Vikash Durairaj', 1, 'vikash.durairaj@valuemomentum.com','Vikash@123', TRUE, '105508'),
 (103659, 'Anitha Natarayasamy', 2, 'Anitha.Natarayasamy@valuemomentum.com', 'Anitha@123', TRUE, '105508');
 
 SELECT * FROM Employees;
