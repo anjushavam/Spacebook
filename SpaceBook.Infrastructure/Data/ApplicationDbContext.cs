@@ -11,7 +11,6 @@ public class ApplicationDbContext : DbContext
     {
     }
 
-
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<Employee> Employees => Set<Employee>();
@@ -30,20 +29,36 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
-
-
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly);
 
 
+        // ==========================================
+        // Facility Mapping
+        // ==========================================
+        modelBuilder.Entity<Facility>(entity =>
+        {
+            entity.ToTable("facilities");
 
+            entity.HasKey(f => f.FacilityId);
+
+            entity.Property(f => f.FacilityId)
+                .HasColumnName("facilityid");
+
+            entity.Property(f => f.FacilityName)
+                .HasColumnName("facilityname")
+                .HasMaxLength(100);
+        });
+
+
+        // ==========================================
         // Room Mapping
+        // ==========================================
         modelBuilder.Entity<Room>(entity =>
         {
             entity.ToTable("rooms");
@@ -68,8 +83,9 @@ public class ApplicationDbContext : DbContext
         });
 
 
-
+        // ==========================================
         // CheckIn Mapping
+        // ==========================================
         modelBuilder.Entity<CheckIn>(entity =>
         {
             entity.ToTable("checkins");
@@ -90,49 +106,40 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("status")
                 .HasMaxLength(50);
 
-
             entity.HasOne(c => c.Booking)
                 .WithOne(b => b.CheckIn)
-                .HasForeignKey<CheckIn>(
-                    c => c.BookingId)
+                .HasForeignKey<CheckIn>(c => c.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
 
-
+        // ==========================================
         // Notification Mapping
+        // ==========================================
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.ToTable("notifications");
 
-
             entity.HasKey(n => n.NotificationId);
-
 
             entity.Property(n => n.NotificationId)
                 .HasColumnName("notificationid");
 
-
             entity.Property(n => n.EmployeeId)
                 .HasColumnName("employeeid");
 
-
             entity.Property(n => n.BookingId)
                 .HasColumnName("bookingid");
-
 
             entity.Property(n => n.Message)
                 .HasColumnName("message")
                 .HasMaxLength(500);
 
-
             entity.Property(n => n.IsRead)
                 .HasColumnName("isread");
 
-
             entity.Property(n => n.CreatedAt)
                 .HasColumnName("createdat");
-
 
             entity.HasOne(n => n.Booking)
                 .WithMany()
