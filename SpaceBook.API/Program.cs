@@ -61,7 +61,7 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:5173",
-"https://inquisitive-kheer-63d60e.netlify.app",
+"https://spacebookss.netlify.app",
                 "https://spacebook211-98989-cs4tdldnv-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook211-98989-acn15v4y5-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook211-98989-g6itccmhu-dvikash211-5241s-projects.vercel.app"
