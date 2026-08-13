@@ -26,6 +26,83 @@ public class EmployeeController : ControllerBase
     }
 
     // =========================================================
+    // GET EMPLOYEE ID FROM TOKEN
+    // =========================================================
+
+    private bool TryGetEmployeeId(out int employeeId)
+    {
+        employeeId = 0;
+
+        var employeeIdClaim =
+            User.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (employeeIdClaim == null)
+        {
+            return false;
+        }
+
+        return int.TryParse(
+            employeeIdClaim.Value,
+            out employeeId);
+    }
+
+    // =========================================================
+    // VALIDATE BOOKING DATE
+    // =========================================================
+
+    private IActionResult? ValidateBookingDate(DateOnly bookingDate)
+    {
+        // -----------------------------------------------------
+        // TODAY
+        // -----------------------------------------------------
+
+        var today =
+            DateOnly.FromDateTime(DateTime.Now);
+
+        // -----------------------------------------------------
+        // PAST DATE
+        // -----------------------------------------------------
+
+        if (bookingDate < today)
+        {
+            return BadRequest(new
+            {
+                Message =
+                    $"Cannot check availability for a past date. " +
+                    $"Today is {today:yyyy-MM-dd}."
+            });
+        }
+
+        // -----------------------------------------------------
+        // SATURDAY
+        // -----------------------------------------------------
+
+        if (bookingDate.DayOfWeek == DayOfWeek.Saturday)
+        {
+            return BadRequest(new
+            {
+                Message =
+                    "Room availability is not available on Saturdays."
+            });
+        }
+
+        // -----------------------------------------------------
+        // SUNDAY
+        // -----------------------------------------------------
+
+        if (bookingDate.DayOfWeek == DayOfWeek.Sunday)
+        {
+            return BadRequest(new
+            {
+                Message =
+                    "Room availability is not available on Sundays."
+            });
+        }
+
+        return null;
+    }
+
+    // =========================================================
     // EMPLOYEE DASHBOARD
     // =========================================================
 
@@ -34,30 +111,26 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token. Employee Id not found."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
-            {
-                return Unauthorized(new
-                {
-                    Message = "Invalid employee Id in token."
-                });
-            }
+            // -------------------------------------------------
+            // GET DASHBOARD
+            // -------------------------------------------------
 
             var result =
-                await _dashboardService.GetDashboardAsync(
-                    employeeId);
+                await _dashboardService
+                    .GetDashboardAsync(employeeId);
 
             return Ok(result);
         }
@@ -94,57 +167,27 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            DateOnly bookingDate = date.Value;
+            var bookingDate = date.Value;
 
             // -------------------------------------------------
-            // GET TODAY
+            // VALIDATE DATE
+            //
+            // This rejects:
+            // 1. Past dates
+            // 2. Saturdays
+            // 3. Sundays
             // -------------------------------------------------
 
-            DateOnly today =
-                DateOnly.FromDateTime(DateTime.Now);
+            var dateValidation =
+                ValidateBookingDate(bookingDate);
 
-            // -------------------------------------------------
-            // PREVENT PAST DATE
-            // -------------------------------------------------
-
-            if (bookingDate < today)
+            if (dateValidation != null)
             {
-                return BadRequest(new
-                {
-                    Message =
-                        $"Cannot check availability for a past date. " +
-                        $"Today is {today:yyyy-MM-dd}."
-                });
+                return dateValidation;
             }
 
             // -------------------------------------------------
-            // PREVENT SATURDAY
-            // -------------------------------------------------
-
-            if (bookingDate.DayOfWeek == DayOfWeek.Saturday)
-            {
-                return BadRequest(new
-                {
-                    Message =
-                        "Room availability is not available on Saturdays."
-                });
-            }
-
-            // -------------------------------------------------
-            // PREVENT SUNDAY
-            // -------------------------------------------------
-
-            if (bookingDate.DayOfWeek == DayOfWeek.Sunday)
-            {
-                return BadRequest(new
-                {
-                    Message =
-                        "Room availability is not available on Sundays."
-                });
-            }
-
-            // -------------------------------------------------
-            // VALID ROOM TYPE
+            // VALIDATE ROOM TYPE
             // -------------------------------------------------
 
             if (roomTypeId.HasValue &&
@@ -160,16 +203,16 @@ public class EmployeeController : ControllerBase
             // GET AVAILABILITY
             //
             // IMPORTANT:
-            // This will NOT execute for:
-            // - Past dates
-            // - Saturdays
-            // - Sundays
+            //
+            // This service will ONLY execute after the
+            // date validation above has passed.
             // -------------------------------------------------
 
             var result =
-                await _dashboardService.GetAvailabilityAsync(
-                    bookingDate,
-                    roomTypeId);
+                await _dashboardService
+                    .GetAvailabilityAsync(
+                        bookingDate,
+                        roomTypeId);
 
             return Ok(result);
         }
@@ -193,26 +236,34 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
+            // -------------------------------------------------
+            // VALIDATE REQUEST
+            // -------------------------------------------------
+
+            if (request == null)
             {
-                return Unauthorized(new
+                return BadRequest(new
                 {
-                    Message = "Invalid employee Id in token."
+                    Message = "Booking request is required."
                 });
             }
+
+            // -------------------------------------------------
+            // CREATE BOOKING
+            // -------------------------------------------------
 
             var bookingId =
                 await _employeeBookingService
@@ -222,8 +273,11 @@ public class EmployeeController : ControllerBase
 
             return Ok(new
             {
-                Message = "Booking created successfully.",
+                Message =
+                    "Booking created successfully.",
+
                 BookingId = bookingId,
+
                 Status = "Pending"
             });
         }
@@ -245,26 +299,22 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
-            {
-                return Unauthorized(new
-                {
-                    Message = "Invalid employee Id in token."
-                });
-            }
+            // -------------------------------------------------
+            // GET BOOKINGS
+            // -------------------------------------------------
 
             var result =
                 await _dashboardService
@@ -290,26 +340,22 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
-            {
-                return Unauthorized(new
-                {
-                    Message = "Invalid employee Id in token."
-                });
-            }
+            // -------------------------------------------------
+            // GET RECENT RESERVATIONS
+            // -------------------------------------------------
 
             var result =
                 await _dashboardService
@@ -336,32 +382,32 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
-            {
-                return Unauthorized(new
-                {
-                    Message = "Invalid employee Id in token."
-                });
-            }
+            // -------------------------------------------------
+            // GET BOOKING
+            // -------------------------------------------------
 
             var booking =
                 await _employeeBookingService
                     .GetBookingByIdAsync(
                         bookingId,
                         employeeId);
+
+            // -------------------------------------------------
+            // BOOKING NOT FOUND
+            // -------------------------------------------------
 
             if (booking == null)
             {
@@ -392,32 +438,32 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
-            {
-                return Unauthorized(new
-                {
-                    Message = "Invalid employee Id in token."
-                });
-            }
+            // -------------------------------------------------
+            // CANCEL BOOKING
+            // -------------------------------------------------
 
             var result =
                 await _employeeBookingService
                     .CancelBookingAsync(
                         bookingId,
                         employeeId);
+
+            // -------------------------------------------------
+            // BOOKING NOT FOUND
+            // -------------------------------------------------
 
             if (!result)
             {
@@ -429,7 +475,8 @@ public class EmployeeController : ControllerBase
 
             return Ok(new
             {
-                Message = "Booking cancelled successfully."
+                Message =
+                    "Booking cancelled successfully."
             });
         }
         catch (Exception ex)
@@ -452,26 +499,35 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
+            // -------------------------------------------------
+            // REQUEST REQUIRED
+            // -------------------------------------------------
+
+            if (request == null)
             {
-                return Unauthorized(new
+                return BadRequest(new
                 {
-                    Message = "Invalid employee Id in token."
+                    Message =
+                        "Update booking request is required."
                 });
             }
+
+            // -------------------------------------------------
+            // UPDATE BOOKING
+            // -------------------------------------------------
 
             var result =
                 await _employeeBookingService
@@ -479,6 +535,10 @@ public class EmployeeController : ControllerBase
                         bookingId,
                         employeeId,
                         request);
+
+            // -------------------------------------------------
+            // BOOKING NOT FOUND
+            // -------------------------------------------------
 
             if (!result)
             {
@@ -490,7 +550,8 @@ public class EmployeeController : ControllerBase
 
             return Ok(new
             {
-                Message = "Booking updated successfully."
+                Message =
+                    "Booking updated successfully."
             });
         }
         catch (Exception ex)
@@ -512,6 +573,10 @@ public class EmployeeController : ControllerBase
     {
         try
         {
+            // -------------------------------------------------
+            // MODULE REQUIRED
+            // -------------------------------------------------
+
             if (string.IsNullOrWhiteSpace(module))
             {
                 return BadRequest(new
@@ -519,6 +584,10 @@ public class EmployeeController : ControllerBase
                     Message = "Module is required."
                 });
             }
+
+            // -------------------------------------------------
+            // GET ROOMS
+            // -------------------------------------------------
 
             var rooms =
                 await _employeeBookingService
@@ -546,49 +615,38 @@ public class EmployeeController : ControllerBase
         try
         {
             // -------------------------------------------------
-            // VALIDATE DATE
+            // REQUEST REQUIRED
+            // -------------------------------------------------
+
+            if (request == null)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Search request is required."
+                });
+            }
+
+            // -------------------------------------------------
+            // DATE VALIDATION
             // -------------------------------------------------
 
             if (request.BookingDate.HasValue)
             {
-                DateOnly bookingDate =
+                var bookingDate =
                     request.BookingDate.Value;
 
-                DateOnly today =
-                    DateOnly.FromDateTime(DateTime.Now);
+                var dateValidation =
+                    ValidateBookingDate(bookingDate);
 
-                if (bookingDate < today)
+                if (dateValidation != null)
                 {
-                    return BadRequest(new
-                    {
-                        Message =
-                            "Cannot search rooms for a past date."
-                    });
-                }
-
-                if (bookingDate.DayOfWeek ==
-                    DayOfWeek.Saturday)
-                {
-                    return BadRequest(new
-                    {
-                        Message =
-                            "Room search is not available on Saturdays."
-                    });
-                }
-
-                if (bookingDate.DayOfWeek ==
-                    DayOfWeek.Sunday)
-                {
-                    return BadRequest(new
-                    {
-                        Message =
-                            "Room search is not available on Sundays."
-                    });
+                    return dateValidation;
                 }
             }
 
             // -------------------------------------------------
-            // VALIDATE TIME
+            // TIME VALIDATION
             // -------------------------------------------------
 
             if (request.StartTime.HasValue &&
@@ -634,27 +692,22 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            var employeeIdClaim =
-                User.FindFirst(
-                    ClaimTypes.NameIdentifier);
+            // -------------------------------------------------
+            // GET EMPLOYEE ID
+            // -------------------------------------------------
 
-            if (employeeIdClaim == null)
+            if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
                 {
-                    Message = "Invalid token."
+                    Message =
+                        "Invalid token. Employee Id not found."
                 });
             }
 
-            if (!int.TryParse(
-                    employeeIdClaim.Value,
-                    out int employeeId))
-            {
-                return Unauthorized(new
-                {
-                    Message = "Invalid employee Id in token."
-                });
-            }
+            // -------------------------------------------------
+            // CHECK-IN
+            // -------------------------------------------------
 
             var result =
                 await _checkInService
