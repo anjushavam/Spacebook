@@ -12,12 +12,15 @@ public class EmployeeBookingService : IEmployeeBookingService
     // =========================================================
     // OFFICE HOURS
     // =========================================================
+    // Office Hours:
+    // 09:00 AM to 07:30 PM
+    // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
         new TimeOnly(9, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(18, 0);
+        new TimeOnly(19, 30);
 
 
     public EmployeeBookingService(
@@ -50,7 +53,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // =====================================================
         // VALIDATE OFFICE HOURS
-        // Office Hours: 09:00 AM to 06:00 PM
+        // Office Hours: 09:00 AM to 07:30 PM
         // =====================================================
 
         if (request.StartTime < OfficeStartTime)
@@ -62,7 +65,31 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 06:00 PM.");
+                "Bookings must end by 07:30 PM.");
+        }
+
+
+        // =====================================================
+        // VALIDATE PAST TIME FOR TODAY
+        // =====================================================
+
+        var today =
+            DateOnly.FromDateTime(DateTime.Now);
+
+        var currentTime =
+            TimeOnly.FromDateTime(DateTime.Now);
+
+        if (request.BookingDate < today)
+        {
+            throw new Exception(
+                "Bookings cannot be created for a past date.");
+        }
+
+        if (request.BookingDate == today &&
+            request.StartTime <= currentTime)
+        {
+            throw new Exception(
+                "Bookings cannot start at or before the current time.");
         }
 
 
@@ -140,16 +167,31 @@ public class EmployeeBookingService : IEmployeeBookingService
         var booking = new Booking
         {
             RoomId = request.RoomId,
+
             EmployeeId = employeeId,
+
             MeetingTitle = resolvedTitle,
+
             Purpose = resolvedPurpose,
-            ParticipantCount = request.ParticipantCount,
-            BookingDate = request.BookingDate,
-            StartTime = request.StartTime,
-            EndTime = request.EndTime,
-            BookedOn = DateTime.UtcNow,
+
+            ParticipantCount =
+                request.ParticipantCount,
+
+            BookingDate =
+                request.BookingDate,
+
+            StartTime =
+                request.StartTime,
+
+            EndTime =
+                request.EndTime,
+
+            BookedOn =
+                DateTime.UtcNow,
+
             Status = "Pending"
         };
+
 
         try
         {
@@ -166,12 +208,14 @@ public class EmployeeBookingService : IEmployeeBookingService
             var adminNotification = new Notification
             {
                 EmployeeId = employeeId,
+
                 BookingId = booking.BookingId,
 
                 Message =
                     $"New booking request submitted for {resolvedTitle}.",
 
                 IsRead = false,
+
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -224,12 +268,14 @@ public class EmployeeBookingService : IEmployeeBookingService
             var adminNotification = new Notification
             {
                 EmployeeId = employeeId,
+
                 BookingId = bookingId,
 
                 Message =
                     $"Booking #{bookingId} was cancelled by employee.",
 
                 IsRead = false,
+
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -265,7 +311,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // =====================================================
         // VALIDATE OFFICE HOURS
-        // Office Hours: 09:00 AM to 06:00 PM
+        // Office Hours: 09:00 AM to 07:30 PM
         // =====================================================
 
         if (request.StartTime < OfficeStartTime)
@@ -277,7 +323,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 06:00 PM.");
+                "Bookings must end by 07:30 PM.");
         }
 
 
@@ -310,16 +356,43 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // =====================================================
         // CHECK RESCHEDULE TIME RESTRICTION
+        // Rescheduling is not allowed within 1 hour
+        // before the existing booking starts.
         // =====================================================
 
         var bookingStartDateTime =
             existingBooking.BookingDate.ToDateTime(
                 existingBooking.StartTime);
 
-        if (DateTime.Now >= bookingStartDateTime.AddHours(-1))
+        if (DateTime.Now >=
+            bookingStartDateTime.AddHours(-1))
         {
             throw new Exception(
                 "Booking cannot be rescheduled within 1 hour before start time.");
+        }
+
+
+        // =====================================================
+        // VALIDATE NEW BOOKING DATE/TIME
+        // =====================================================
+
+        var today =
+            DateOnly.FromDateTime(DateTime.Now);
+
+        var currentTime =
+            TimeOnly.FromDateTime(DateTime.Now);
+
+        if (request.BookingDate < today)
+        {
+            throw new Exception(
+                "Booking cannot be rescheduled to a past date.");
+        }
+
+        if (request.BookingDate == today &&
+            request.StartTime <= currentTime)
+        {
+            throw new Exception(
+                "Booking cannot be rescheduled to a time that has already passed.");
         }
 
 
@@ -382,12 +455,14 @@ public class EmployeeBookingService : IEmployeeBookingService
             var adminNotification = new Notification
             {
                 EmployeeId = employeeId,
+
                 BookingId = bookingId,
 
                 Message =
                     $"Booking #{bookingId} was rescheduled by employee.",
 
                 IsRead = false,
+
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -405,8 +480,9 @@ public class EmployeeBookingService : IEmployeeBookingService
     // SEARCH AVAILABLE ROOMS
     // =========================================================
 
-    public async Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
-        SearchRoomsRequestDto request)
+    public async Task<List<AvailableRoomDto>>
+        SearchAvailableRoomsAsync(
+            SearchRoomsRequestDto request)
     {
         bool hasModule =
             !string.IsNullOrWhiteSpace(request.Module);
@@ -456,7 +532,8 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         if (hasStartTime &&
             hasEndTime &&
-            request.StartTime!.Value >= request.EndTime!.Value)
+            request.StartTime!.Value >=
+            request.EndTime!.Value)
         {
             throw new Exception(
                 "End time must be after start time.");
@@ -465,21 +542,50 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // =====================================================
         // VALIDATE OFFICE HOURS
-        // Office Hours: 09:00 AM to 06:00 PM
+        // Office Hours: 09:00 AM to 07:30 PM
         // =====================================================
 
         if (hasStartTime &&
-            request.StartTime!.Value < OfficeStartTime)
+            request.StartTime!.Value <
+            OfficeStartTime)
         {
             throw new Exception(
-                "Rooms can only be booked between 09:00 AM and 06:00 PM.");
+                "Rooms can only be booked between 09:00 AM and 07:30 PM.");
         }
 
         if (hasEndTime &&
-            request.EndTime!.Value > OfficeEndTime)
+            request.EndTime!.Value >
+            OfficeEndTime)
         {
             throw new Exception(
-                "Rooms can only be booked between 09:00 AM and 06:00 PM.");
+                "Rooms can only be booked between 09:00 AM and 07:30 PM.");
+        }
+
+
+        // =====================================================
+        // VALIDATE PAST DATE/TIME FOR SEARCH
+        // =====================================================
+
+        var today =
+            DateOnly.FromDateTime(DateTime.Now);
+
+        var currentTime =
+            TimeOnly.FromDateTime(DateTime.Now);
+
+        if (hasBookingDate &&
+            request.BookingDate!.Value < today)
+        {
+            throw new Exception(
+                "Cannot search availability for a past date.");
+        }
+
+        if (hasBookingDate &&
+            request.BookingDate!.Value == today &&
+            hasStartTime &&
+            request.StartTime!.Value <= currentTime)
+        {
+            throw new Exception(
+                "Cannot search for a time that has already passed.");
         }
 
 
@@ -496,8 +602,9 @@ public class EmployeeBookingService : IEmployeeBookingService
     // GET ROOMS BY MODULE
     // =========================================================
 
-    public async Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
-        string module)
+    public async Task<List<AvailableRoomDto>>
+        GetRoomsByModuleAsync(
+            string module)
     {
         if (string.IsNullOrWhiteSpace(module))
         {
