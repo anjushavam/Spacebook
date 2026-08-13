@@ -5,6 +5,8 @@ public class MyBookingDto
 {
 
     public int BookingId { get; set; }
+
+    public int RoomId { get; set; }
  
     public string RoomName { get; set; } = string.Empty;
  
