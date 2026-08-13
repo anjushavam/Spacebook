@@ -164,43 +164,59 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // Update / Reschedule Booking
     // =========================================================
 
-    public async Task<bool> UpdateBookingAsync(
-        int bookingId,
-        int employeeId,
-        UpdateBookingRequestDto request)
+    // =========================================================
+// Update / Reschedule Booking
+// =========================================================
+
+public async Task<bool> UpdateBookingAsync(
+    int bookingId,
+    int employeeId,
+    UpdateBookingRequestDto request)
+{
+    var booking = await _context.Bookings
+        .FirstOrDefaultAsync(b =>
+            b.BookingId == bookingId &&
+            b.EmployeeId == employeeId);
+
+    if (booking == null)
     {
-        var booking = await _context.Bookings
-            .FirstOrDefaultAsync(b =>
-                b.BookingId == bookingId &&
-                b.EmployeeId == employeeId);
-
-        if (booking == null)
-        {
-            return false;
-        }
-
-        booking.RoomId = request.RoomId;
-        booking.BookingDate = request.BookingDate;
-        booking.StartTime = request.StartTime;
-        booking.EndTime = request.EndTime;
-
-        if (!string.IsNullOrWhiteSpace(request.MeetingTitle))
-        {
-            booking.MeetingTitle = request.MeetingTitle;
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Purpose))
-        {
-            booking.Purpose = request.Purpose;
-        }
-
-        booking.ParticipantCount = request.ParticipantCount;
-
-        await _context.SaveChangesAsync();
-
-        return true;
+        return false;
     }
 
+    // RoomId is nullable in UpdateBookingRequestDto,
+    // but Booking.RoomId is non-nullable int.
+    if (!request.RoomId.HasValue ||
+        request.RoomId.Value <= 0)
+    {
+        throw new Exception(
+            "Room ID is required.");
+    }
+
+    booking.RoomId = request.RoomId.Value;
+
+    booking.BookingDate = request.BookingDate;
+
+    booking.StartTime = request.StartTime;
+
+    booking.EndTime = request.EndTime;
+
+    if (!string.IsNullOrWhiteSpace(request.MeetingTitle))
+    {
+        booking.MeetingTitle = request.MeetingTitle;
+    }
+
+    if (!string.IsNullOrWhiteSpace(request.Purpose))
+    {
+        booking.Purpose = request.Purpose;
+    }
+
+    booking.ParticipantCount =
+        request.ParticipantCount;
+
+    await _context.SaveChangesAsync();
+
+    return true;
+}
 
     // =========================================================
     // Search Available Rooms
