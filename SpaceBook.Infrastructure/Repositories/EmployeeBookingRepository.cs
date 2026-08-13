@@ -16,9 +16,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         _context = context;
     }
 
-
     // =========================================================
-    // Create Booking
+    // CREATE BOOKING
     // =========================================================
 
     public async Task CreateBookingAsync(
@@ -27,9 +26,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         await _context.Bookings.AddAsync(booking);
     }
 
-
     // =========================================================
-    // Save Changes
+    // SAVE CHANGES
     // =========================================================
 
     public async Task SaveChangesAsync()
@@ -37,9 +35,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         await _context.SaveChangesAsync();
     }
 
-
     // =========================================================
-    // Check Room Availability
+    // CHECK ROOM AVAILABILITY
     // =========================================================
 
     public async Task<bool> IsRoomAvailableAsync(
@@ -61,10 +58,9 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             );
     }
 
-
     // =========================================================
-    // Check Room Availability
-    // Exclude Existing Booking
+    // CHECK ROOM AVAILABILITY
+    // EXCLUDE EXISTING BOOKING
     // =========================================================
 
     public async Task<bool> IsRoomAvailableAsync(
@@ -88,54 +84,53 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             );
     }
 
-
     // =========================================================
-    // Get Booking Details
+    // GET BOOKING DETAILS
     // =========================================================
 
     public async Task<BookingDetailsDto?> GetBookingByIdAsync(
-    int bookingId,
-    int employeeId)
-{
-    return await _context.Bookings
-        .Include(b => b.Room)
-            .ThenInclude(r => r!.RoomType)
+        int bookingId,
+        int employeeId)
+    {
+        return await _context.Bookings
 
-        .Include(b => b.Room)
-            .ThenInclude(r => r!.RoomFacilities)
-                .ThenInclude(rf => rf.Facility)
+            .Include(b => b.Room)
+                .ThenInclude(r => r!.RoomType)
 
-        .Where(b =>
-            b.BookingId == bookingId &&
-            b.EmployeeId == employeeId)
+            .Include(b => b.Room)
+                .ThenInclude(r => r!.RoomFacilities)
+                    .ThenInclude(rf => rf.Facility)
 
-        .Select(b => new BookingDetailsDto
-        {
-            BookingId = b.BookingId,
+            .Where(b =>
+                b.BookingId == bookingId &&
+                b.EmployeeId == employeeId)
 
-            RoomName = b.Room!.RoomName,
+            .Select(b => new BookingDetailsDto
+            {
+                BookingId = b.BookingId,
 
-            BookingDate = b.BookingDate,
+                RoomName = b.Room!.RoomName,
 
-            StartTime = b.StartTime,
+                BookingDate = b.BookingDate,
 
-            EndTime = b.EndTime,
+                StartTime = b.StartTime,
 
-            ParticipantCount = b.ParticipantCount,
+                EndTime = b.EndTime,
 
-            MeetingTitle = b.MeetingTitle,
+                ParticipantCount = b.ParticipantCount,
 
-            Purpose = b.Purpose,
+                MeetingTitle = b.MeetingTitle,
 
-            Status = b.Status
-        })
+                Purpose = b.Purpose,
 
-        .FirstOrDefaultAsync();
-}
+                Status = b.Status
+            })
 
+            .FirstOrDefaultAsync();
+    }
 
     // =========================================================
-    // Cancel Booking
+    // CANCEL BOOKING
     // =========================================================
 
     public async Task<bool> CancelBookingAsync(
@@ -159,125 +154,299 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         return true;
     }
 
-
     // =========================================================
-    // Update / Reschedule Booking
+    // UPDATE / RESCHEDULE BOOKING
     // =========================================================
 
-    // =========================================================
-// Update / Reschedule Booking
-// =========================================================
-
-public async Task<bool> UpdateBookingAsync(
-    int bookingId,
-    int employeeId,
-    UpdateBookingRequestDto request)
-{
-    var booking = await _context.Bookings
-        .FirstOrDefaultAsync(b =>
-            b.BookingId == bookingId &&
-            b.EmployeeId == employeeId);
-
-    if (booking == null)
+    public async Task<bool> UpdateBookingAsync(
+        int bookingId,
+        int employeeId,
+        UpdateBookingRequestDto request)
     {
-        return false;
+        // -----------------------------------------------------
+        // FIND EXISTING BOOKING
+        // -----------------------------------------------------
+
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(b =>
+                b.BookingId == bookingId &&
+                b.EmployeeId == employeeId);
+
+        if (booking == null)
+        {
+            return false;
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE ROOM ID
+        // -----------------------------------------------------
+
+        if (!request.RoomId.HasValue ||
+            request.RoomId.Value <= 0)
+        {
+            throw new Exception("Room ID is required.");
+        }
+
+        // -----------------------------------------------------
+        // GET ROOM
+        // -----------------------------------------------------
+
+        var room = await _context.Rooms
+            .FirstOrDefaultAsync(r =>
+                r.RoomId == request.RoomId.Value);
+
+        if (room == null)
+        {
+            throw new Exception("Selected room was not found.");
+        }
+
+        // -----------------------------------------------------
+        // CHECK ROOM STATUS
+        // -----------------------------------------------------
+
+        if (room.IsBlocked ||
+            room.Status == "Blocked")
+        {
+            throw new Exception(
+                "Selected room is currently blocked.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE PARTICIPANT CAPACITY
+        // -----------------------------------------------------
+
+        if (request.ParticipantCount <= 0)
+        {
+            throw new Exception(
+                "Participant count must be greater than zero.");
+        }
+
+        if (request.ParticipantCount > room.Capacity)
+        {
+            throw new Exception(
+                $"Room capacity is {room.Capacity}. " +
+                $"Participant count cannot exceed room capacity.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE DATE
+        // -----------------------------------------------------
+
+        var today =
+            DateOnly.FromDateTime(DateTime.Now);
+
+        if (request.BookingDate < today)
+        {
+            throw new Exception(
+                "Booking date cannot be in the past.");
+        }
+
+        // -----------------------------------------------------
+        // WEEKEND VALIDATION
+        // -----------------------------------------------------
+
+        if (request.BookingDate.DayOfWeek == DayOfWeek.Saturday ||
+            request.BookingDate.DayOfWeek == DayOfWeek.Sunday)
+        {
+            throw new Exception(
+                "Bookings are not allowed on Saturdays and Sundays.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE TIME
+        // OFFICE HOURS
+        //
+        // 09:00 AM - 07:30 PM
+        // -----------------------------------------------------
+
+        var officeStart =
+            new TimeOnly(9, 0);
+
+        var officeEnd =
+            new TimeOnly(19, 30);
+
+        if (request.StartTime < officeStart ||
+            request.EndTime > officeEnd)
+        {
+            throw new Exception(
+                "Booking time must be between 09:00 AM and 07:30 PM.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE START / END TIME
+        // -----------------------------------------------------
+
+        if (request.StartTime >= request.EndTime)
+        {
+            throw new Exception(
+                "End time must be later than start time.");
+        }
+
+        // -----------------------------------------------------
+        // CHECK MINIMUM BOOKING DURATION
+        // -----------------------------------------------------
+
+        var duration =
+            request.EndTime - request.StartTime;
+
+        if (duration.TotalMinutes <= 0)
+        {
+            throw new Exception(
+                "Booking duration must be greater than zero.");
+        }
+
+        // -----------------------------------------------------
+        // CHECK ROOM AVAILABILITY
+        //
+        // Exclude the current booking because it is being
+        // rescheduled.
+        // -----------------------------------------------------
+
+        var roomAvailable =
+            await IsRoomAvailableAsync(
+                request.RoomId.Value,
+                request.BookingDate,
+                request.StartTime,
+                request.EndTime,
+                bookingId);
+
+        if (!roomAvailable)
+        {
+            throw new Exception(
+                "Selected room is already booked for the selected date and time.");
+        }
+
+        // -----------------------------------------------------
+        // UPDATE ROOM
+        // -----------------------------------------------------
+
+        booking.RoomId =
+            request.RoomId.Value;
+
+        // -----------------------------------------------------
+        // UPDATE DATE
+        // -----------------------------------------------------
+
+        booking.BookingDate =
+            request.BookingDate;
+
+        // -----------------------------------------------------
+        // UPDATE START TIME
+        // -----------------------------------------------------
+
+        booking.StartTime =
+            request.StartTime;
+
+        // -----------------------------------------------------
+        // UPDATE END TIME
+        // -----------------------------------------------------
+
+        booking.EndTime =
+            request.EndTime;
+
+        // -----------------------------------------------------
+        // UPDATE MEETING TITLE
+        // -----------------------------------------------------
+
+        if (!string.IsNullOrWhiteSpace(
+            request.MeetingTitle))
+        {
+            booking.MeetingTitle =
+                request.MeetingTitle;
+        }
+
+        // -----------------------------------------------------
+        // UPDATE PURPOSE
+        // -----------------------------------------------------
+
+        if (!string.IsNullOrWhiteSpace(
+            request.Purpose))
+        {
+            booking.Purpose =
+                request.Purpose;
+        }
+
+        // -----------------------------------------------------
+        // UPDATE PARTICIPANT COUNT
+        // -----------------------------------------------------
+
+        booking.ParticipantCount =
+            request.ParticipantCount;
+
+        // -----------------------------------------------------
+        // SAVE CHANGES
+        // -----------------------------------------------------
+
+        await _context.SaveChangesAsync();
+
+        return true;
     }
 
-    // RoomId is nullable in UpdateBookingRequestDto,
-    // but Booking.RoomId is non-nullable int.
-    if (!request.RoomId.HasValue ||
-        request.RoomId.Value <= 0)
-    {
-        throw new Exception(
-            "Room ID is required.");
-    }
-
-    booking.RoomId = request.RoomId.Value;
-
-    booking.BookingDate = request.BookingDate;
-
-    booking.StartTime = request.StartTime;
-
-    booking.EndTime = request.EndTime;
-
-    if (!string.IsNullOrWhiteSpace(request.MeetingTitle))
-    {
-        booking.MeetingTitle = request.MeetingTitle;
-    }
-
-    if (!string.IsNullOrWhiteSpace(request.Purpose))
-    {
-        booking.Purpose = request.Purpose;
-    }
-
-    booking.ParticipantCount =
-        request.ParticipantCount;
-
-    await _context.SaveChangesAsync();
-
-    return true;
-}
-
     // =========================================================
-    // Search Available Rooms
+    // SEARCH AVAILABLE ROOMS
     // =========================================================
 
-    public async Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
-        SearchRoomsRequestDto request)
+    public async Task<List<AvailableRoomDto>>
+        SearchAvailableRoomsAsync(
+            SearchRoomsRequestDto request)
     {
         var query = _context.Rooms
+
             .Include(r => r.RoomType)
+
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
+
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked")
+
             .AsQueryable();
 
+        // =====================================================
+        // MODULE FILTER
+        // =====================================================
 
-        // -----------------------------------------------------
-        // Module Filter
-        // -----------------------------------------------------
-
-        if (!string.IsNullOrWhiteSpace(request.Module))
+        if (!string.IsNullOrWhiteSpace(
+            request.Module))
         {
             query = query.Where(r =>
                 r.Module == request.Module);
         }
 
-
-        // -----------------------------------------------------
-        // Room Type Filter
-        // -----------------------------------------------------
+        // =====================================================
+        // ROOM TYPE FILTER
+        // =====================================================
 
         if (request.RoomTypeId.HasValue &&
             request.RoomTypeId.Value > 0)
         {
             query = query.Where(r =>
-                r.RoomTypeId == request.RoomTypeId.Value);
+                r.RoomTypeId ==
+                request.RoomTypeId.Value);
         }
 
-
-        // -----------------------------------------------------
-        // Participant Capacity Filter
-        // -----------------------------------------------------
+        // =====================================================
+        // PARTICIPANT CAPACITY FILTER
+        // =====================================================
 
         if (request.ParticipantCount.HasValue &&
             request.ParticipantCount.Value > 0)
         {
             query = query.Where(r =>
-                r.Capacity >= request.ParticipantCount.Value);
+                r.Capacity >=
+                request.ParticipantCount.Value);
         }
 
-
-        // -----------------------------------------------------
-        // Facility Filter
-        // -----------------------------------------------------
+        // =====================================================
+        // FACILITY FILTER
+        // =====================================================
 
         if (request.FacilityIds != null &&
             request.FacilityIds.Count > 0)
         {
-            foreach (var facilityId in request.FacilityIds)
+            foreach (var facilityId
+                     in request.FacilityIds)
             {
                 query = query.Where(r =>
                     r.RoomFacilities.Any(rf =>
@@ -285,25 +454,29 @@ public async Task<bool> UpdateBookingAsync(
             }
         }
 
-
-        // -----------------------------------------------------
-        // Date + Time Availability
-        // -----------------------------------------------------
+        // =====================================================
+        // DATE + TIME AVAILABILITY
+        // =====================================================
 
         if (request.BookingDate.HasValue)
         {
-            var bookingDate = request.BookingDate.Value;
+            var bookingDate =
+                request.BookingDate.Value;
 
             if (request.StartTime.HasValue &&
                 request.EndTime.HasValue)
             {
-                var startTime = request.StartTime.Value;
-                var endTime = request.EndTime.Value;
+                var startTime =
+                    request.StartTime.Value;
+
+                var endTime =
+                    request.EndTime.Value;
 
                 query = query.Where(room =>
                     !room.Bookings.Any(booking =>
 
-                        booking.BookingDate == bookingDate &&
+                        booking.BookingDate ==
+                        bookingDate &&
 
                         booking.Status != "Cancelled" &&
                         booking.Status != "Rejected" &&
@@ -314,12 +487,12 @@ public async Task<bool> UpdateBookingAsync(
             }
         }
 
-
-        // -----------------------------------------------------
-        // Select Result
-        // -----------------------------------------------------
+        // =====================================================
+        // SELECT RESULT
+        // =====================================================
 
         return await query
+
             .Select(r => new AvailableRoomDto
             {
                 RoomId = r.RoomId,
@@ -335,31 +508,26 @@ public async Task<bool> UpdateBookingAsync(
                 Capacity = r.Capacity,
 
                 Facilities = r.RoomFacilities
-                    .Where(rf => rf.Facility != null)
+
+                    .Where(rf =>
+                        rf.Facility != null)
+
                     .Select(rf =>
                         rf.Facility!.FacilityName)
+
                     .ToList()
             })
+
             .ToListAsync();
     }
 
-
     // =========================================================
-    // Get Rooms By Module
-    // =========================================================
-    //
-    // This method is required by
-    // IEmployeeBookingRepository.
-    //
-    // Example:
-    // GET rooms for "Module 2"
-    //
-    // It does NOT check booking date/time.
-    // It simply returns rooms belonging to that module.
+    // GET ROOMS BY MODULE
     // =========================================================
 
-    public async Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
-        string module)
+    public async Task<List<AvailableRoomDto>>
+        GetRoomsByModuleAsync(
+            string module)
     {
         if (string.IsNullOrWhiteSpace(module))
         {
@@ -369,6 +537,7 @@ public async Task<bool> UpdateBookingAsync(
         module = module.Trim();
 
         return await _context.Rooms
+
             .Include(r => r.RoomType)
 
             .Include(r => r.RoomFacilities)
@@ -394,27 +563,35 @@ public async Task<bool> UpdateBookingAsync(
                 Capacity = r.Capacity,
 
                 Facilities = r.RoomFacilities
-                    .Where(rf => rf.Facility != null)
+
+                    .Where(rf =>
+                        rf.Facility != null)
+
                     .Select(rf =>
                         rf.Facility!.FacilityName)
+
                     .ToList()
             })
 
             .ToListAsync();
     }
 
-// =========================================================
-// Get Room Capacity
-// =========================================================
+    // =========================================================
+    // GET ROOM CAPACITY
+    // =========================================================
 
-public async Task<int?> GetRoomCapacityAsync(int roomId)
-{
-    return await _context.Rooms
-        .Where(r =>
-            r.RoomId == roomId &&
-            !r.IsBlocked &&
-            r.Status != "Blocked")
-        .Select(r => (int?)r.Capacity)
-        .FirstOrDefaultAsync();
-}
+    public async Task<int?> GetRoomCapacityAsync(
+        int roomId)
+    {
+        return await _context.Rooms
+
+            .Where(r =>
+                r.RoomId == roomId &&
+                !r.IsBlocked &&
+                r.Status != "Blocked")
+
+            .Select(r => (int?)r.Capacity)
+
+            .FirstOrDefaultAsync();
+    }
 }

@@ -25,7 +25,6 @@ public class EmployeeController : ControllerBase
         _checkInService = checkInService;
     }
 
-
     // =========================================================
     // EMPLOYEE DASHBOARD
     // =========================================================
@@ -46,8 +45,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var result =
                 await _dashboardService.GetDashboardAsync(
@@ -65,7 +71,6 @@ public class EmployeeController : ControllerBase
         }
     }
 
-
     // =========================================================
     // EMPLOYEE AVAILABILITY CALENDAR
     // =========================================================
@@ -78,7 +83,7 @@ public class EmployeeController : ControllerBase
         try
         {
             // -------------------------------------------------
-            // DATE IS REQUIRED
+            // DATE REQUIRED
             // -------------------------------------------------
 
             if (!date.HasValue)
@@ -89,31 +94,81 @@ public class EmployeeController : ControllerBase
                 });
             }
 
+            DateOnly bookingDate = date.Value;
 
             // -------------------------------------------------
-            // OPTIONAL: PREVENT PAST DATE SEARCH
+            // GET TODAY
             // -------------------------------------------------
 
-            var today =
+            DateOnly today =
                 DateOnly.FromDateTime(DateTime.Now);
 
-            if (date.Value < today)
+            // -------------------------------------------------
+            // PREVENT PAST DATE
+            // -------------------------------------------------
+
+            if (bookingDate < today)
             {
                 return BadRequest(new
                 {
                     Message =
-                        "Cannot check availability for a past date."
+                        $"Cannot check availability for a past date. " +
+                        $"Today is {today:yyyy-MM-dd}."
                 });
             }
 
+            // -------------------------------------------------
+            // PREVENT SATURDAY
+            // -------------------------------------------------
+
+            if (bookingDate.DayOfWeek == DayOfWeek.Saturday)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Room availability is not available on Saturdays."
+                });
+            }
+
+            // -------------------------------------------------
+            // PREVENT SUNDAY
+            // -------------------------------------------------
+
+            if (bookingDate.DayOfWeek == DayOfWeek.Sunday)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Room availability is not available on Sundays."
+                });
+            }
+
+            // -------------------------------------------------
+            // VALID ROOM TYPE
+            // -------------------------------------------------
+
+            if (roomTypeId.HasValue &&
+                roomTypeId.Value <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message = "Invalid room type."
+                });
+            }
 
             // -------------------------------------------------
             // GET AVAILABILITY
+            //
+            // IMPORTANT:
+            // This will NOT execute for:
+            // - Past dates
+            // - Saturdays
+            // - Sundays
             // -------------------------------------------------
 
             var result =
                 await _dashboardService.GetAvailabilityAsync(
-                    date.Value,
+                    bookingDate,
                     roomTypeId);
 
             return Ok(result);
@@ -127,7 +182,6 @@ public class EmployeeController : ControllerBase
             });
         }
     }
-
 
     // =========================================================
     // CREATE BOOKING
@@ -150,8 +204,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var bookingId =
                 await _employeeBookingService
@@ -175,7 +236,6 @@ public class EmployeeController : ControllerBase
         }
     }
 
-
     // =========================================================
     // MY BOOKINGS
     // =========================================================
@@ -196,8 +256,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var result =
                 await _dashboardService
@@ -213,7 +280,6 @@ public class EmployeeController : ControllerBase
             });
         }
     }
-
 
     // =========================================================
     // RECENT RESERVATIONS
@@ -235,8 +301,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var result =
                 await _dashboardService
@@ -252,7 +325,6 @@ public class EmployeeController : ControllerBase
             });
         }
     }
-
 
     // =========================================================
     // VIEW BOOKING
@@ -275,8 +347,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var booking =
                 await _employeeBookingService
@@ -303,7 +382,6 @@ public class EmployeeController : ControllerBase
         }
     }
 
-
     // =========================================================
     // CANCEL BOOKING
     // =========================================================
@@ -325,8 +403,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var result =
                 await _employeeBookingService
@@ -356,7 +441,6 @@ public class EmployeeController : ControllerBase
         }
     }
 
-
     // =========================================================
     // EDIT / RESCHEDULE BOOKING
     // =========================================================
@@ -379,8 +463,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var result =
                 await _employeeBookingService
@@ -410,7 +501,6 @@ public class EmployeeController : ControllerBase
             });
         }
     }
-
 
     // =========================================================
     // GET ROOMS BY MODULE
@@ -445,7 +535,6 @@ public class EmployeeController : ControllerBase
         }
     }
 
-
     // =========================================================
     // SEARCH AVAILABLE ROOMS
     // =========================================================
@@ -456,6 +545,70 @@ public class EmployeeController : ControllerBase
     {
         try
         {
+            // -------------------------------------------------
+            // VALIDATE DATE
+            // -------------------------------------------------
+
+            if (request.BookingDate.HasValue)
+            {
+                DateOnly bookingDate =
+                    request.BookingDate.Value;
+
+                DateOnly today =
+                    DateOnly.FromDateTime(DateTime.Now);
+
+                if (bookingDate < today)
+                {
+                    return BadRequest(new
+                    {
+                        Message =
+                            "Cannot search rooms for a past date."
+                    });
+                }
+
+                if (bookingDate.DayOfWeek ==
+                    DayOfWeek.Saturday)
+                {
+                    return BadRequest(new
+                    {
+                        Message =
+                            "Room search is not available on Saturdays."
+                    });
+                }
+
+                if (bookingDate.DayOfWeek ==
+                    DayOfWeek.Sunday)
+                {
+                    return BadRequest(new
+                    {
+                        Message =
+                            "Room search is not available on Sundays."
+                    });
+                }
+            }
+
+            // -------------------------------------------------
+            // VALIDATE TIME
+            // -------------------------------------------------
+
+            if (request.StartTime.HasValue &&
+                request.EndTime.HasValue)
+            {
+                if (request.StartTime.Value >=
+                    request.EndTime.Value)
+                {
+                    return BadRequest(new
+                    {
+                        Message =
+                            "Start time must be earlier than end time."
+                    });
+                }
+            }
+
+            // -------------------------------------------------
+            // SEARCH ROOMS
+            // -------------------------------------------------
+
             var rooms =
                 await _employeeBookingService
                     .SearchAvailableRoomsAsync(request);
@@ -470,7 +623,6 @@ public class EmployeeController : ControllerBase
             });
         }
     }
-
 
     // =========================================================
     // CHECK-IN BOOKING
@@ -494,8 +646,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId =
-                int.Parse(employeeIdClaim.Value);
+            if (!int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid employee Id in token."
+                });
+            }
 
             var result =
                 await _checkInService
