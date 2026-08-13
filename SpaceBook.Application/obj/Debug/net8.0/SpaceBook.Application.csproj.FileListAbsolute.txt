@@ -62,3 +62,19 @@ C:\Users\AmirthaGovindasamy\Spacebook\Spacebook\SpaceBook.Application\obj\Debug\
 C:\Users\AmirthaGovindasamy\Spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\refint\SpaceBook.Application.dll
 C:\Users\AmirthaGovindasamy\Spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.pdb
 C:\Users\AmirthaGovindasamy\Spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\ref\SpaceBook.Application.dll
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\bin\Debug\net8.0\SpaceBook.Application.deps.json
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\bin\Debug\net8.0\SpaceBook.Application.dll
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\bin\Debug\net8.0\SpaceBook.Application.pdb
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\bin\Debug\net8.0\SpaceBook.Domain.dll
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\bin\Debug\net8.0\SpaceBook.Domain.pdb
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.csproj.AssemblyReference.cache
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.AssemblyInfoInputs.cache
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.AssemblyInfo.cs
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.csproj.CoreCompileInputs.cache
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.sourcelink.json
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBoo.3BE4D8F3.Up2Date
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.dll
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\refint\SpaceBook.Application.dll
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\SpaceBook.Application.pdb
+C:\Users\VikashDurairaj\new backend-spacebook\Spacebook\SpaceBook.Application\obj\Debug\net8.0\ref\SpaceBook.Application.dll
