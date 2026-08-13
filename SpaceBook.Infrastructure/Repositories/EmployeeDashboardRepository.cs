@@ -479,11 +479,14 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             {
                 BookingId =
                     x.BookingId,
+                RoomId =
+                    x.RoomId,
  
                 RoomName =
                     x.Room != null
                         ? x.Room.RoomName
                         : $"Room {x.RoomId}",
+                
  
                 Purpose =
                     !string.IsNullOrWhiteSpace(x.Purpose)
