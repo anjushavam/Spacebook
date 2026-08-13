@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using SpaceBook.Application.DTOs.Booking;
 using SpaceBook.Application.Interfaces;
 
-
 namespace SpaceBook.API.Controllers;
 
 [ApiController]
@@ -14,26 +13,30 @@ public class EmployeeController : ControllerBase
 {
     private readonly IEmployeeDashboardService _dashboardService;
     private readonly IEmployeeBookingService _employeeBookingService;
-
     private readonly IEmployeeCheckInService _checkInService;
 
     public EmployeeController(
-    IEmployeeDashboardService dashboardService,
-    IEmployeeBookingService employeeBookingService,
-    IEmployeeCheckInService checkInService)
-{
-    _dashboardService = dashboardService;
-    _employeeBookingService = employeeBookingService;
-    _checkInService = checkInService;
-}
+        IEmployeeDashboardService dashboardService,
+        IEmployeeBookingService employeeBookingService,
+        IEmployeeCheckInService checkInService)
+    {
+        _dashboardService = dashboardService;
+        _employeeBookingService = employeeBookingService;
+        _checkInService = checkInService;
+    }
 
-    // Employee Dashboard
+
+    // =========================================================
+    // EMPLOYEE DASHBOARD
+    // =========================================================
+
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard()
     {
         try
         {
-            var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (employeeIdClaim == null)
             {
@@ -43,9 +46,12 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            int employeeId = int.Parse(employeeIdClaim.Value);
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
 
-            var result = await _dashboardService.GetDashboardAsync(employeeId);
+            var result =
+                await _dashboardService.GetDashboardAsync(
+                    employeeId);
 
             return Ok(result);
         }
@@ -59,86 +65,128 @@ public class EmployeeController : ControllerBase
         }
     }
 
-    // Employee Availability Calendar
+
+    // =========================================================
+    // EMPLOYEE AVAILABILITY CALENDAR
+    // =========================================================
+
     [HttpGet("availability")]
-public async Task<IActionResult> GetAvailability(
-    [FromQuery] DateOnly date,
-    [FromQuery] int? roomTypeId)
-{
-    try
+    public async Task<IActionResult> GetAvailability(
+        [FromQuery] DateOnly? date,
+        [FromQuery] int? roomTypeId)
     {
-        var result = await _dashboardService.GetAvailabilityAsync(date, roomTypeId);
- 
-        return Ok(result);
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new
+        try
         {
-            Message = "Something went wrong.",
-            Error = ex.Message
-        });
-    }
-}
+            // -------------------------------------------------
+            // DATE IS REQUIRED
+            // -------------------------------------------------
 
-    // Create Booking
-[HttpPost("bookings")]
-public async Task<IActionResult> CreateBooking(
-    [FromBody] CreateBookingRequestDto request)
-{
-    try
-    {
-        var employeeIdClaim =
-            User.FindFirst(ClaimTypes.NameIdentifier);
-
-
-        if (employeeIdClaim == null)
-        {
-            return Unauthorized(new
+            if (!date.HasValue)
             {
-                Message = "Invalid token."
+                return BadRequest(new
+                {
+                    Message = "Date is required."
+                });
+            }
+
+
+            // -------------------------------------------------
+            // OPTIONAL: PREVENT PAST DATE SEARCH
+            // -------------------------------------------------
+
+            var today =
+                DateOnly.FromDateTime(DateTime.Now);
+
+            if (date.Value < today)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Cannot check availability for a past date."
+                });
+            }
+
+
+            // -------------------------------------------------
+            // GET AVAILABILITY
+            // -------------------------------------------------
+
+            var result =
+                await _dashboardService.GetAvailabilityAsync(
+                    date.Value,
+                    roomTypeId);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                Message = "Something went wrong.",
+                Error = ex.Message
             });
         }
-
-
-        int employeeId =
-            int.Parse(employeeIdClaim.Value);
-
-
-
-        var bookingId =
-            await _employeeBookingService
-            .CreateBookingAsync(
-                employeeId,
-                request);
-
-
-
-        return Ok(new
-        {
-            Message = "Booking created successfully.",
-
-            BookingId = bookingId,
-
-            Status = "Pending"
-        });
     }
-    catch (Exception ex)
+
+
+    // =========================================================
+    // CREATE BOOKING
+    // =========================================================
+
+    [HttpPost("bookings")]
+    public async Task<IActionResult> CreateBooking(
+        [FromBody] CreateBookingRequestDto request)
     {
-        return BadRequest(new
+        try
         {
-            Message = ex.Message
-        });
-    }
-}
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
-    // My Bookings
+            if (employeeIdClaim == null)
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid token."
+                });
+            }
+
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
+
+            var bookingId =
+                await _employeeBookingService
+                    .CreateBookingAsync(
+                        employeeId,
+                        request);
+
+            return Ok(new
+            {
+                Message = "Booking created successfully.",
+                BookingId = bookingId,
+                Status = "Pending"
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+    }
+
+
+    // =========================================================
+    // MY BOOKINGS
+    // =========================================================
+
     [HttpGet("mybookings")]
     public async Task<IActionResult> GetMyBookings()
     {
         try
         {
-            var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (employeeIdClaim == null)
             {
@@ -148,9 +196,12 @@ public async Task<IActionResult> CreateBooking(
                 });
             }
 
-            int employeeId = int.Parse(employeeIdClaim.Value);
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
 
-            var result = await _dashboardService.GetMyBookingsAsync(employeeId);
+            var result =
+                await _dashboardService
+                    .GetMyBookingsAsync(employeeId);
 
             return Ok(result);
         }
@@ -163,13 +214,18 @@ public async Task<IActionResult> CreateBooking(
         }
     }
 
-    // Recent Reservations
+
+    // =========================================================
+    // RECENT RESERVATIONS
+    // =========================================================
+
     [HttpGet("recentreservations")]
     public async Task<IActionResult> GetRecentReservations()
     {
         try
         {
-            var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
             if (employeeIdClaim == null)
             {
@@ -179,9 +235,12 @@ public async Task<IActionResult> CreateBooking(
                 });
             }
 
-            int employeeId = int.Parse(employeeIdClaim.Value);
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
 
-            var result = await _dashboardService.GetRecentReservationsAsync(employeeId);
+            var result =
+                await _dashboardService
+                    .GetRecentReservationsAsync(employeeId);
 
             return Ok(result);
         }
@@ -193,228 +252,265 @@ public async Task<IActionResult> CreateBooking(
             });
         }
     }
-    // View Booking
-[HttpGet("bookings/{bookingId}")]
-public async Task<IActionResult> GetBookingById(int bookingId)
-{
-    try
-    {
-        var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
 
-        if (employeeIdClaim == null)
+
+    // =========================================================
+    // VIEW BOOKING
+    // =========================================================
+
+    [HttpGet("bookings/{bookingId}")]
+    public async Task<IActionResult> GetBookingById(
+        int bookingId)
+    {
+        try
         {
-            return Unauthorized(new
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
+
+            if (employeeIdClaim == null)
             {
-                Message = "Invalid token."
+                return Unauthorized(new
+                {
+                    Message = "Invalid token."
+                });
+            }
+
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
+
+            var booking =
+                await _employeeBookingService
+                    .GetBookingByIdAsync(
+                        bookingId,
+                        employeeId);
+
+            if (booking == null)
+            {
+                return NotFound(new
+                {
+                    Message = "Booking not found."
+                });
+            }
+
+            return Ok(booking);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                Message = ex.Message
             });
         }
+    }
 
-        int employeeId = int.Parse(employeeIdClaim.Value);
 
-        var booking = await _employeeBookingService.GetBookingByIdAsync(
-            bookingId,
-            employeeId);
+    // =========================================================
+    // CANCEL BOOKING
+    // =========================================================
 
-        if (booking == null)
+    [HttpPut("bookings/{bookingId}/cancel")]
+    public async Task<IActionResult> CancelBooking(
+        int bookingId)
+    {
+        try
         {
-            return NotFound(new
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
+
+            if (employeeIdClaim == null)
             {
-                Message = "Booking not found."
+                return Unauthorized(new
+                {
+                    Message = "Invalid token."
+                });
+            }
+
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
+
+            var result =
+                await _employeeBookingService
+                    .CancelBookingAsync(
+                        bookingId,
+                        employeeId);
+
+            if (!result)
+            {
+                return NotFound(new
+                {
+                    Message = "Booking not found."
+                });
+            }
+
+            return Ok(new
+            {
+                Message = "Booking cancelled successfully."
             });
         }
-
-        return Ok(booking);
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new
-        {
-            Message = ex.Message
-        });
-    }
-}
-// Cancel Booking
-[HttpPut("bookings/{bookingId}/cancel")]
-public async Task<IActionResult> CancelBooking(int bookingId)
-{
-    try
-    {
-        var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-
-        if (employeeIdClaim == null)
-        {
-            return Unauthorized(new
-            {
-                Message = "Invalid token."
-            });
-        }
-
-        int employeeId = int.Parse(employeeIdClaim.Value);
-
-        var result = await _employeeBookingService.CancelBookingAsync(
-            bookingId,
-            employeeId);
-
-        if (!result)
-        {
-            return NotFound(new
-            {
-                Message = "Booking not found."
-            });
-        }
-
-        return Ok(new
-        {
-            Message = "Booking cancelled successfully."
-        });
-    }
-    catch (Exception ex)
-    {
-        return BadRequest(new
-        {
-            Message = ex.Message
-        });
-    }
-}
-// Edit Booking
-[HttpPut("bookings/{bookingId}")]
-public async Task<IActionResult> UpdateBooking(
-    int bookingId,
-    [FromBody] UpdateBookingRequestDto request)
-{
-    try
-    {
-        var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-
-        if (employeeIdClaim == null)
-        {
-            return Unauthorized(new
-            {
-                Message = "Invalid token."
-            });
-        }
-
-        int employeeId = int.Parse(employeeIdClaim.Value);
-
-        var result = await _employeeBookingService.UpdateBookingAsync(
-            bookingId,
-            employeeId,
-            request);
-
-        if (!result)
-        {
-            return NotFound(new
-            {
-                Message = "Booking not found."
-            });
-        }
-
-        return Ok(new
-        {
-            Message = "Booking updated successfully."
-        });
-    }
-    catch (Exception ex)
-    {
-        return BadRequest(new
-        {
-            Message = ex.Message
-        });
-    }
-}
-
-// Get Rooms By Module
-[HttpGet("rooms")]
-public async Task<IActionResult> GetRoomsByModule(
-    [FromQuery] string module)
-{
-    try
-    {
-        if (string.IsNullOrWhiteSpace(module))
+        catch (Exception ex)
         {
             return BadRequest(new
             {
-                Message = "Module is required."
+                Message = ex.Message
             });
         }
-
-        var rooms = await _employeeBookingService
-            .GetRoomsByModuleAsync(module);
-
-        return Ok(rooms);
     }
-    catch (Exception ex)
+
+
+    // =========================================================
+    // EDIT / RESCHEDULE BOOKING
+    // =========================================================
+
+    [HttpPut("bookings/{bookingId}")]
+    public async Task<IActionResult> UpdateBooking(
+        int bookingId,
+        [FromBody] UpdateBookingRequestDto request)
     {
-        return BadRequest(new
+        try
         {
-            Message = ex.Message
-        });
-    }
-}
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
 
-// Search Available Rooms
-[HttpPost("searchrooms")]
-public async Task<IActionResult> SearchAvailableRooms(
-    [FromBody] SearchRoomsRequestDto request)
-{
-    try
-    {
-        var rooms = await _employeeBookingService.SearchAvailableRoomsAsync(request);
-
-        return Ok(rooms);
-    }
-    catch (Exception ex)
-    {
-        return BadRequest(new
-        {
-            Message = ex.Message
-        });
-    }
-}
-
-// Check-In Booking
-[HttpPost("bookings/{bookingId}/checkin")]
-public async Task<IActionResult> CheckIn(
-    int bookingId)
-{
-    try
-    {
-        var employeeIdClaim =
-            User.FindFirst(
-                ClaimTypes.NameIdentifier);
-
-
-        if(employeeIdClaim == null)
-        {
-            return Unauthorized(new
+            if (employeeIdClaim == null)
             {
-                Message = "Invalid token."
+                return Unauthorized(new
+                {
+                    Message = "Invalid token."
+                });
+            }
+
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
+
+            var result =
+                await _employeeBookingService
+                    .UpdateBookingAsync(
+                        bookingId,
+                        employeeId,
+                        request);
+
+            if (!result)
+            {
+                return NotFound(new
+                {
+                    Message = "Booking not found."
+                });
+            }
+
+            return Ok(new
+            {
+                Message = "Booking updated successfully."
             });
         }
-
-
-        int employeeId =
-            int.Parse(employeeIdClaim.Value);
-
-
-
-        var result =
-            await _checkInService
-            .CheckInAsync(
-                bookingId,
-                employeeId);
-
-
-
-        return Ok(result);
-    }
-    catch(Exception ex)
-    {
-        return BadRequest(new
+        catch (Exception ex)
         {
-            Message = ex.Message
-        });
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
     }
-}
 
+
+    // =========================================================
+    // GET ROOMS BY MODULE
+    // =========================================================
+
+    [HttpGet("rooms")]
+    public async Task<IActionResult> GetRoomsByModule(
+        [FromQuery] string module)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(module))
+            {
+                return BadRequest(new
+                {
+                    Message = "Module is required."
+                });
+            }
+
+            var rooms =
+                await _employeeBookingService
+                    .GetRoomsByModuleAsync(module);
+
+            return Ok(rooms);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+    }
+
+
+    // =========================================================
+    // SEARCH AVAILABLE ROOMS
+    // =========================================================
+
+    [HttpPost("searchrooms")]
+    public async Task<IActionResult> SearchAvailableRooms(
+        [FromBody] SearchRoomsRequestDto request)
+    {
+        try
+        {
+            var rooms =
+                await _employeeBookingService
+                    .SearchAvailableRoomsAsync(request);
+
+            return Ok(rooms);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+    }
+
+
+    // =========================================================
+    // CHECK-IN BOOKING
+    // =========================================================
+
+    [HttpPost("bookings/{bookingId}/checkin")]
+    public async Task<IActionResult> CheckIn(
+        int bookingId)
+    {
+        try
+        {
+            var employeeIdClaim =
+                User.FindFirst(
+                    ClaimTypes.NameIdentifier);
+
+            if (employeeIdClaim == null)
+            {
+                return Unauthorized(new
+                {
+                    Message = "Invalid token."
+                });
+            }
+
+            int employeeId =
+                int.Parse(employeeIdClaim.Value);
+
+            var result =
+                await _checkInService
+                    .CheckInAsync(
+                        bookingId,
+                        employeeId);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+    }
 }

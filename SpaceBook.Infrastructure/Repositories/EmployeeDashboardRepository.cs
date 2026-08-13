@@ -3,6 +3,7 @@ using SpaceBook.Application.DTOs.Employee;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Infrastructure.Data;
 using SpaceBook.Application.DTOs.Admin;
+using SpaceBook.Domain.Entities;
 
 namespace SpaceBook.Infrastructure.Repositories;
 
@@ -21,8 +22,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
     public async Task<EmployeeDashboardDto> GetDashboardAsync(int employeeId)
     {
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        var currentTime = TimeOnly.FromDateTime(DateTime.Now);
+        var now = DateTime.Now;
+
+        var today = DateOnly.FromDateTime(now);
+        var currentTime = TimeOnly.FromDateTime(now);
 
         var bookingsToday = await _context.Bookings
             .AsNoTracking()
@@ -106,11 +109,22 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         DateOnly date,
         int? roomTypeId)
     {
+        // =====================================================
+        // CURRENT DATE AND TIME
+        // =====================================================
+
+        var now = DateTime.Now;
+
         var today =
-            DateOnly.FromDateTime(DateTime.Now);
+            DateOnly.FromDateTime(now);
 
         var currentTime =
-            TimeOnly.FromDateTime(DateTime.Now);
+            TimeOnly.FromDateTime(now);
+
+
+        // =====================================================
+        // RESULT
+        // =====================================================
 
         var result = new AvailabilityCalendarDto
         {
@@ -120,6 +134,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
         // =====================================================
         // OFFICE HOURS
+        //
+        // 09:00 AM -> 07:30 PM
         // =====================================================
 
         TimeOnly officeStart =
@@ -185,44 +201,55 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             List<TimeSlotDto> slots = new();
 
 
-            TimeOnly start = officeStart;
+            // =================================================
+            // PAST DATE
+            // =================================================
+
+            if (date < today)
+            {
+                slots = new List<TimeSlotDto>();
+            }
 
 
             // =================================================
             // FUTURE DATE
-            // Show all slots from 09:00 AM to 07:30 PM
+            //
+            // Show:
+            //
+            // 09:00 - 10:00
+            // 10:00 - 11:00
+            // ...
+            // 18:00 - 19:00
+            // 19:00 - 19:30
             // =================================================
 
-            if (date > today)
+            else if (date > today)
             {
+                TimeOnly start =
+                    officeStart;
+
                 while (start < officeEnd)
                 {
                     TimeOnly end =
                         start.AddHours(1);
-
-
-                    // Last slot:
-                    // 07:00 PM - 07:30 PM
 
                     if (end > officeEnd)
                     {
                         end = officeEnd;
                     }
 
-
                     bool isBooked =
                         bookings.Any(b =>
                             b.StartTime < end &&
                             b.EndTime > start);
 
-
-                    slots.Add(new TimeSlotDto
-                    {
-                        StartTime = start,
-                        EndTime = end,
-                        IsBooked = isBooked
-                    });
-
+                    slots.Add(
+                        new TimeSlotDto
+                        {
+                            StartTime = start,
+                            EndTime = end,
+                            IsBooked = isBooked
+                        });
 
                     start = end;
                 }
@@ -231,19 +258,34 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
             // =================================================
             // TODAY
-            // Only show slots that have NOT already ended
+            //
+            // IMPORTANT:
+            // Never show a slot that has already ended.
+            //
+            // Example:
+            // Current time = 03:45 PM
+            //
+            // 09-10 -> hidden
+            // 10-11 -> hidden
+            // 11-12 -> hidden
+            // 12-01 -> hidden
+            // 01-02 -> hidden
+            // 02-03 -> hidden
+            // 03-04 -> shown
+            // 04-05 -> shown
+            // ...
+            // 07-07:30 -> shown
             // =================================================
 
-            else if (date == today)
+            else
             {
+                TimeOnly start =
+                    officeStart;
+
                 while (start < officeEnd)
                 {
                     TimeOnly end =
                         start.AddHours(1);
-
-
-                    // Last slot:
-                    // 07:00 PM - 07:30 PM
 
                     if (end > officeEnd)
                     {
@@ -252,23 +294,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
 
                     // -----------------------------------------
-                    // IMPORTANT
-                    // Skip slots that have already ended
-                    //
-                    // Example:
-                    // Current time = 04:00 PM
-                    //
-                    // 09-10  -> hidden
-                    // 10-11  -> hidden
-                    // 11-12  -> hidden
-                    // 12-01  -> hidden
-                    // 01-02  -> hidden
-                    // 02-03  -> hidden
-                    // 03-04  -> hidden
-                    // 04-05  -> shown
-                    // 05-06  -> shown
-                    // 06-07  -> shown
-                    // 07-07:30 -> shown
+                    // DO NOT SHOW COMPLETELY PASSED SLOT
                     // -----------------------------------------
 
                     if (end <= currentTime)
@@ -284,12 +310,13 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                             b.EndTime > start);
 
 
-                    slots.Add(new TimeSlotDto
-                    {
-                        StartTime = start,
-                        EndTime = end,
-                        IsBooked = isBooked
-                    });
+                    slots.Add(
+                        new TimeSlotDto
+                        {
+                            StartTime = start,
+                            EndTime = end,
+                            IsBooked = isBooked
+                        });
 
 
                     start = end;
@@ -298,42 +325,46 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
 
             // =================================================
-            // PAST DATE
-            // No available slots
+            // CURRENT BOOKING
             // =================================================
 
-            else
-            {
-                slots = new List<TimeSlotDto>();
-            }
+            Booking? currentBooking = null;
 
-
-            // =================================================
-            // CURRENT / UPCOMING BOOKING
-            // =================================================
-
-            var currentBooking =
-                bookings
-                    .Where(b =>
-                        b.StartTime <= currentTime &&
-                        b.EndTime > currentTime)
-                    .OrderBy(b => b.StartTime)
-                    .FirstOrDefault();
-
-
-            // =================================================
-            // IF THERE IS NO CURRENT BOOKING,
-            // GET NEXT UPCOMING BOOKING
-            // =================================================
-
-            if (currentBooking == null)
+            if (date == today)
             {
                 currentBooking =
                     bookings
                         .Where(b =>
-                            b.StartTime > currentTime)
+                            b.StartTime <= currentTime &&
+                            b.EndTime > currentTime)
                         .OrderBy(b => b.StartTime)
                         .FirstOrDefault();
+            }
+
+
+            // =================================================
+            // NEXT UPCOMING BOOKING
+            // =================================================
+
+            if (currentBooking == null &&
+                date >= today)
+            {
+                if (date == today)
+                {
+                    currentBooking =
+                        bookings
+                            .Where(b =>
+                                b.StartTime > currentTime)
+                            .OrderBy(b => b.StartTime)
+                            .FirstOrDefault();
+                }
+                else
+                {
+                    currentBooking =
+                        bookings
+                            .OrderBy(b => b.StartTime)
+                            .FirstOrDefault();
+                }
             }
 
 
@@ -357,6 +388,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             string roomStatus = "Available";
 
 
+            // TODAY
             if (date == today)
             {
                 var activeBooking =
@@ -369,6 +401,9 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     roomStatus = "Booked";
                 }
             }
+
+
+            // FUTURE DATE
             else if (date > today)
             {
                 if (bookings.Any())
@@ -379,33 +414,40 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
 
             // =================================================
-            // ADD ROOM TO RESPONSE
+            // ADD ROOM
             // =================================================
 
             result.Rooms.Add(
                 new RoomAvailabilityDto
                 {
-                    RoomId = room.RoomId,
+                    RoomId =
+                        room.RoomId,
 
-                    RoomName = room.RoomName,
+                    RoomName =
+                        room.RoomName,
 
                     RoomType =
                         room.RoomType != null
                             ? room.RoomType.TypeName
                             : "Conference",
 
-                    Module = room.Module,
+                    Module =
+                        room.Module,
 
-                    Capacity = room.Capacity,
+                    Capacity =
+                        room.Capacity,
 
-                    Facilities = facilities,
+                    Facilities =
+                        facilities,
 
-                    Status = roomStatus,
+                    Status =
+                        roomStatus,
 
                     AvailableSlots =
                         slots.Count(x => !x.IsBooked),
 
-                    TimeSlots = slots,
+                    TimeSlots =
+                        slots,
 
                     CurrentBooking =
                         currentBooking == null
@@ -456,7 +498,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             .ThenByDescending(x => x.StartTime)
             .Select(x => new MyBookingDto
             {
-                BookingId = x.BookingId,
+                BookingId =
+                    x.BookingId,
 
                 RoomName =
                     x.Room != null
@@ -472,13 +515,17 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                                 : "Reserved Workspace"
                           ),
 
-                BookingDate = x.BookingDate,
+                BookingDate =
+                    x.BookingDate,
 
-                StartTime = x.StartTime,
+                StartTime =
+                    x.StartTime,
 
-                EndTime = x.EndTime,
+                EndTime =
+                    x.EndTime,
 
-                Status = x.Status
+                Status =
+                    x.Status
             })
             .ToListAsync();
     }
@@ -503,20 +550,25 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             .ThenByDescending(x => x.StartTime)
             .Select(x => new RecentReservationDto
             {
-                BookingId = x.BookingId,
+                BookingId =
+                    x.BookingId,
 
                 RoomName =
                     x.Room != null
                         ? x.Room.RoomName
                         : $"Room {x.RoomId}",
 
-                BookingDate = x.BookingDate,
+                BookingDate =
+                    x.BookingDate,
 
-                StartTime = x.StartTime,
+                StartTime =
+                    x.StartTime,
 
-                EndTime = x.EndTime,
+                EndTime =
+                    x.EndTime,
 
-                Status = x.Status
+                Status =
+                    x.Status
             })
             .ToListAsync();
     }
