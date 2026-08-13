@@ -386,4 +386,19 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
             .ToListAsync();
     }
+
+// =========================================================
+// Get Room Capacity
+// =========================================================
+
+public async Task<int?> GetRoomCapacityAsync(int roomId)
+{
+    return await _context.Rooms
+        .Where(r =>
+            r.RoomId == roomId &&
+            !r.IsBlocked &&
+            r.Status != "Blocked")
+        .Select(r => (int?)r.Capacity)
+        .FirstOrDefaultAsync();
+}
 }

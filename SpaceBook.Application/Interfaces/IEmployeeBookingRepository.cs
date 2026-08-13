@@ -84,5 +84,7 @@ public interface IEmployeeBookingRepository
     // Save Changes
     // =========================================================
 
+    Task<int?> GetRoomCapacityAsync(int roomId);
+    
     Task SaveChangesAsync();
 }

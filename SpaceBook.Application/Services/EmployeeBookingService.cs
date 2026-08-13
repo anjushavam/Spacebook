@@ -9,6 +9,17 @@ public class EmployeeBookingService : IEmployeeBookingService
     private readonly IEmployeeBookingRepository _bookingRepository;
     private readonly INotificationRepository _notificationRepository;
 
+    // =========================================================
+    // OFFICE HOURS
+    // =========================================================
+
+    private static readonly TimeOnly OfficeStartTime =
+        new TimeOnly(9, 0);
+
+    private static readonly TimeOnly OfficeEndTime =
+        new TimeOnly(18, 0);
+
+
     public EmployeeBookingService(
         IEmployeeBookingRepository bookingRepository,
         INotificationRepository notificationRepository)
@@ -17,19 +28,79 @@ public class EmployeeBookingService : IEmployeeBookingService
         _notificationRepository = notificationRepository;
     }
 
+
     // =========================================================
-    // Create Booking
+    // CREATE BOOKING
     // =========================================================
 
     public async Task<int> CreateBookingAsync(
         int employeeId,
         CreateBookingRequestDto request)
     {
+        // =====================================================
+        // VALIDATE TIME
+        // =====================================================
+
         if (request.StartTime >= request.EndTime)
         {
             throw new Exception(
                 "End time must be after start time.");
         }
+
+
+        // =====================================================
+        // VALIDATE OFFICE HOURS
+        // Office Hours: 09:00 AM to 06:00 PM
+        // =====================================================
+
+        if (request.StartTime < OfficeStartTime)
+        {
+            throw new Exception(
+                "Bookings can only start from 09:00 AM.");
+        }
+
+        if (request.EndTime > OfficeEndTime)
+        {
+            throw new Exception(
+                "Bookings must end by 06:00 PM.");
+        }
+
+
+        // =====================================================
+        // VALIDATE PARTICIPANT COUNT
+        // =====================================================
+
+        if (request.ParticipantCount <= 0)
+        {
+            throw new Exception(
+                "Participant count must be at least 1.");
+        }
+
+
+        // =====================================================
+        // VALIDATE ROOM CAPACITY
+        // =====================================================
+
+        var roomCapacity =
+            await _bookingRepository.GetRoomCapacityAsync(
+                request.RoomId);
+
+        if (roomCapacity == null)
+        {
+            throw new Exception(
+                "Selected room is not available.");
+        }
+
+        if (request.ParticipantCount > roomCapacity.Value)
+        {
+            throw new Exception(
+                $"The selected room can accommodate a maximum of {roomCapacity.Value} participants.");
+        }
+
+
+        // =====================================================
+        // CHECK ROOM AVAILABILITY
+        // =====================================================
 
         bool isAvailable =
             await _bookingRepository.IsRoomAvailableAsync(
@@ -44,6 +115,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Room is already booked for the selected time.");
         }
 
+
+        // =====================================================
+        // RESOLVE MEETING TITLE AND PURPOSE
+        // =====================================================
+
         string resolvedPurpose =
             !string.IsNullOrWhiteSpace(request.Purpose)
                 ? request.Purpose
@@ -55,6 +131,11 @@ public class EmployeeBookingService : IEmployeeBookingService
             !string.IsNullOrWhiteSpace(request.MeetingTitle)
                 ? request.MeetingTitle
                 : resolvedPurpose;
+
+
+        // =====================================================
+        // CREATE BOOKING
+        // =====================================================
 
         var booking = new Booking
         {
@@ -72,9 +153,15 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         try
         {
-            await _bookingRepository.CreateBookingAsync(booking);
+            await _bookingRepository.CreateBookingAsync(
+                booking);
 
             await _bookingRepository.SaveChangesAsync();
+
+
+            // =================================================
+            // CREATE ADMIN NOTIFICATION
+            // =================================================
 
             var adminNotification = new Notification
             {
@@ -93,6 +180,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
             await _notificationRepository.SaveChangesAsync();
 
+
             return booking.BookingId;
         }
         catch (Exception ex)
@@ -105,7 +193,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
 
     // =========================================================
-    // View Booking
+    // VIEW BOOKING
     // =========================================================
 
     public async Task<BookingDetailsDto?> GetBookingByIdAsync(
@@ -119,7 +207,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
 
     // =========================================================
-    // Cancel Booking
+    // CANCEL BOOKING
     // =========================================================
 
     public async Task<bool> CancelBookingAsync(
@@ -156,7 +244,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
 
     // =========================================================
-    // Update / Reschedule Booking
+    // UPDATE / RESCHEDULE BOOKING
     // =========================================================
 
     public async Task<bool> UpdateBookingAsync(
@@ -164,11 +252,49 @@ public class EmployeeBookingService : IEmployeeBookingService
         int employeeId,
         UpdateBookingRequestDto request)
     {
+        // =====================================================
+        // VALIDATE TIME
+        // =====================================================
+
         if (request.StartTime >= request.EndTime)
         {
             throw new Exception(
                 "End time must be after start time.");
         }
+
+
+        // =====================================================
+        // VALIDATE OFFICE HOURS
+        // Office Hours: 09:00 AM to 06:00 PM
+        // =====================================================
+
+        if (request.StartTime < OfficeStartTime)
+        {
+            throw new Exception(
+                "Bookings can only start from 09:00 AM.");
+        }
+
+        if (request.EndTime > OfficeEndTime)
+        {
+            throw new Exception(
+                "Bookings must end by 06:00 PM.");
+        }
+
+
+        // =====================================================
+        // VALIDATE PARTICIPANT COUNT
+        // =====================================================
+
+        if (request.ParticipantCount <= 0)
+        {
+            throw new Exception(
+                "Participant count must be at least 1.");
+        }
+
+
+        // =====================================================
+        // CHECK EXISTING BOOKING
+        // =====================================================
 
         var existingBooking =
             await _bookingRepository.GetBookingByIdAsync(
@@ -181,6 +307,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Booking not found.");
         }
 
+
+        // =====================================================
+        // CHECK RESCHEDULE TIME RESTRICTION
+        // =====================================================
+
         var bookingStartDateTime =
             existingBooking.BookingDate.ToDateTime(
                 existingBooking.StartTime);
@@ -190,6 +321,32 @@ public class EmployeeBookingService : IEmployeeBookingService
             throw new Exception(
                 "Booking cannot be rescheduled within 1 hour before start time.");
         }
+
+
+        // =====================================================
+        // VALIDATE ROOM CAPACITY
+        // =====================================================
+
+        var roomCapacity =
+            await _bookingRepository.GetRoomCapacityAsync(
+                request.RoomId);
+
+        if (roomCapacity == null)
+        {
+            throw new Exception(
+                "Selected room is not available.");
+        }
+
+        if (request.ParticipantCount > roomCapacity.Value)
+        {
+            throw new Exception(
+                $"The selected room can accommodate a maximum of {roomCapacity.Value} participants.");
+        }
+
+
+        // =====================================================
+        // CHECK ROOM AVAILABILITY
+        // =====================================================
 
         bool isAvailable =
             await _bookingRepository.IsRoomAvailableAsync(
@@ -205,6 +362,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Room is already booked for the selected time.");
         }
 
+
+        // =====================================================
+        // UPDATE BOOKING
+        // =====================================================
+
         bool updated =
             await _bookingRepository.UpdateBookingAsync(
                 bookingId,
@@ -213,6 +375,10 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         if (updated)
         {
+            // =============================================
+            // CREATE ADMIN NOTIFICATION
+            // =============================================
+
             var adminNotification = new Notification
             {
                 EmployeeId = employeeId,
@@ -236,7 +402,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
 
     // =========================================================
-    // Search Available Rooms
+    // SEARCH AVAILABLE ROOMS
     // =========================================================
 
     public async Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
@@ -266,6 +432,11 @@ public class EmployeeBookingService : IEmployeeBookingService
             request.FacilityIds != null &&
             request.FacilityIds.Any(id => id > 0);
 
+
+        // =====================================================
+        // VALIDATE AT LEAST ONE SEARCH CRITERION
+        // =====================================================
+
         if (!hasModule &&
             !hasRoomType &&
             !hasParticipantCount &&
@@ -278,6 +449,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Please provide at least one search criterion.");
         }
 
+
+        // =====================================================
+        // VALIDATE TIME
+        // =====================================================
+
         if (hasStartTime &&
             hasEndTime &&
             request.StartTime!.Value >= request.EndTime!.Value)
@@ -286,21 +462,38 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "End time must be after start time.");
         }
 
-        return await _bookingRepository.SearchAvailableRoomsAsync(
-            request);
+
+        // =====================================================
+        // VALIDATE OFFICE HOURS
+        // Office Hours: 09:00 AM to 06:00 PM
+        // =====================================================
+
+        if (hasStartTime &&
+            request.StartTime!.Value < OfficeStartTime)
+        {
+            throw new Exception(
+                "Rooms can only be booked between 09:00 AM and 06:00 PM.");
+        }
+
+        if (hasEndTime &&
+            request.EndTime!.Value > OfficeEndTime)
+        {
+            throw new Exception(
+                "Rooms can only be booked between 09:00 AM and 06:00 PM.");
+        }
+
+
+        // =====================================================
+        // SEARCH AVAILABLE ROOMS
+        // =====================================================
+
+        return await _bookingRepository
+            .SearchAvailableRoomsAsync(request);
     }
 
 
     // =========================================================
-    // Get Rooms By Module
-    // =========================================================
-    //
-    // Used when the employee selects only:
-    //
-    // Module 2
-    //
-    // This allows the UI to immediately get rooms belonging
-    // to that module.
+    // GET ROOMS BY MODULE
     // =========================================================
 
     public async Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
@@ -312,7 +505,7 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Module is required.");
         }
 
-        return await _bookingRepository.GetRoomsByModuleAsync(
-            module);
+        return await _bookingRepository
+            .GetRoomsByModuleAsync(module);
     }
 }
