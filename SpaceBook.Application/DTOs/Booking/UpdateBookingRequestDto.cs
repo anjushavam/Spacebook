@@ -6,7 +6,9 @@ public class UpdateBookingRequestDto
 
     public string Purpose { get; set; } = string.Empty;
 
-    public int RoomId { get; set; }
+    // Nullable because the Edit screen does not select a room.
+    // If RoomId is not sent, backend will keep the existing room.
+    public int? RoomId { get; set; }
 
     public DateOnly BookingDate { get; set; }
 
