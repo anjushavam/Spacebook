@@ -6,14 +6,14 @@ namespace SpaceBook.Application.Interfaces;
 public interface IEmployeeBookingRepository
 {
     // =========================================================
-    // Create Booking
+    // CREATE BOOKING
     // =========================================================
 
     Task CreateBookingAsync(Booking booking);
 
 
     // =========================================================
-    // Check Room Availability
+    // CHECK ROOM AVAILABILITY
     // =========================================================
 
     Task<bool> IsRoomAvailableAsync(
@@ -24,8 +24,9 @@ public interface IEmployeeBookingRepository
 
 
     // =========================================================
-    // Check Room Availability
-    // Exclude Existing Booking
+    // CHECK ROOM AVAILABILITY
+    // EXCLUDE EXISTING BOOKING
+    // Used while updating/rescheduling a booking
     // =========================================================
 
     Task<bool> IsRoomAvailableAsync(
@@ -37,7 +38,7 @@ public interface IEmployeeBookingRepository
 
 
     // =========================================================
-    // Get Booking Details
+    // GET BOOKING DETAILS
     // =========================================================
 
     Task<BookingDetailsDto?> GetBookingByIdAsync(
@@ -46,7 +47,7 @@ public interface IEmployeeBookingRepository
 
 
     // =========================================================
-    // Cancel Booking
+    // CANCEL BOOKING
     // =========================================================
 
     Task<bool> CancelBookingAsync(
@@ -55,7 +56,7 @@ public interface IEmployeeBookingRepository
 
 
     // =========================================================
-    // Update / Reschedule Booking
+    // UPDATE / RESCHEDULE BOOKING
     // =========================================================
 
     Task<bool> UpdateBookingAsync(
@@ -65,7 +66,7 @@ public interface IEmployeeBookingRepository
 
 
     // =========================================================
-    // Search Available Rooms
+    // SEARCH AVAILABLE ROOMS
     // =========================================================
 
     Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
@@ -73,7 +74,17 @@ public interface IEmployeeBookingRepository
 
 
     // =========================================================
-    // Get Rooms By Module
+    // CHECK ROOM CAPACITY
+    // Used to determine whether any room satisfies
+    // the requested participant count.
+    // =========================================================
+
+    Task<bool> HasRoomWithRequiredCapacityAsync(
+        SearchRoomsRequestDto request);
+
+
+    // =========================================================
+    // GET ROOMS BY MODULE
     // =========================================================
 
     Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
@@ -81,10 +92,16 @@ public interface IEmployeeBookingRepository
 
 
     // =========================================================
-    // Save Changes
+    // GET ROOM CAPACITY
     // =========================================================
 
-    Task<int?> GetRoomCapacityAsync(int roomId);
-    
+    Task<int?> GetRoomCapacityAsync(
+        int roomId);
+
+
+    // =========================================================
+    // SAVE CHANGES
+    // =========================================================
+
     Task SaveChangesAsync();
 }

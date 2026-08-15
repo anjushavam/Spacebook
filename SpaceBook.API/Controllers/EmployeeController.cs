@@ -50,7 +50,8 @@ public class EmployeeController : ControllerBase
     // VALIDATE BOOKING DATE
     // =========================================================
 
-    private IActionResult? ValidateBookingDate(DateOnly bookingDate)
+    private IActionResult? ValidateBookingDate(
+        DateOnly bookingDate)
     {
         var today =
             DateOnly.FromDateTime(DateTime.Now);
@@ -64,8 +65,7 @@ public class EmployeeController : ControllerBase
             return BadRequest(new
             {
                 Message =
-                    $"Cannot check availability for a past date. " +
-                    $"Today is {today:yyyy-MM-dd}."
+                    $"Cannot use a past date. Today is {today:yyyy-MM-dd}."
             });
         }
 
@@ -78,7 +78,7 @@ public class EmployeeController : ControllerBase
             return BadRequest(new
             {
                 Message =
-                    "Room availability is not available on Saturdays."
+                    "Room availability and bookings are not allowed on Saturdays."
             });
         }
 
@@ -91,7 +91,7 @@ public class EmployeeController : ControllerBase
             return BadRequest(new
             {
                 Message =
-                    "Room availability is not available on Sundays."
+                    "Room availability and bookings are not allowed on Sundays."
             });
         }
 
@@ -143,6 +143,10 @@ public class EmployeeController : ControllerBase
     {
         try
         {
+            // -------------------------------------------------
+            // DATE REQUIRED
+            // -------------------------------------------------
+
             if (!date.HasValue)
             {
                 return BadRequest(new
@@ -151,15 +155,21 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            var bookingDate = date.Value;
+            // -------------------------------------------------
+            // DATE VALIDATION
+            // -------------------------------------------------
 
             var dateValidation =
-                ValidateBookingDate(bookingDate);
+                ValidateBookingDate(date.Value);
 
             if (dateValidation != null)
             {
                 return dateValidation;
             }
+
+            // -------------------------------------------------
+            // ROOM TYPE VALIDATION
+            // -------------------------------------------------
 
             if (roomTypeId.HasValue &&
                 roomTypeId.Value <= 0)
@@ -170,10 +180,14 @@ public class EmployeeController : ControllerBase
                 });
             }
 
+            // -------------------------------------------------
+            // GET AVAILABILITY
+            // -------------------------------------------------
+
             var result =
                 await _dashboardService
                     .GetAvailabilityAsync(
-                        bookingDate,
+                        date.Value,
                         roomTypeId);
 
             return Ok(result);
@@ -198,6 +212,10 @@ public class EmployeeController : ControllerBase
     {
         try
         {
+            // -------------------------------------------------
+            // EMPLOYEE ID
+            // -------------------------------------------------
+
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -207,13 +225,22 @@ public class EmployeeController : ControllerBase
                 });
             }
 
+            // -------------------------------------------------
+            // REQUEST VALIDATION
+            // -------------------------------------------------
+
             if (request == null)
             {
                 return BadRequest(new
                 {
-                    Message = "Booking request is required."
+                    Message =
+                        "Booking request is required."
                 });
             }
+
+            // -------------------------------------------------
+            // CREATE BOOKING
+            // -------------------------------------------------
 
             var bookingId =
                 await _employeeBookingService
@@ -226,16 +253,19 @@ public class EmployeeController : ControllerBase
                 Message =
                     "Booking created successfully.",
 
-                BookingId = bookingId,
+                BookingId =
+                    bookingId,
 
-                Status = "Pending"
+                Status =
+                    "Pending"
             });
         }
         catch (Exception ex)
         {
             return BadRequest(new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
@@ -268,7 +298,8 @@ public class EmployeeController : ControllerBase
         {
             return StatusCode(500, new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
@@ -301,7 +332,8 @@ public class EmployeeController : ControllerBase
         {
             return StatusCode(500, new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
@@ -310,7 +342,7 @@ public class EmployeeController : ControllerBase
     // VIEW BOOKING
     // =========================================================
 
-    [HttpGet("bookings/{bookingId}")]
+    [HttpGet("bookings/{bookingId:int}")]
     public async Task<IActionResult> GetBookingById(
         int bookingId)
     {
@@ -325,6 +357,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
+            if (bookingId <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Invalid booking ID."
+                });
+            }
+
             var booking =
                 await _employeeBookingService
                     .GetBookingByIdAsync(
@@ -335,7 +376,8 @@ public class EmployeeController : ControllerBase
             {
                 return NotFound(new
                 {
-                    Message = "Booking not found."
+                    Message =
+                        "Booking not found."
                 });
             }
 
@@ -345,7 +387,8 @@ public class EmployeeController : ControllerBase
         {
             return StatusCode(500, new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
@@ -354,7 +397,7 @@ public class EmployeeController : ControllerBase
     // CANCEL BOOKING
     // =========================================================
 
-    [HttpPut("bookings/{bookingId}/cancel")]
+    [HttpPut("bookings/{bookingId:int}/cancel")]
     public async Task<IActionResult> CancelBooking(
         int bookingId)
     {
@@ -369,6 +412,15 @@ public class EmployeeController : ControllerBase
                 });
             }
 
+            if (bookingId <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Invalid booking ID."
+                });
+            }
+
             var result =
                 await _employeeBookingService
                     .CancelBookingAsync(
@@ -379,7 +431,8 @@ public class EmployeeController : ControllerBase
             {
                 return NotFound(new
                 {
-                    Message = "Booking not found."
+                    Message =
+                        "Booking not found."
                 });
             }
 
@@ -393,16 +446,17 @@ public class EmployeeController : ControllerBase
         {
             return BadRequest(new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
 
     // =========================================================
-    // EDIT / RESCHEDULE BOOKING
+    // UPDATE / RESCHEDULE BOOKING
     // =========================================================
 
-    [HttpPut("bookings/{bookingId}")]
+    [HttpPut("bookings/{bookingId:int}")]
     public async Task<IActionResult> UpdateBooking(
         int bookingId,
         [FromBody] UpdateBookingRequestDto request)
@@ -415,6 +469,15 @@ public class EmployeeController : ControllerBase
                 {
                     Message =
                         "Invalid token. Employee Id not found."
+                });
+            }
+
+            if (bookingId <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Invalid booking ID."
                 });
             }
 
@@ -438,7 +501,8 @@ public class EmployeeController : ControllerBase
             {
                 return NotFound(new
                 {
-                    Message = "Booking not found."
+                    Message =
+                        "Booking not found."
                 });
             }
 
@@ -452,7 +516,8 @@ public class EmployeeController : ControllerBase
         {
             return BadRequest(new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
@@ -471,13 +536,15 @@ public class EmployeeController : ControllerBase
             {
                 return BadRequest(new
                 {
-                    Message = "Module is required."
+                    Message =
+                        "Module is required."
                 });
             }
 
             var rooms =
                 await _employeeBookingService
-                    .GetRoomsByModuleAsync(module);
+                    .GetRoomsByModuleAsync(
+                        module.Trim());
 
             return Ok(rooms);
         }
@@ -485,7 +552,8 @@ public class EmployeeController : ControllerBase
         {
             return BadRequest(new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
@@ -528,16 +596,28 @@ public class EmployeeController : ControllerBase
             }
 
             // -------------------------------------------------
+            // ROOM TYPE VALIDATION
+            // -------------------------------------------------
+
+            if (request.RoomTypeId.HasValue &&
+                request.RoomTypeId.Value <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Invalid room type."
+                });
+            }
+
+            // -------------------------------------------------
             // DATE VALIDATION
             // -------------------------------------------------
 
             if (request.BookingDate.HasValue)
             {
-                var bookingDate =
-                    request.BookingDate.Value;
-
                 var dateValidation =
-                    ValidateBookingDate(bookingDate);
+                    ValidateBookingDate(
+                        request.BookingDate.Value);
 
                 if (dateValidation != null)
                 {
@@ -546,14 +626,32 @@ public class EmployeeController : ControllerBase
             }
 
             // -------------------------------------------------
-            // TIME VALIDATION
+            // START / END TIME MUST BE PROVIDED TOGETHER
             // -------------------------------------------------
 
-            if (request.StartTime.HasValue &&
-                request.EndTime.HasValue)
+            var hasStartTime =
+                request.StartTime.HasValue;
+
+            var hasEndTime =
+                request.EndTime.HasValue;
+
+            if (hasStartTime != hasEndTime)
             {
-                if (request.StartTime.Value >=
-                    request.EndTime.Value)
+                return BadRequest(new
+                {
+                    Message =
+                        "Both start time and end time are required when searching by time."
+                });
+            }
+
+            // -------------------------------------------------
+            // TIME RANGE VALIDATION
+            // -------------------------------------------------
+
+            if (hasStartTime && hasEndTime)
+            {
+                if (request.StartTime!.Value >=
+                    request.EndTime!.Value)
                 {
                     return BadRequest(new
                     {
@@ -561,29 +659,67 @@ public class EmployeeController : ControllerBase
                             "Start time must be earlier than end time."
                     });
                 }
+
+                var officeStart =
+                    new TimeOnly(9, 0);
+
+                var officeEnd =
+                    new TimeOnly(19, 30);
+
+                if (request.StartTime.Value <
+                    officeStart ||
+                    request.EndTime.Value >
+                    officeEnd)
+                {
+                    return BadRequest(new
+                    {
+                        Message =
+                            "Search time must be between 09:00 AM and 07:30 PM."
+                    });
+                }
+
+                // -------------------------------------------------
+                // TODAY + PAST TIME
+                // -------------------------------------------------
+
+                if (request.BookingDate.HasValue &&
+                    request.BookingDate.Value ==
+                    DateOnly.FromDateTime(DateTime.Now))
+                {
+                    var currentTime =
+                        TimeOnly.FromDateTime(DateTime.Now);
+
+                    if (request.StartTime.Value <=
+                        currentTime)
+                    {
+                        return BadRequest(new
+                        {
+                            Message =
+                                "Cannot search for a time that has already passed."
+                        });
+                    }
+                }
             }
 
             // -------------------------------------------------
-            // SEARCH ROOMS
+            // SEARCH
             // -------------------------------------------------
 
             var rooms =
                 await _employeeBookingService
-                    .SearchAvailableRoomsAsync(request);
+                    .SearchAvailableRoomsAsync(
+                        request);
 
-            // Convert result to a list so we can check count
             var roomList =
                 rooms?.ToList() ??
                 new List<AvailableRoomDto>();
 
             // -------------------------------------------------
-            // NO ROOMS FOUND
+            // NO ROOMS
             // -------------------------------------------------
 
             if (!roomList.Any())
             {
-                // If participant count was entered, provide
-                // a clear capacity-related message.
                 if (request.ParticipantCount.HasValue)
                 {
                     return Ok(new
@@ -591,17 +727,18 @@ public class EmployeeController : ControllerBase
                         Message =
                             "No room can accommodate the selected number of participants.",
 
-                        Rooms = roomList
+                        Rooms =
+                            roomList
                     });
                 }
 
-                // Normal no-results response
                 return Ok(new
                 {
                     Message =
                         "No rooms are available for the selected criteria.",
 
-                    Rooms = roomList
+                    Rooms =
+                        roomList
                 });
             }
 
@@ -614,14 +751,16 @@ public class EmployeeController : ControllerBase
                 Message =
                     "Rooms found successfully.",
 
-                Rooms = roomList
+                Rooms =
+                    roomList
             });
         }
         catch (Exception ex)
         {
             return BadRequest(new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }
@@ -630,7 +769,7 @@ public class EmployeeController : ControllerBase
     // CHECK-IN BOOKING
     // =========================================================
 
-    [HttpPost("bookings/{bookingId}/checkin")]
+    [HttpPost("bookings/{bookingId:int}/checkin")]
     public async Task<IActionResult> CheckIn(
         int bookingId)
     {
@@ -642,6 +781,15 @@ public class EmployeeController : ControllerBase
                 {
                     Message =
                         "Invalid token. Employee Id not found."
+                });
+            }
+
+            if (bookingId <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Invalid booking ID."
                 });
             }
 
@@ -657,7 +805,8 @@ public class EmployeeController : ControllerBase
         {
             return BadRequest(new
             {
-                Message = ex.Message
+                Message =
+                    ex.Message
             });
         }
     }

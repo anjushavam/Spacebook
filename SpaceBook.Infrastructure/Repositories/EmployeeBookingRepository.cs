@@ -50,9 +50,14 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 b.RoomId == roomId &&
                 b.BookingDate == bookingDate &&
 
+                // Cancelled and rejected bookings
+                // should not block the room.
                 b.Status != "Cancelled" &&
                 b.Status != "Rejected" &&
 
+                // Overlap condition:
+                // Existing Start < Requested End
+                // Existing End > Requested Start
                 b.StartTime < endTime &&
                 b.EndTime > startTime
             );
@@ -61,6 +66,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // =========================================================
     // CHECK ROOM AVAILABILITY
     // EXCLUDE EXISTING BOOKING
+    // Used during rescheduling/update
     // =========================================================
 
     public async Task<bool> IsRoomAvailableAsync(
@@ -73,12 +79,18 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         return !await _context.Bookings
             .AnyAsync(b =>
                 b.RoomId == roomId &&
+
+                // Do not compare the booking with itself.
                 b.BookingId != excludeBookingId &&
+
                 b.BookingDate == bookingDate &&
 
+                // Cancelled and rejected bookings
+                // should not block the room.
                 b.Status != "Cancelled" &&
                 b.Status != "Rejected" &&
 
+                // Overlap condition.
                 b.StartTime < endTime &&
                 b.EndTime > startTime
             );
@@ -197,7 +209,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
         if (room == null)
         {
-            throw new Exception("Selected room was not found.");
+            throw new Exception(
+                "Selected room was not found.");
         }
 
         // -----------------------------------------------------
@@ -212,7 +225,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE PARTICIPANT CAPACITY
+        // VALIDATE PARTICIPANT COUNT
         // -----------------------------------------------------
 
         if (request.ParticipantCount <= 0)
@@ -229,7 +242,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE DATE
+        // VALIDATE BOOKING DATE
         // -----------------------------------------------------
 
         var today =
@@ -253,7 +266,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE TIME
         // OFFICE HOURS
         //
         // 09:00 AM - 07:30 PM
@@ -283,7 +295,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // CHECK MINIMUM BOOKING DURATION
+        // CHECK BOOKING DURATION
         // -----------------------------------------------------
 
         var duration =
@@ -298,8 +310,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
         // CHECK ROOM AVAILABILITY
         //
-        // Exclude the current booking because it is being
-        // rescheduled.
+        // Exclude the current booking because this is an update.
         // -----------------------------------------------------
 
         var roomAvailable =
@@ -391,32 +402,31 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             SearchRoomsRequestDto request)
     {
         var query = _context.Rooms
-
             .Include(r => r.RoomType)
-
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
-
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked")
-
             .AsQueryable();
 
-        // =====================================================
+        // -----------------------------------------------------
         // MODULE FILTER
-        // =====================================================
+        // -----------------------------------------------------
 
         if (!string.IsNullOrWhiteSpace(
             request.Module))
         {
+            var module =
+                request.Module.Trim();
+
             query = query.Where(r =>
-                r.Module == request.Module);
+                r.Module == module);
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // ROOM TYPE FILTER
-        // =====================================================
+        // -----------------------------------------------------
 
         if (request.RoomTypeId.HasValue &&
             request.RoomTypeId.Value > 0)
@@ -426,9 +436,9 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 request.RoomTypeId.Value);
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // PARTICIPANT CAPACITY FILTER
-        // =====================================================
+        // -----------------------------------------------------
 
         if (request.ParticipantCount.HasValue &&
             request.ParticipantCount.Value > 0)
@@ -438,15 +448,17 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 request.ParticipantCount.Value);
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // FACILITY FILTER
-        // =====================================================
+        //
+        // Every requested facility must exist in the room.
+        // -----------------------------------------------------
 
         if (request.FacilityIds != null &&
             request.FacilityIds.Count > 0)
         {
             foreach (var facilityId
-                     in request.FacilityIds)
+                     in request.FacilityIds.Distinct())
             {
                 query = query.Where(r =>
                     r.RoomFacilities.Any(rf =>
@@ -454,45 +466,40 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             }
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // DATE + TIME AVAILABILITY
-        // =====================================================
+        // -----------------------------------------------------
 
-        if (request.BookingDate.HasValue)
+        if (request.BookingDate.HasValue &&
+            request.StartTime.HasValue &&
+            request.EndTime.HasValue)
         {
             var bookingDate =
                 request.BookingDate.Value;
 
-            if (request.StartTime.HasValue &&
-                request.EndTime.HasValue)
-            {
-                var startTime =
-                    request.StartTime.Value;
+            var startTime =
+                request.StartTime.Value;
 
-                var endTime =
-                    request.EndTime.Value;
+            var endTime =
+                request.EndTime.Value;
 
-                query = query.Where(room =>
-                    !room.Bookings.Any(booking =>
+            query = query.Where(room =>
+                !room.Bookings.Any(booking =>
+                    booking.BookingDate == bookingDate &&
 
-                        booking.BookingDate ==
-                        bookingDate &&
+                    booking.Status != "Cancelled" &&
+                    booking.Status != "Rejected" &&
 
-                        booking.Status != "Cancelled" &&
-                        booking.Status != "Rejected" &&
-
-                        booking.StartTime < endTime &&
-                        booking.EndTime > startTime
-                    ));
-            }
+                    booking.StartTime < endTime &&
+                    booking.EndTime > startTime
+                ));
         }
 
-        // =====================================================
-        // SELECT RESULT
-        // =====================================================
+        // -----------------------------------------------------
+        // RETURN RESULT
+        // -----------------------------------------------------
 
         return await query
-
             .Select(r => new AvailableRoomDto
             {
                 RoomId = r.RoomId,
@@ -508,17 +515,89 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 Capacity = r.Capacity,
 
                 Facilities = r.RoomFacilities
-
                     .Where(rf =>
                         rf.Facility != null)
-
                     .Select(rf =>
                         rf.Facility!.FacilityName)
-
                     .ToList()
             })
-
             .ToListAsync();
+    }
+
+    // =========================================================
+    // CHECK ROOM CAPACITY FOR SEARCH CRITERIA
+    // =========================================================
+
+    public async Task<bool>
+        HasRoomWithRequiredCapacityAsync(
+            SearchRoomsRequestDto request)
+    {
+        // -----------------------------------------------------
+        // If participant count is not supplied,
+        // there is no capacity restriction.
+        // -----------------------------------------------------
+
+        if (!request.ParticipantCount.HasValue ||
+            request.ParticipantCount.Value <= 0)
+        {
+            return true;
+        }
+
+        var query = _context.Rooms
+            .Where(r =>
+                !r.IsBlocked &&
+                r.Status != "Blocked")
+            .AsQueryable();
+
+        // -----------------------------------------------------
+        // MODULE FILTER
+        // -----------------------------------------------------
+
+        if (!string.IsNullOrWhiteSpace(
+            request.Module))
+        {
+            var module =
+                request.Module.Trim();
+
+            query = query.Where(r =>
+                r.Module == module);
+        }
+
+        // -----------------------------------------------------
+        // ROOM TYPE FILTER
+        // -----------------------------------------------------
+
+        if (request.RoomTypeId.HasValue &&
+            request.RoomTypeId.Value > 0)
+        {
+            query = query.Where(r =>
+                r.RoomTypeId ==
+                request.RoomTypeId.Value);
+        }
+
+        // -----------------------------------------------------
+        // FACILITY FILTER
+        // -----------------------------------------------------
+
+        if (request.FacilityIds != null &&
+            request.FacilityIds.Count > 0)
+        {
+            foreach (var facilityId
+                     in request.FacilityIds.Distinct())
+            {
+                query = query.Where(r =>
+                    r.RoomFacilities.Any(rf =>
+                        rf.FacilityId == facilityId));
+            }
+        }
+
+        // -----------------------------------------------------
+        // CHECK CAPACITY
+        // -----------------------------------------------------
+
+        return await query.AnyAsync(r =>
+            r.Capacity >=
+            request.ParticipantCount.Value);
     }
 
     // =========================================================
@@ -537,17 +616,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         module = module.Trim();
 
         return await _context.Rooms
-
             .Include(r => r.RoomType)
-
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
-
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked" &&
                 r.Module == module)
-
             .Select(r => new AvailableRoomDto
             {
                 RoomId = r.RoomId,
@@ -563,16 +638,12 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 Capacity = r.Capacity,
 
                 Facilities = r.RoomFacilities
-
                     .Where(rf =>
                         rf.Facility != null)
-
                     .Select(rf =>
                         rf.Facility!.FacilityName)
-
                     .ToList()
             })
-
             .ToListAsync();
     }
 
@@ -584,14 +655,11 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         int roomId)
     {
         return await _context.Rooms
-
             .Where(r =>
                 r.RoomId == roomId &&
                 !r.IsBlocked &&
                 r.Status != "Blocked")
-
             .Select(r => (int?)r.Capacity)
-
             .FirstOrDefaultAsync();
     }
 }

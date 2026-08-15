@@ -12,15 +12,15 @@ public class EmployeeBookingService : IEmployeeBookingService
     // =========================================================
     // OFFICE HOURS
     // =========================================================
-    // Office Hours:
-    // 09:00 AM to 07:30 PM
+    // Configured Office Hours:
+    // 10:00 AM to 07:00 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
-        new TimeOnly(9, 0);
+        new TimeOnly(10, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(19, 30);
+        new TimeOnly(19, 0);
 
     public EmployeeBookingService(
         IEmployeeBookingRepository bookingRepository,
@@ -61,41 +61,31 @@ public class EmployeeBookingService : IEmployeeBookingService
         int employeeId,
         CreateBookingRequestDto request)
     {
-        // =====================================================
-        // VALIDATE WEEKEND
-        // =====================================================
+        // -----------------------------------------------------
+        // VALIDATE EMPLOYEE
+        // -----------------------------------------------------
+
+        if (employeeId <= 0)
+        {
+            throw new Exception(
+                "Invalid employee.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE REQUEST
+        // -----------------------------------------------------
+
+        if (request == null)
+        {
+            throw new Exception(
+                "Booking request is required.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE DATE
+        // -----------------------------------------------------
 
         ValidateWeekday(request.BookingDate);
-
-        // =====================================================
-        // VALIDATE TIME
-        // =====================================================
-
-        if (request.StartTime >= request.EndTime)
-        {
-            throw new Exception(
-                "End time must be after start time.");
-        }
-
-        // =====================================================
-        // VALIDATE OFFICE HOURS
-        // =====================================================
-
-        if (request.StartTime < OfficeStartTime)
-        {
-            throw new Exception(
-                "Bookings can only start from 09:00 AM.");
-        }
-
-        if (request.EndTime > OfficeEndTime)
-        {
-            throw new Exception(
-                "Bookings must end by 07:30 PM.");
-        }
-
-        // =====================================================
-        // VALIDATE PAST DATE/TIME
-        // =====================================================
 
         var now = DateTime.Now;
 
@@ -118,9 +108,35 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Bookings cannot start at or before the current time.");
         }
 
-        // =====================================================
+        // -----------------------------------------------------
+        // VALIDATE TIME ORDER
+        // -----------------------------------------------------
+
+        if (request.StartTime >= request.EndTime)
+        {
+            throw new Exception(
+                "End time must be after start time.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE OFFICE HOURS
+        // -----------------------------------------------------
+
+        if (request.StartTime < OfficeStartTime)
+        {
+            throw new Exception(
+                "Bookings can only start from 10:00 AM.");
+        }
+
+        if (request.EndTime > OfficeEndTime)
+        {
+            throw new Exception(
+                "Bookings must end by 07:00 PM.");
+        }
+
+        // -----------------------------------------------------
         // VALIDATE PARTICIPANT COUNT
-        // =====================================================
+        // -----------------------------------------------------
 
         if (request.ParticipantCount <= 0)
         {
@@ -128,9 +144,9 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Participant count must be at least 1.");
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // VALIDATE ROOM ID
-        // =====================================================
+        // -----------------------------------------------------
 
         if (request.RoomId <= 0)
         {
@@ -138,9 +154,9 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Room ID is required.");
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // VALIDATE ROOM CAPACITY
-        // =====================================================
+        // -----------------------------------------------------
 
         var roomCapacity =
             await _bookingRepository.GetRoomCapacityAsync(
@@ -152,17 +168,18 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Selected room is not available.");
         }
 
-        if (request.ParticipantCount > roomCapacity.Value)
+        if (request.ParticipantCount >
+            roomCapacity.Value)
         {
             throw new Exception(
                 $"The selected room can accommodate a maximum of {roomCapacity.Value} participants.");
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // CHECK ROOM AVAILABILITY
-        // =====================================================
+        // -----------------------------------------------------
 
-        bool isAvailable =
+        var isAvailable =
             await _bookingRepository.IsRoomAvailableAsync(
                 request.RoomId,
                 request.BookingDate,
@@ -175,25 +192,27 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Room is already booked for the selected time.");
         }
 
-        // =====================================================
-        // RESOLVE MEETING TITLE AND PURPOSE
-        // =====================================================
+        // -----------------------------------------------------
+        // RESOLVE MEETING TITLE
+        // -----------------------------------------------------
 
-        string resolvedPurpose =
-            !string.IsNullOrWhiteSpace(request.Purpose)
-                ? request.Purpose
-                : !string.IsNullOrWhiteSpace(request.MeetingTitle)
-                    ? request.MeetingTitle
-                    : "Reserved Workspace";
-
-        string resolvedTitle =
+        var resolvedTitle =
             !string.IsNullOrWhiteSpace(request.MeetingTitle)
-                ? request.MeetingTitle
-                : resolvedPurpose;
+                ? request.MeetingTitle.Trim()
+                : "Reserved Workspace";
 
-        // =====================================================
-        // CREATE BOOKING
-        // =====================================================
+        // -----------------------------------------------------
+        // RESOLVE PURPOSE
+        // -----------------------------------------------------
+
+        var resolvedPurpose =
+            !string.IsNullOrWhiteSpace(request.Purpose)
+                ? request.Purpose.Trim()
+                : resolvedTitle;
+
+        // -----------------------------------------------------
+        // CREATE BOOKING ENTITY
+        // -----------------------------------------------------
 
         var booking = new Booking
         {
@@ -225,16 +244,20 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         try
         {
+            // -------------------------------------------------
+            // SAVE BOOKING
+            // -------------------------------------------------
+
             await _bookingRepository.CreateBookingAsync(
                 booking);
 
             await _bookingRepository.SaveChangesAsync();
 
-            // =================================================
-            // CREATE ADMIN NOTIFICATION
-            // =================================================
+            // -------------------------------------------------
+            // CREATE NOTIFICATION
+            // -------------------------------------------------
 
-            var adminNotification = new Notification
+            var notification = new Notification
             {
                 EmployeeId = employeeId,
 
@@ -249,7 +272,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             };
 
             await _notificationRepository.AddAsync(
-                adminNotification);
+                notification);
 
             await _notificationRepository.SaveChangesAsync();
 
@@ -264,13 +287,25 @@ public class EmployeeBookingService : IEmployeeBookingService
     }
 
     // =========================================================
-    // VIEW BOOKING
+    // GET BOOKING DETAILS
     // =========================================================
 
     public async Task<BookingDetailsDto?> GetBookingByIdAsync(
         int bookingId,
         int employeeId)
     {
+        if (bookingId <= 0)
+        {
+            throw new Exception(
+                "Invalid booking ID.");
+        }
+
+        if (employeeId <= 0)
+        {
+            throw new Exception(
+                "Invalid employee.");
+        }
+
         return await _bookingRepository.GetBookingByIdAsync(
             bookingId,
             employeeId);
@@ -284,34 +319,56 @@ public class EmployeeBookingService : IEmployeeBookingService
         int bookingId,
         int employeeId)
     {
+        if (bookingId <= 0)
+        {
+            throw new Exception(
+                "Invalid booking ID.");
+        }
+
+        if (employeeId <= 0)
+        {
+            throw new Exception(
+                "Invalid employee.");
+        }
+
+        // -----------------------------------------------------
+        // CANCEL BOOKING
+        // -----------------------------------------------------
+
         var result =
             await _bookingRepository.CancelBookingAsync(
                 bookingId,
                 employeeId);
 
-        if (result)
+        if (!result)
         {
-            var adminNotification = new Notification
-            {
-                EmployeeId = employeeId,
-
-                BookingId = bookingId,
-
-                Message =
-                    $"Booking #{bookingId} was cancelled by employee.",
-
-                IsRead = false,
-
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _notificationRepository.AddAsync(
-                adminNotification);
-
-            await _notificationRepository.SaveChangesAsync();
+            return false;
         }
 
-        return result;
+        // -----------------------------------------------------
+        // CREATE ADMIN NOTIFICATION
+        // -----------------------------------------------------
+
+        var notification = new Notification
+        {
+            EmployeeId = employeeId,
+
+            BookingId = bookingId,
+
+            Message =
+                $"Booking #{bookingId} was cancelled by employee.",
+
+            IsRead = false,
+
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _notificationRepository.AddAsync(
+            notification);
+
+        await _notificationRepository.SaveChangesAsync();
+
+        return true;
     }
 
     // =========================================================
@@ -323,92 +380,37 @@ public class EmployeeBookingService : IEmployeeBookingService
         int employeeId,
         UpdateBookingRequestDto request)
     {
-        // =====================================================
-        // VALIDATE WEEKEND
-        // =====================================================
+        // -----------------------------------------------------
+        // VALIDATE IDs
+        // -----------------------------------------------------
+
+        if (bookingId <= 0)
+        {
+            throw new Exception(
+                "Invalid booking ID.");
+        }
+
+        if (employeeId <= 0)
+        {
+            throw new Exception(
+                "Invalid employee.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE REQUEST
+        // -----------------------------------------------------
+
+        if (request == null)
+        {
+            throw new Exception(
+                "Update booking request is required.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE DATE
+        // -----------------------------------------------------
 
         ValidateWeekday(request.BookingDate);
-
-        // =====================================================
-        // VALIDATE TIME
-        // =====================================================
-
-        if (request.StartTime >= request.EndTime)
-        {
-            throw new Exception(
-                "End time must be after start time.");
-        }
-
-        // =====================================================
-        // VALIDATE OFFICE HOURS
-        // =====================================================
-
-        if (request.StartTime < OfficeStartTime)
-        {
-            throw new Exception(
-                "Bookings can only start from 09:00 AM.");
-        }
-
-        if (request.EndTime > OfficeEndTime)
-        {
-            throw new Exception(
-                "Bookings must end by 07:30 PM.");
-        }
-
-        // =====================================================
-        // VALIDATE PARTICIPANT COUNT
-        // =====================================================
-
-        if (request.ParticipantCount <= 0)
-        {
-            throw new Exception(
-                "Participant count must be at least 1.");
-        }
-
-        // =====================================================
-        // VALIDATE ROOM ID
-        // =====================================================
-
-        if (!request.RoomId.HasValue ||
-            request.RoomId.Value <= 0)
-        {
-            throw new Exception(
-                "Room ID is required.");
-        }
-
-        // =====================================================
-        // CHECK EXISTING BOOKING
-        // =====================================================
-
-        var existingBooking =
-            await _bookingRepository.GetBookingByIdAsync(
-                bookingId,
-                employeeId);
-
-        if (existingBooking == null)
-        {
-            throw new Exception(
-                "Booking not found.");
-        }
-
-        // =====================================================
-        // CHECK RESCHEDULE TIME RESTRICTION
-        // =====================================================
-
-        var bookingStartDateTime =
-            existingBooking.BookingDate.ToDateTime(
-                existingBooking.StartTime);
-
-        if (DateTime.Now >=
-            bookingStartDateTime.AddHours(-1))
-        {
-            throw new Exception(
-                "Booking cannot be rescheduled within 1 hour before start time.");
-        }
-
-        // =====================================================
-        // VALIDATE NEW BOOKING DATE/TIME
-        // =====================================================
 
         var now = DateTime.Now;
 
@@ -431,9 +433,102 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Booking cannot be rescheduled to a time that has already passed.");
         }
 
-        // =====================================================
+        // -----------------------------------------------------
+        // VALIDATE TIME
+        // -----------------------------------------------------
+
+        if (request.StartTime >= request.EndTime)
+        {
+            throw new Exception(
+                "End time must be after start time.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE OFFICE HOURS
+        // -----------------------------------------------------
+
+        if (request.StartTime < OfficeStartTime)
+        {
+            throw new Exception(
+                "Bookings can only start from 10:00 AM.");
+        }
+
+        if (request.EndTime > OfficeEndTime)
+        {
+            throw new Exception(
+                "Bookings must end by 07:00 PM.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE PARTICIPANT COUNT
+        // -----------------------------------------------------
+
+        if (request.ParticipantCount <= 0)
+        {
+            throw new Exception(
+                "Participant count must be at least 1.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE ROOM ID
+        // -----------------------------------------------------
+
+        if (!request.RoomId.HasValue ||
+            request.RoomId.Value <= 0)
+        {
+            throw new Exception(
+                "Room ID is required.");
+        }
+
+        // -----------------------------------------------------
+        // GET EXISTING BOOKING
+        // -----------------------------------------------------
+
+        var existingBooking =
+            await _bookingRepository.GetBookingByIdAsync(
+                bookingId,
+                employeeId);
+
+        if (existingBooking == null)
+        {
+            throw new Exception(
+                "Booking not found.");
+        }
+
+        // -----------------------------------------------------
+        // PREVENT RESCHEDULE OF CANCELLED BOOKING
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                existingBooking.Status,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "Cancelled bookings cannot be rescheduled.");
+        }
+
+        // -----------------------------------------------------
+        // CHECK RESCHEDULE RESTRICTION
+        //
+        // Booking cannot be changed within 1 hour before
+        // its original start time.
+        // -----------------------------------------------------
+
+        var bookingStartDateTime =
+            existingBooking.BookingDate.ToDateTime(
+                existingBooking.StartTime);
+
+        if (DateTime.Now >=
+            bookingStartDateTime.AddHours(-1))
+        {
+            throw new Exception(
+                "Booking cannot be rescheduled within 1 hour before start time.");
+        }
+
+        // -----------------------------------------------------
         // VALIDATE ROOM CAPACITY
-        // =====================================================
+        // -----------------------------------------------------
 
         var roomCapacity =
             await _bookingRepository.GetRoomCapacityAsync(
@@ -445,17 +540,20 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Selected room is not available.");
         }
 
-        if (request.ParticipantCount > roomCapacity.Value)
+        if (request.ParticipantCount >
+            roomCapacity.Value)
         {
             throw new Exception(
                 $"The selected room can accommodate a maximum of {roomCapacity.Value} participants.");
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // CHECK ROOM AVAILABILITY
-        // =====================================================
+        //
+        // Exclude current booking.
+        // -----------------------------------------------------
 
-        bool isAvailable =
+        var isAvailable =
             await _bookingRepository.IsRoomAvailableAsync(
                 request.RoomId.Value,
                 request.BookingDate,
@@ -469,39 +567,45 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Room is already booked for the selected time.");
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // UPDATE BOOKING
-        // =====================================================
+        // -----------------------------------------------------
 
-        bool updated =
+        var updated =
             await _bookingRepository.UpdateBookingAsync(
                 bookingId,
                 employeeId,
                 request);
 
-        if (updated)
+        if (!updated)
         {
-            var adminNotification = new Notification
-            {
-                EmployeeId = employeeId,
-
-                BookingId = bookingId,
-
-                Message =
-                    $"Booking #{bookingId} was rescheduled by employee.",
-
-                IsRead = false,
-
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _notificationRepository.AddAsync(
-                adminNotification);
-
-            await _notificationRepository.SaveChangesAsync();
+            return false;
         }
 
-        return updated;
+        // -----------------------------------------------------
+        // CREATE ADMIN NOTIFICATION
+        // -----------------------------------------------------
+
+        var notification = new Notification
+        {
+            EmployeeId = employeeId,
+
+            BookingId = bookingId,
+
+            Message =
+                $"Booking #{bookingId} was rescheduled by employee.",
+
+            IsRead = false,
+
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _notificationRepository.AddAsync(
+            notification);
+
+        await _notificationRepository.SaveChangesAsync();
+
+        return true;
     }
 
     // =========================================================
@@ -512,33 +616,47 @@ public class EmployeeBookingService : IEmployeeBookingService
         SearchAvailableRoomsAsync(
             SearchRoomsRequestDto request)
     {
-        bool hasModule =
+        // -----------------------------------------------------
+        // VALIDATE REQUEST
+        // -----------------------------------------------------
+
+        if (request == null)
+        {
+            throw new Exception(
+                "Search request is required.");
+        }
+
+        // -----------------------------------------------------
+        // DETERMINE SEARCH CRITERIA
+        // -----------------------------------------------------
+
+        var hasModule =
             !string.IsNullOrWhiteSpace(request.Module);
 
-        bool hasRoomType =
+        var hasRoomType =
             request.RoomTypeId.HasValue &&
             request.RoomTypeId.Value > 0;
 
-        bool hasParticipantCount =
+        var hasParticipantCount =
             request.ParticipantCount.HasValue &&
             request.ParticipantCount.Value > 0;
 
-        bool hasBookingDate =
+        var hasBookingDate =
             request.BookingDate.HasValue;
 
-        bool hasStartTime =
+        var hasStartTime =
             request.StartTime.HasValue;
 
-        bool hasEndTime =
+        var hasEndTime =
             request.EndTime.HasValue;
 
-        bool hasFacilities =
+        var hasFacilities =
             request.FacilityIds != null &&
             request.FacilityIds.Any(id => id > 0);
 
-        // =====================================================
-        // VALIDATE AT LEAST ONE SEARCH CRITERION
-        // =====================================================
+        // -----------------------------------------------------
+        // AT LEAST ONE SEARCH CRITERION
+        // -----------------------------------------------------
 
         if (!hasModule &&
             !hasRoomType &&
@@ -552,80 +670,104 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Please provide at least one search criterion.");
         }
 
-        // =====================================================
-        // VALIDATE WEEKEND
-        // =====================================================
+        // -----------------------------------------------------
+        // TIME RANGE MUST BE COMPLETE
+        // -----------------------------------------------------
+
+        if (hasStartTime != hasEndTime)
+        {
+            throw new Exception(
+                "Both start time and end time are required when searching by time.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE DATE
+        // -----------------------------------------------------
 
         if (hasBookingDate)
         {
-            ValidateWeekday(
-                request.BookingDate!.Value);
+            var bookingDate =
+                request.BookingDate!.Value;
+
+            ValidateWeekday(bookingDate);
+
+            var today =
+                DateOnly.FromDateTime(DateTime.Now);
+
+            if (bookingDate < today)
+            {
+                throw new Exception(
+                    "Cannot search availability for a past date.");
+            }
         }
 
-        // =====================================================
-        // VALIDATE TIME
-        // =====================================================
+        // -----------------------------------------------------
+        // VALIDATE TIME RANGE
+        // -----------------------------------------------------
 
-        if (hasStartTime &&
-            hasEndTime &&
-            request.StartTime!.Value >=
-            request.EndTime!.Value)
+        if (hasStartTime && hasEndTime)
+        {
+            var startTime =
+                request.StartTime!.Value;
+
+            var endTime =
+                request.EndTime!.Value;
+
+            if (startTime >= endTime)
+            {
+                throw new Exception(
+                    "End time must be after start time.");
+            }
+
+            // -------------------------------------------------
+            // OFFICE HOURS: 10:00 AM - 07:00 PM
+            // -------------------------------------------------
+
+            if (startTime < OfficeStartTime)
+            {
+                throw new Exception(
+                    "Rooms can only be searched from 10:00 AM.");
+            }
+
+            if (endTime > OfficeEndTime)
+            {
+                throw new Exception(
+                    "Rooms can only be searched until 07:00 PM.");
+            }
+
+            // -------------------------------------------------
+            // TODAY + TIME VALIDATION
+            // -------------------------------------------------
+
+            if (hasBookingDate &&
+                request.BookingDate!.Value ==
+                DateOnly.FromDateTime(DateTime.Now))
+            {
+                var currentTime =
+                    TimeOnly.FromDateTime(DateTime.Now);
+
+                if (startTime <= currentTime)
+                {
+                    throw new Exception(
+                        "Cannot search for a time that has already passed.");
+                }
+            }
+        }
+
+        // -----------------------------------------------------
+        // PARTICIPANT COUNT VALIDATION
+        // -----------------------------------------------------
+
+        if (request.ParticipantCount.HasValue &&
+            request.ParticipantCount.Value <= 0)
         {
             throw new Exception(
-                "End time must be after start time.");
+                "Participant count must be greater than zero.");
         }
 
-        // =====================================================
-        // VALIDATE OFFICE HOURS
-        // =====================================================
-
-        if (hasStartTime &&
-            request.StartTime!.Value <
-            OfficeStartTime)
-        {
-            throw new Exception(
-                "Rooms can only be booked between 09:00 AM and 07:30 PM.");
-        }
-
-        if (hasEndTime &&
-            request.EndTime!.Value >
-            OfficeEndTime)
-        {
-            throw new Exception(
-                "Rooms can only be booked between 09:00 AM and 07:30 PM.");
-        }
-
-        // =====================================================
-        // VALIDATE PAST DATE/TIME
-        // =====================================================
-
-        var now = DateTime.Now;
-
-        var today =
-            DateOnly.FromDateTime(now);
-
-        var currentTime =
-            TimeOnly.FromDateTime(now);
-
-        if (hasBookingDate &&
-            request.BookingDate!.Value < today)
-        {
-            throw new Exception(
-                "Cannot search availability for a past date.");
-        }
-
-        if (hasBookingDate &&
-            request.BookingDate!.Value == today &&
-            hasStartTime &&
-            request.StartTime!.Value <= currentTime)
-        {
-            throw new Exception(
-                "Cannot search for a time that has already passed.");
-        }
-
-        // =====================================================
-        // SEARCH AVAILABLE ROOMS
-        // =====================================================
+        // -----------------------------------------------------
+        // SEARCH ROOMS
+        // -----------------------------------------------------
 
         return await _bookingRepository
             .SearchAvailableRoomsAsync(request);
@@ -646,6 +788,6 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         return await _bookingRepository
-            .GetRoomsByModuleAsync(module);
+            .GetRoomsByModuleAsync(module.Trim());
     }
 }

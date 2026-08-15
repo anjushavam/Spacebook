@@ -5,7 +5,7 @@ namespace SpaceBook.Application.Interfaces;
 public interface IEmployeeBookingService
 {
     // =========================================================
-    // Create new room booking
+    // CREATE BOOKING
     // =========================================================
 
     Task<int> CreateBookingAsync(
@@ -14,7 +14,7 @@ public interface IEmployeeBookingService
 
 
     // =========================================================
-    // View booking details
+    // GET BOOKING DETAILS
     // =========================================================
 
     Task<BookingDetailsDto?> GetBookingByIdAsync(
@@ -23,7 +23,7 @@ public interface IEmployeeBookingService
 
 
     // =========================================================
-    // Cancel employee booking
+    // CANCEL BOOKING
     // =========================================================
 
     Task<bool> CancelBookingAsync(
@@ -32,7 +32,7 @@ public interface IEmployeeBookingService
 
 
     // =========================================================
-    // Update / Reschedule booking
+    // UPDATE / RESCHEDULE BOOKING
     // =========================================================
 
     Task<bool> UpdateBookingAsync(
@@ -42,9 +42,9 @@ public interface IEmployeeBookingService
 
 
     // =========================================================
-    // Search available rooms
+    // SEARCH AVAILABLE ROOMS
     //
-    // Supports:
+    // Supported criteria:
     // - Module
     // - Room Type
     // - Participant Count
@@ -53,7 +53,7 @@ public interface IEmployeeBookingService
     // - Start Time
     // - End Time
     //
-    // Any one criterion can be supplied.
+    // Criteria are optional and can be combined.
     // =========================================================
 
     Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
@@ -61,13 +61,10 @@ public interface IEmployeeBookingService
 
 
     // =========================================================
-    // Get rooms belonging to a specific module
+    // GET ROOMS BY MODULE
     //
-    // Example:
-    // "Module 2"
-    //
-    // Returns all available/non-blocked rooms belonging
-    // to the selected module.
+    // Returns available/non-blocked rooms belonging
+    // to the specified module.
     // =========================================================
 
     Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
