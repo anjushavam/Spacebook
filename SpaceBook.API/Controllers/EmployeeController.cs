@@ -52,10 +52,6 @@ public class EmployeeController : ControllerBase
 
     private IActionResult? ValidateBookingDate(DateOnly bookingDate)
     {
-        // -----------------------------------------------------
-        // TODAY
-        // -----------------------------------------------------
-
         var today =
             DateOnly.FromDateTime(DateTime.Now);
 
@@ -111,10 +107,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -123,10 +115,6 @@ public class EmployeeController : ControllerBase
                         "Invalid token. Employee Id not found."
                 });
             }
-
-            // -------------------------------------------------
-            // GET DASHBOARD
-            // -------------------------------------------------
 
             var result =
                 await _dashboardService
@@ -155,10 +143,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // DATE REQUIRED
-            // -------------------------------------------------
-
             if (!date.HasValue)
             {
                 return BadRequest(new
@@ -169,15 +153,6 @@ public class EmployeeController : ControllerBase
 
             var bookingDate = date.Value;
 
-            // -------------------------------------------------
-            // VALIDATE DATE
-            //
-            // This rejects:
-            // 1. Past dates
-            // 2. Saturdays
-            // 3. Sundays
-            // -------------------------------------------------
-
             var dateValidation =
                 ValidateBookingDate(bookingDate);
 
@@ -185,10 +160,6 @@ public class EmployeeController : ControllerBase
             {
                 return dateValidation;
             }
-
-            // -------------------------------------------------
-            // VALIDATE ROOM TYPE
-            // -------------------------------------------------
 
             if (roomTypeId.HasValue &&
                 roomTypeId.Value <= 0)
@@ -198,15 +169,6 @@ public class EmployeeController : ControllerBase
                     Message = "Invalid room type."
                 });
             }
-
-            // -------------------------------------------------
-            // GET AVAILABILITY
-            //
-            // IMPORTANT:
-            //
-            // This service will ONLY execute after the
-            // date validation above has passed.
-            // -------------------------------------------------
 
             var result =
                 await _dashboardService
@@ -236,10 +198,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -249,10 +207,6 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            // -------------------------------------------------
-            // VALIDATE REQUEST
-            // -------------------------------------------------
-
             if (request == null)
             {
                 return BadRequest(new
@@ -260,10 +214,6 @@ public class EmployeeController : ControllerBase
                     Message = "Booking request is required."
                 });
             }
-
-            // -------------------------------------------------
-            // CREATE BOOKING
-            // -------------------------------------------------
 
             var bookingId =
                 await _employeeBookingService
@@ -299,10 +249,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -311,10 +257,6 @@ public class EmployeeController : ControllerBase
                         "Invalid token. Employee Id not found."
                 });
             }
-
-            // -------------------------------------------------
-            // GET BOOKINGS
-            // -------------------------------------------------
 
             var result =
                 await _dashboardService
@@ -340,10 +282,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -352,10 +290,6 @@ public class EmployeeController : ControllerBase
                         "Invalid token. Employee Id not found."
                 });
             }
-
-            // -------------------------------------------------
-            // GET RECENT RESERVATIONS
-            // -------------------------------------------------
 
             var result =
                 await _dashboardService
@@ -382,10 +316,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -395,19 +325,11 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            // -------------------------------------------------
-            // GET BOOKING
-            // -------------------------------------------------
-
             var booking =
                 await _employeeBookingService
                     .GetBookingByIdAsync(
                         bookingId,
                         employeeId);
-
-            // -------------------------------------------------
-            // BOOKING NOT FOUND
-            // -------------------------------------------------
 
             if (booking == null)
             {
@@ -438,10 +360,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -451,19 +369,11 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            // -------------------------------------------------
-            // CANCEL BOOKING
-            // -------------------------------------------------
-
             var result =
                 await _employeeBookingService
                     .CancelBookingAsync(
                         bookingId,
                         employeeId);
-
-            // -------------------------------------------------
-            // BOOKING NOT FOUND
-            // -------------------------------------------------
 
             if (!result)
             {
@@ -499,10 +409,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -511,10 +417,6 @@ public class EmployeeController : ControllerBase
                         "Invalid token. Employee Id not found."
                 });
             }
-
-            // -------------------------------------------------
-            // REQUEST REQUIRED
-            // -------------------------------------------------
 
             if (request == null)
             {
@@ -525,20 +427,12 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            // -------------------------------------------------
-            // UPDATE BOOKING
-            // -------------------------------------------------
-
             var result =
                 await _employeeBookingService
                     .UpdateBookingAsync(
                         bookingId,
                         employeeId,
                         request);
-
-            // -------------------------------------------------
-            // BOOKING NOT FOUND
-            // -------------------------------------------------
 
             if (!result)
             {
@@ -573,10 +467,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // MODULE REQUIRED
-            // -------------------------------------------------
-
             if (string.IsNullOrWhiteSpace(module))
             {
                 return BadRequest(new
@@ -584,10 +474,6 @@ public class EmployeeController : ControllerBase
                     Message = "Module is required."
                 });
             }
-
-            // -------------------------------------------------
-            // GET ROOMS
-            // -------------------------------------------------
 
             var rooms =
                 await _employeeBookingService
@@ -624,6 +510,20 @@ public class EmployeeController : ControllerBase
                 {
                     Message =
                         "Search request is required."
+                });
+            }
+
+            // -------------------------------------------------
+            // PARTICIPANT COUNT VALIDATION
+            // -------------------------------------------------
+
+            if (request.ParticipantCount.HasValue &&
+                request.ParticipantCount.Value <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Participant count must be greater than zero."
                 });
             }
 
@@ -671,7 +571,51 @@ public class EmployeeController : ControllerBase
                 await _employeeBookingService
                     .SearchAvailableRoomsAsync(request);
 
-            return Ok(rooms);
+            // Convert result to a list so we can check count
+            var roomList =
+                rooms?.ToList() ??
+                new List<AvailableRoomDto>();
+
+            // -------------------------------------------------
+            // NO ROOMS FOUND
+            // -------------------------------------------------
+
+            if (!roomList.Any())
+            {
+                // If participant count was entered, provide
+                // a clear capacity-related message.
+                if (request.ParticipantCount.HasValue)
+                {
+                    return Ok(new
+                    {
+                        Message =
+                            "No room can accommodate the selected number of participants.",
+
+                        Rooms = roomList
+                    });
+                }
+
+                // Normal no-results response
+                return Ok(new
+                {
+                    Message =
+                        "No rooms are available for the selected criteria.",
+
+                    Rooms = roomList
+                });
+            }
+
+            // -------------------------------------------------
+            // ROOMS FOUND
+            // -------------------------------------------------
+
+            return Ok(new
+            {
+                Message =
+                    "Rooms found successfully.",
+
+                Rooms = roomList
+            });
         }
         catch (Exception ex)
         {
@@ -692,10 +636,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // GET EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -704,10 +644,6 @@ public class EmployeeController : ControllerBase
                         "Invalid token. Employee Id not found."
                 });
             }
-
-            // -------------------------------------------------
-            // CHECK-IN
-            // -------------------------------------------------
 
             var result =
                 await _checkInService
