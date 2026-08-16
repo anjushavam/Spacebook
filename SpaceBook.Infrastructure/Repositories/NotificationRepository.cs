@@ -11,26 +11,38 @@ public class NotificationRepository : INotificationRepository
 {
     private readonly ApplicationDbContext _context;
 
-    public NotificationRepository(ApplicationDbContext context)
+    public NotificationRepository(
+        ApplicationDbContext context)
     {
         _context = context;
     }
 
     // =========================================================
-    // Employee Notifications
+    // EMPLOYEE NOTIFICATIONS
     // =========================================================
 
-    public async Task<List<NotificationDto>> GetEmployeeNotificationsAsync(
-        int employeeId)
+    public async Task<List<NotificationDto>>
+        GetEmployeeNotificationsAsync(
+            int employeeId)
     {
         var list = await _context.Notifications
             .AsNoTracking()
+
             .Include(n => n.Employee)
+
             .Include(n => n.Booking)
                 .ThenInclude(b => b!.Room)
-            .Where(n => n.EmployeeId == employeeId)
+
+            .Include(n => n.Booking)
+                .ThenInclude(b => b!.Employee)
+
+            .Where(n =>
+                n.EmployeeId == employeeId)
+
             .OrderByDescending(n => n.CreatedAt)
+
             .Take(15)
+
             .ToListAsync();
 
         return list.Select(n => new NotificationDto
@@ -64,35 +76,42 @@ public class NotificationRepository : INotificationRepository
 
             EndTime =
                 n.Booking?.EndTime
-
-        }).ToList();
+        })
+        .ToList();
     }
 
-
     // =========================================================
-    // Admin Notifications
+    // ADMIN NOTIFICATIONS
     // =========================================================
 
-    public async Task<List<NotificationDto>> GetAdminNotificationsAsync()
+    public async Task<List<NotificationDto>>
+        GetAdminNotificationsAsync()
     {
         var list = await _context.Notifications
             .AsNoTracking()
 
-            // Employee who submitted the booking
+            // Employee who performed the action
             .Include(n => n.Employee)
 
             // Booking and Room
             .Include(n => n.Booking)
                 .ThenInclude(b => b!.Room)
 
-            // Employee associated with Booking
+            // Employee associated with booking
             .Include(n => n.Booking)
                 .ThenInclude(b => b!.Employee)
+
+            // -------------------------------------------------
+            // ADMIN RELEVANT NOTIFICATIONS
+            // -------------------------------------------------
 
             .Where(n =>
                 n.Message.ToLower().Contains("request") ||
                 n.Message.ToLower().Contains("submitted") ||
-                n.Message.ToLower().Contains("pending"))
+                n.Message.ToLower().Contains("pending") ||
+                n.Message.ToLower().Contains("rescheduled") ||
+                n.Message.ToLower().Contains("requires approval") ||
+                n.Message.ToLower().Contains("cancelled"))
 
             .OrderByDescending(n => n.CreatedAt)
 
@@ -100,14 +119,12 @@ public class NotificationRepository : INotificationRepository
 
             .ToListAsync();
 
-
         return list.Select(n =>
         {
             var booking = n.Booking;
 
-
             // -------------------------------------------------
-            // Employee Name
+            // EMPLOYEE NAME
             // -------------------------------------------------
 
             var employeeName =
@@ -115,27 +132,78 @@ public class NotificationRepository : INotificationRepository
                 ?? booking?.Employee?.Name
                 ?? "Employee";
 
-
             // -------------------------------------------------
-            // Room Name
+            // ROOM NAME
             // -------------------------------------------------
 
             var roomName =
                 booking?.Room?.RoomName
                 ?? "Meeting Room";
 
+            // -------------------------------------------------
+            // NOTIFICATION TYPE
+            // -------------------------------------------------
+
+            var isRescheduled =
+                n.Message.Contains(
+                    "rescheduled",
+                    StringComparison.OrdinalIgnoreCase);
+
+            var isCancelled =
+                n.Message.Contains(
+                    "cancelled",
+                    StringComparison.OrdinalIgnoreCase);
 
             // -------------------------------------------------
-            // Notification Message
+            // MESSAGE
             // -------------------------------------------------
 
-            var message = booking != null
-                ? $"{employeeName} submitted a booking request for {roomName}."
-                : n.Message;
+            string message;
 
+            if (isRescheduled)
+            {
+                message =
+                    $"{employeeName} rescheduled a booking for " +
+                    $"{roomName} and it requires approval.";
+            }
+            else if (isCancelled)
+            {
+                message =
+                    $"{employeeName} cancelled a booking for " +
+                    $"{roomName}.";
+            }
+            else if (booking != null)
+            {
+                message =
+                    $"{employeeName} submitted a booking request " +
+                    $"for {roomName}.";
+            }
+            else
+            {
+                message = n.Message;
+            }
 
             // -------------------------------------------------
-            // Return DTO
+            // TITLE
+            // -------------------------------------------------
+
+            string title;
+
+            if (isRescheduled)
+            {
+                title = "Booking Rescheduled";
+            }
+            else if (isCancelled)
+            {
+                title = "Booking Cancelled";
+            }
+            else
+            {
+                title = "Booking Request";
+            }
+
+            // -------------------------------------------------
+            // RETURN DTO
             // -------------------------------------------------
 
             return new NotificationDto
@@ -144,7 +212,7 @@ public class NotificationRepository : INotificationRepository
                     n.NotificationId,
 
                 Title =
-                    "Booking Request",
+                    title,
 
                 Message =
                     message,
@@ -176,27 +244,28 @@ public class NotificationRepository : INotificationRepository
                 EndTime =
                     booking?.EndTime
             };
-
-        }).ToList();
+        })
+        .ToList();
     }
 
-
     // =========================================================
-    // Generic User Notifications
+    // GENERIC USER NOTIFICATIONS
     // =========================================================
 
-    public async Task<List<NotificationDto>> GetNotificationsForUserAsync(
-        int employeeId)
+    public async Task<List<NotificationDto>>
+        GetNotificationsForUserAsync(
+            int employeeId)
     {
-        return await GetEmployeeNotificationsAsync(employeeId);
+        return await GetEmployeeNotificationsAsync(
+            employeeId);
     }
 
-
     // =========================================================
-    // Get All Notifications
+    // GET ALL NOTIFICATIONS
     // =========================================================
 
-    public async Task<List<NotificationDto>> GetAllAsync()
+    public async Task<List<NotificationDto>>
+        GetAllAsync()
     {
         var list = await _context.Notifications
             .AsNoTracking()
@@ -214,7 +283,6 @@ public class NotificationRepository : INotificationRepository
             .Take(50)
 
             .ToListAsync();
-
 
         return list.Select(n => new NotificationDto
         {
@@ -254,18 +322,19 @@ public class NotificationRepository : INotificationRepository
 
             EndTime =
                 n.Booking?.EndTime
-
-        }).ToList();
+        })
+        .ToList();
     }
 
-
     // =========================================================
-    // Mark Notifications As Read
+    // MARK NOTIFICATIONS AS READ
     // =========================================================
 
-    public async Task MarkAllAsReadAsync(int employeeId)
+    public async Task MarkAllAsReadAsync(
+        int employeeId)
     {
-        var unreadNotifications = employeeId == 0
+        var unreadNotifications =
+            employeeId == 0
 
             // Admin: mark all notifications as read
             ? await _context.Notifications
@@ -279,29 +348,28 @@ public class NotificationRepository : INotificationRepository
                     !n.IsRead)
                 .ToListAsync();
 
-
-        foreach (var notification in unreadNotifications)
+        foreach (var notification
+                 in unreadNotifications)
         {
             notification.IsRead = true;
         }
 
-
         await _context.SaveChangesAsync();
     }
 
-
     // =========================================================
-    // Add Notification
+    // ADD NOTIFICATION
     // =========================================================
 
-    public async Task AddAsync(Notification notification)
+    public async Task AddAsync(
+        Notification notification)
     {
-        await _context.Notifications.AddAsync(notification);
+        await _context.Notifications.AddAsync(
+            notification);
     }
 
-
     // =========================================================
-    // Save Changes
+    // SAVE CHANGES
     // =========================================================
 
     public async Task SaveChangesAsync()
@@ -309,18 +377,24 @@ public class NotificationRepository : INotificationRepository
         await _context.SaveChangesAsync();
     }
 
-
     // =========================================================
-    // Notification Title
+    // NOTIFICATION TITLE
     // =========================================================
 
-    private static string DeriveTitle(string message)
+    private static string DeriveTitle(
+        string message)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
             return "Notification";
         }
 
+        if (message.Contains(
+                "rescheduled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Booking Rescheduled";
+        }
 
         if (message.Contains(
                 "approve",
@@ -329,14 +403,12 @@ public class NotificationRepository : INotificationRepository
             return "Booking Approved";
         }
 
-
         if (message.Contains(
                 "reject",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Booking Rejected";
         }
-
 
         if (message.Contains(
                 "cancel",
@@ -345,14 +417,12 @@ public class NotificationRepository : INotificationRepository
             return "Booking Cancelled";
         }
 
-
         if (message.Contains(
                 "missed",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Missed Check-in";
         }
-
 
         if (
             message.Contains(
@@ -361,21 +431,24 @@ public class NotificationRepository : INotificationRepository
             ||
             message.Contains(
                 "submitted",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            message.Contains(
+                "pending",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Booking Request";
         }
 
-
         return "Notification";
     }
 
-
     // =========================================================
-    // Time Ago
+    // TIME AGO
     // =========================================================
 
-    private static string FormatTimeAgo(DateTime created)
+    private static string FormatTimeAgo(
+        DateTime created)
     {
         var utcCreated =
             created.Kind == DateTimeKind.Unspecified
@@ -384,35 +457,30 @@ public class NotificationRepository : INotificationRepository
                     DateTimeKind.Utc)
                 : created.ToUniversalTime();
 
-
         var span =
             DateTime.UtcNow - utcCreated;
-
 
         if (span.TotalSeconds < 60)
         {
             return "Just now";
         }
 
-
         if (span.TotalMinutes < 60)
         {
             return $"{(int)span.TotalMinutes}m ago";
         }
-
 
         if (span.TotalHours < 24)
         {
             return $"{(int)span.TotalHours}h ago";
         }
 
-
         if (span.TotalDays < 7)
         {
             return $"{(int)span.TotalDays}d ago";
         }
 
-
-        return utcCreated.ToString("MMM dd, yyyy");
+        return utcCreated.ToString(
+            "MMM dd, yyyy");
     }
 }

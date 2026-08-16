@@ -239,6 +239,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             BookedOn =
                 DateTime.UtcNow,
 
+            // New bookings must always require approval.
             Status = "Pending"
         };
 
@@ -254,7 +255,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             await _bookingRepository.SaveChangesAsync();
 
             // -------------------------------------------------
-            // CREATE NOTIFICATION
+            // CREATE BOOKING REQUEST NOTIFICATION
             // -------------------------------------------------
 
             var notification = new Notification
@@ -568,7 +569,10 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // UPDATE BOOKING
+        // UPDATE / RESCHEDULE BOOKING
+        //
+        // IMPORTANT:
+        // Repository must reset the booking status to Pending.
         // -----------------------------------------------------
 
         var updated =
@@ -584,6 +588,9 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // -----------------------------------------------------
         // CREATE ADMIN NOTIFICATION
+        //
+        // Admin notification repository will identify messages
+        // containing "rescheduled".
         // -----------------------------------------------------
 
         var notification = new Notification
@@ -593,7 +600,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             BookingId = bookingId,
 
             Message =
-                $"Booking #{bookingId} was rescheduled by employee.",
+                $"Booking #{bookingId} was rescheduled by employee and requires approval.",
 
             IsRead = false,
 
@@ -719,10 +726,6 @@ public class EmployeeBookingService : IEmployeeBookingService
                     "End time must be after start time.");
             }
 
-            // -------------------------------------------------
-            // OFFICE HOURS: 10:00 AM - 07:00 PM
-            // -------------------------------------------------
-
             if (startTime < OfficeStartTime)
             {
                 throw new Exception(
@@ -735,18 +738,14 @@ public class EmployeeBookingService : IEmployeeBookingService
                     "Rooms can only be searched until 07:00 PM.");
             }
 
-            // -------------------------------------------------
-            // TODAY + TIME VALIDATION
-            // -------------------------------------------------
-
             if (hasBookingDate &&
                 request.BookingDate!.Value ==
                 DateOnly.FromDateTime(DateTime.Now))
             {
-                var currentTime =
+                var currentSearchTime =
                     TimeOnly.FromDateTime(DateTime.Now);
 
-                if (startTime <= currentTime)
+                if (startTime <= currentSearchTime)
                 {
                     throw new Exception(
                         "Cannot search for a time that has already passed.");

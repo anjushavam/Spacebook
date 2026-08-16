@@ -49,15 +49,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             .AnyAsync(b =>
                 b.RoomId == roomId &&
                 b.BookingDate == bookingDate &&
-
-                // Cancelled and rejected bookings
-                // should not block the room.
                 b.Status != "Cancelled" &&
                 b.Status != "Rejected" &&
-
-                // Overlap condition:
-                // Existing Start < Requested End
-                // Existing End > Requested Start
                 b.StartTime < endTime &&
                 b.EndTime > startTime
             );
@@ -66,7 +59,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // =========================================================
     // CHECK ROOM AVAILABILITY
     // EXCLUDE EXISTING BOOKING
-    // Used during rescheduling/update
     // =========================================================
 
     public async Task<bool> IsRoomAvailableAsync(
@@ -79,18 +71,10 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         return !await _context.Bookings
             .AnyAsync(b =>
                 b.RoomId == roomId &&
-
-                // Do not compare the booking with itself.
                 b.BookingId != excludeBookingId &&
-
                 b.BookingDate == bookingDate &&
-
-                // Cancelled and rejected bookings
-                // should not block the room.
                 b.Status != "Cancelled" &&
                 b.Status != "Rejected" &&
-
-                // Overlap condition.
                 b.StartTime < endTime &&
                 b.EndTime > startTime
             );
@@ -159,6 +143,16 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             return false;
         }
 
+        // Do not cancel an already cancelled booking
+        if (string.Equals(
+                booking.Status,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "This booking is already cancelled.");
+        }
+
         booking.Status = "Cancelled";
 
         await _context.SaveChangesAsync();
@@ -190,13 +184,27 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
+        // PREVENT UPDATE OF CANCELLED BOOKING
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                booking.Status,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "Cancelled bookings cannot be updated.");
+        }
+
+        // -----------------------------------------------------
         // VALIDATE ROOM ID
         // -----------------------------------------------------
 
         if (!request.RoomId.HasValue ||
             request.RoomId.Value <= 0)
         {
-            throw new Exception("Room ID is required.");
+            throw new Exception(
+                "Room ID is required.");
         }
 
         // -----------------------------------------------------
@@ -258,30 +266,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // WEEKEND VALIDATION
         // -----------------------------------------------------
 
-        if (request.BookingDate.DayOfWeek == DayOfWeek.Saturday ||
-            request.BookingDate.DayOfWeek == DayOfWeek.Sunday)
+        if (request.BookingDate.DayOfWeek ==
+                DayOfWeek.Saturday ||
+            request.BookingDate.DayOfWeek ==
+                DayOfWeek.Sunday)
         {
             throw new Exception(
                 "Bookings are not allowed on Saturdays and Sundays.");
-        }
-
-        // -----------------------------------------------------
-        // OFFICE HOURS
-        //
-        // 09:00 AM - 07:30 PM
-        // -----------------------------------------------------
-
-        var officeStart =
-            new TimeOnly(9, 0);
-
-        var officeEnd =
-            new TimeOnly(19, 30);
-
-        if (request.StartTime < officeStart ||
-            request.EndTime > officeEnd)
-        {
-            throw new Exception(
-                "Booking time must be between 09:00 AM and 07:30 PM.");
         }
 
         // -----------------------------------------------------
@@ -310,7 +301,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
         // CHECK ROOM AVAILABILITY
         //
-        // Exclude the current booking because this is an update.
+        // Exclude the current booking.
         // -----------------------------------------------------
 
         var roomAvailable =
@@ -363,7 +354,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             request.MeetingTitle))
         {
             booking.MeetingTitle =
-                request.MeetingTitle;
+                request.MeetingTitle.Trim();
         }
 
         // -----------------------------------------------------
@@ -374,7 +365,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             request.Purpose))
         {
             booking.Purpose =
-                request.Purpose;
+                request.Purpose.Trim();
         }
 
         // -----------------------------------------------------
@@ -383,6 +374,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
         booking.ParticipantCount =
             request.ParticipantCount;
+
+        // -----------------------------------------------------
+        // IMPORTANT:
+        // EDITED BOOKINGS REQUIRE ADMIN APPROVAL AGAIN
+        // -----------------------------------------------------
+
+        booking.Status = "Pending";
 
         // -----------------------------------------------------
         // SAVE CHANGES
@@ -450,8 +448,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
         // -----------------------------------------------------
         // FACILITY FILTER
-        //
-        // Every requested facility must exist in the room.
         // -----------------------------------------------------
 
         if (request.FacilityIds != null &&
@@ -487,6 +483,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 !room.Bookings.Any(booking =>
                     booking.BookingDate == bookingDate &&
 
+                    // Pending and approved bookings both
+                    // reserve the room.
                     booking.Status != "Cancelled" &&
                     booking.Status != "Rejected" &&
 
@@ -532,11 +530,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         HasRoomWithRequiredCapacityAsync(
             SearchRoomsRequestDto request)
     {
-        // -----------------------------------------------------
-        // If participant count is not supplied,
-        // there is no capacity restriction.
-        // -----------------------------------------------------
-
         if (!request.ParticipantCount.HasValue ||
             request.ParticipantCount.Value <= 0)
         {
