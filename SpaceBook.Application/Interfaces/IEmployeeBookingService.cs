@@ -43,30 +43,18 @@ public interface IEmployeeBookingService
 
     // =========================================================
     // SEARCH AVAILABLE ROOMS
-    //
-    // Supported criteria:
-    // - Module
-    // - Room Type
-    // - Participant Count
-    // - Facilities
-    // - Booking Date
-    // - Start Time
-    // - End Time
-    //
-    // Criteria are optional and can be combined.
     // =========================================================
 
-    Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
-        SearchRoomsRequestDto request);
+    Task<List<AvailableRoomDto>>
+        SearchAvailableRoomsAsync(
+            SearchRoomsRequestDto request);
 
 
     // =========================================================
     // GET ROOMS BY MODULE
-    //
-    // Returns available/non-blocked rooms belonging
-    // to the specified module.
     // =========================================================
 
-    Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
-        string module);
+    Task<List<AvailableRoomDto>>
+        GetRoomsByModuleAsync(
+            string module);
 }
