@@ -74,6 +74,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         var todayMeetings =
             await _context.Bookings
                 .AsNoTracking()
+                .Include(x => x.Room)
                 .Where(x =>
                     x.EmployeeId == employeeId &&
                     x.BookingDate == today &&
@@ -452,6 +453,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
     {
         return await _context.Bookings
             .AsNoTracking()
+            .Include(x => x.Room)
             .Where(x =>
                 x.EmployeeId == employeeId)
             .OrderByDescending(x =>
@@ -510,6 +512,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
     {
         return await _context.Bookings
             .AsNoTracking()
+            .Include(x => x.Room)
             .Where(x =>
                 x.EmployeeId == employeeId &&
                 x.Status != "Cancelled" &&
