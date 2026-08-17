@@ -10,6 +10,8 @@ public class BookingDto
 
     public string RoomName { get; set; } = string.Empty;
 
+    public string Module { get; set; } = string.Empty;
+
     public string EmployeeName { get; set; } = string.Empty;
 
     public DateOnly BookingDate { get; set; }

@@ -69,6 +69,8 @@ public class BookingRepository : IBookingRepository
                 BookingId = x.BookingId,
                 Purpose = x.Purpose,
                 RoomName = x.Room!.RoomName,
+               
+                Module = x.Room != null ? x.Room.Module : string.Empty,   // <-- Added
                 EmployeeName = x.Employee!.Name,
                 BookingDate = x.BookingDate,
                 StartTime = x.StartTime,
@@ -93,8 +95,7 @@ public class BookingRepository : IBookingRepository
             {
                 BookingId = x.BookingId,
 
-                // IMPORTANT
-                // This is required for employee notifications.
+                // IMPORTANT: Required for employee notifications
                 EmployeeId = x.EmployeeId,
 
                 MeetingTitle = x.MeetingTitle,
@@ -104,6 +105,10 @@ public class BookingRepository : IBookingRepository
                 ParticipantCount = x.ParticipantCount,
 
                 RoomName = x.Room!.RoomName,
+
+              
+
+                Module = x.Room != null ? x.Room.Module : string.Empty,   // <-- Added
 
                 EmployeeName = x.Employee!.Name,
 
