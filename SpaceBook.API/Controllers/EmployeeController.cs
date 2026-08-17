@@ -661,7 +661,7 @@ public class EmployeeController : ControllerBase
                 }
 
                 var officeStart =
-                    new TimeOnly(9, 0);
+                    new TimeOnly(10, 0);
 
                 var officeEnd =
                     new TimeOnly(19, 30);

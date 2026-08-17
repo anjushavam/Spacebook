@@ -27,7 +27,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         new TimeOnly(10, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(19, 0);
+        new TimeOnly(19, 30);
 
     // =========================================================
     // EMPLOYEE DASHBOARD
