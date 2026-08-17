@@ -89,23 +89,23 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         int employeeId)
     {
         return await _context.Bookings
-
             .Include(b => b.Room)
                 .ThenInclude(r => r!.RoomType)
-
             .Include(b => b.Room)
                 .ThenInclude(r => r!.RoomFacilities)
                     .ThenInclude(rf => rf.Facility)
-
             .Where(b =>
                 b.BookingId == bookingId &&
                 b.EmployeeId == employeeId)
-
             .Select(b => new BookingDetailsDto
             {
                 BookingId = b.BookingId,
 
-                RoomName = b.Room!.RoomName,
+                EmployeeId = b.EmployeeId,
+
+                RoomName = b.Room != null ? b.Room.RoomName : string.Empty,
+
+                Module = b.Room != null ? b.Room.Module : string.Empty,
 
                 BookingDate = b.BookingDate,
 
@@ -119,9 +119,10 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
                 Purpose = b.Purpose,
 
-                Status = b.Status
-            })
+                Status = b.Status,
 
+                BookedOn = b.BookedOn
+            })
             .FirstOrDefaultAsync();
     }
 
@@ -482,12 +483,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             query = query.Where(room =>
                 !room.Bookings.Any(booking =>
                     booking.BookingDate == bookingDate &&
-
-                    // Pending and approved bookings both
-                    // reserve the room.
                     booking.Status != "Cancelled" &&
                     booking.Status != "Rejected" &&
-
                     booking.StartTime < endTime &&
                     booking.EndTime > startTime
                 ));
