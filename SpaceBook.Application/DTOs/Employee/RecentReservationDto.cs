@@ -6,6 +6,8 @@ public class RecentReservationDto
 
     public string RoomName { get; set; } = string.Empty;
 
+    public string Module { get; set; } = string.Empty;
+
     public DateOnly BookingDate { get; set; }
 
     public TimeOnly StartTime { get; set; }

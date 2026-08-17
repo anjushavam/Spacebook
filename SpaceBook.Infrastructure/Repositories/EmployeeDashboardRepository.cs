@@ -20,7 +20,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
     // OFFICE HOURS
     // =========================================================
     // Configured Office Hours:
-    // 10:00 AM - 07:00 PM
+    // 10:00 AM - 07:30 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
@@ -44,6 +44,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         var currentTime =
             TimeOnly.FromDateTime(now);
 
+        // -----------------------------------------------------
+        // BOOKINGS TODAY
+        // -----------------------------------------------------
+
         var bookingsToday =
             await _context.Bookings
                 .AsNoTracking()
@@ -52,6 +56,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     x.BookingDate == today &&
                     x.Status != "Cancelled" &&
                     x.Status != "Rejected");
+
+        // -----------------------------------------------------
+        // UPCOMING BOOKINGS
+        // -----------------------------------------------------
 
         var upcomingCount =
             await _context.Bookings
@@ -68,8 +76,16 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     x.Status != "Cancelled" &&
                     x.Status != "Rejected");
 
+        // -----------------------------------------------------
+        // RECENT RESERVATIONS
+        // -----------------------------------------------------
+
         var recentReservations =
             await GetRecentReservationsAsync(employeeId);
+
+        // -----------------------------------------------------
+        // TODAY'S MEETINGS
+        // -----------------------------------------------------
 
         var todayMeetings =
             await _context.Bookings
@@ -100,6 +116,17 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                             ? x.Room.RoomName
                             : $"Room {x.RoomId}",
 
+                    // =================================================
+                    // MODULE ADDED
+                    // Example:
+                    // Module 1 - Elcot Park - CMB
+                    // =================================================
+
+                    Module =
+                        x.Room != null
+                            ? x.Room.Module
+                            : string.Empty,
+
                     StartTime =
                         x.StartTime,
 
@@ -110,6 +137,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                         x.Status
                 })
                 .ToListAsync();
+
+        // -----------------------------------------------------
+        // RETURN DASHBOARD
+        // -----------------------------------------------------
 
         return new EmployeeDashboardDto
         {
@@ -158,6 +189,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         TimeOnly officeEnd =
             OfficeEndTime;
 
+        // -----------------------------------------------------
+        // GET ROOMS
+        // -----------------------------------------------------
+
         var roomsQuery =
             _context.Rooms
                 .AsNoTracking()
@@ -181,10 +216,18 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     .ThenInclude(rf => rf.Facility)
                 .ToListAsync();
 
+        // -----------------------------------------------------
+        // GET ROOM IDS
+        // -----------------------------------------------------
+
         var roomIds =
             rooms
                 .Select(r => r.RoomId)
                 .ToList();
+
+        // -----------------------------------------------------
+        // GET BOOKINGS FOR SELECTED DATE
+        // -----------------------------------------------------
 
         var allBookings =
             await _context.Bookings
@@ -195,6 +238,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     b.Status != "Cancelled" &&
                     b.Status != "Rejected")
                 .ToListAsync();
+
+        // -----------------------------------------------------
+        // PROCESS EACH ROOM
+        // -----------------------------------------------------
 
         foreach (var room in rooms)
         {
@@ -207,11 +254,20 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             List<TimeSlotDto> slots =
                 new();
 
+            // -------------------------------------------------
+            // PAST DATE
+            // -------------------------------------------------
+
             if (date < today)
             {
                 slots =
                     new List<TimeSlotDto>();
             }
+
+            // -------------------------------------------------
+            // FUTURE DATE
+            // -------------------------------------------------
+
             else if (date > today)
             {
                 TimeOnly start =
@@ -255,6 +311,11 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                         end;
                 }
             }
+
+            // -------------------------------------------------
+            // TODAY
+            // -------------------------------------------------
+
             else
             {
                 TimeOnly start =
@@ -307,6 +368,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 }
             }
 
+            // -------------------------------------------------
+            // CURRENT / NEXT BOOKING
+            // -------------------------------------------------
+
             Booking? currentBooking =
                 null;
 
@@ -345,6 +410,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 }
             }
 
+            // -------------------------------------------------
+            // FACILITIES
+            // -------------------------------------------------
+
             var facilities =
                 room.RoomFacilities != null
                     ? room.RoomFacilities
@@ -354,6 +423,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                             rf.Facility!.FacilityName)
                         .ToList()
                     : new List<string>();
+
+            // -------------------------------------------------
+            // ROOM STATUS
+            // -------------------------------------------------
 
             string roomStatus =
                 "Available";
@@ -380,6 +453,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 }
             }
 
+            // -------------------------------------------------
+            // ADD ROOM AVAILABILITY
+            // -------------------------------------------------
+
             result.Rooms.Add(
                 new RoomAvailabilityDto
                 {
@@ -393,6 +470,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                         room.RoomType != null
                             ? room.RoomType.TypeName
                             : "Conference",
+
+                    // =================================================
+                    // MODULE
+                    // =================================================
 
                     Module =
                         room.Module,
@@ -425,8 +506,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                                         : (
                                             !string.IsNullOrWhiteSpace(
                                                 currentBooking.MeetingTitle)
-                                                ? currentBooking.MeetingTitle
-                                                : "Reserved Workspace"
+                                                    ? currentBooking.MeetingTitle
+                                                    : "Reserved Workspace"
                                           ),
 
                                 StartTime =
@@ -472,6 +553,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     x.Room != null
                         ? x.Room.RoomName
                         : $"Room {x.RoomId}",
+
+                // =================================================
+                // MODULE
+                // =================================================
 
                 Module =
                     x.Room != null
@@ -530,6 +615,15 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     x.Room != null
                         ? x.Room.RoomName
                         : $"Room {x.RoomId}",
+
+                // =================================================
+                // MODULE ADDED
+                // =================================================
+
+                Module =
+                    x.Room != null
+                        ? x.Room.Module
+                        : string.Empty,
 
                 BookingDate =
                     x.BookingDate,

@@ -8,6 +8,8 @@ public class TodayMeetingDto
 
     public string RoomName { get; set; } = string.Empty;
 
+    public string Module { get; set; } = string.Empty;
+
     public TimeOnly StartTime { get; set; }
 
     public TimeOnly EndTime { get; set; }
