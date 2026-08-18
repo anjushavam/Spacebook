@@ -40,9 +40,10 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // =====================================================
+
+        // =========================================================
         // ROLE
-        // =====================================================
+        // =========================================================
 
         modelBuilder.Entity<Role>(entity =>
         {
@@ -55,8 +56,9 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(r => r.RoleName)
                 .HasColumnName("rolename")
-                .HasMaxLength(100)
+                .HasMaxLength(50)
                 .IsRequired();
+
 
             // One Role -> Many Employees
             entity.HasMany(r => r.Employees)
@@ -66,9 +68,9 @@ public class ApplicationDbContext : DbContext
         });
 
 
-        // =====================================================
+        // =========================================================
         // EMPLOYEE
-        // =====================================================
+        // =========================================================
 
         modelBuilder.Entity<Employee>(entity =>
         {
@@ -100,7 +102,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CreatedOn)
                 .HasColumnName("createdon");
 
-            // One Employee -> Many Bookings
+
+            // Employee -> Bookings
             entity.HasMany(e => e.Bookings)
                 .WithOne(b => b.Employee)
                 .HasForeignKey(b => b.EmployeeId)
@@ -108,28 +111,36 @@ public class ApplicationDbContext : DbContext
         });
 
 
-        // =====================================================
-        // FACILITY
-        // =====================================================
+        // =========================================================
+        // ROOM TYPE
+        // =========================================================
 
-        modelBuilder.Entity<Facility>(entity =>
+        modelBuilder.Entity<RoomType>(entity =>
         {
-            entity.ToTable("facilities");
+            entity.ToTable("roomtypes");
 
-            entity.HasKey(f => f.FacilityId);
+            entity.HasKey(rt => rt.RoomTypeId);
 
-            entity.Property(f => f.FacilityId)
-                .HasColumnName("facilityid");
+            entity.Property(rt => rt.RoomTypeId)
+                .HasColumnName("roomtypeid");
 
-            entity.Property(f => f.FacilityName)
-                .HasColumnName("facilityname")
-                .HasMaxLength(100);
+            entity.Property(rt => rt.TypeName)
+                .HasColumnName("typename")
+                .HasMaxLength(100)
+                .IsRequired();
+
+
+            // RoomType -> Rooms
+            entity.HasMany(rt => rt.Rooms)
+                .WithOne(r => r.RoomType)
+                .HasForeignKey(r => r.RoomTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
 
-        // =====================================================
+        // =========================================================
         // MODULE
-        // =====================================================
+        // =========================================================
 
         modelBuilder.Entity<Module>(entity =>
         {
@@ -157,12 +168,19 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(m => m.RecordModifiedOn)
                 .HasColumnName("recordmodifiedon");
+
+
+            // Module -> Rooms
+            entity.HasMany(m => m.Rooms)
+                .WithOne(r => r.Module)
+                .HasForeignKey(r => r.ModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
 
-        // =====================================================
+        // =========================================================
         // ROOM
-        // =====================================================
+        // =========================================================
 
         modelBuilder.Entity<Room>(entity =>
         {
@@ -176,14 +194,14 @@ public class ApplicationDbContext : DbContext
             entity.Property(r => r.RoomTypeId)
                 .HasColumnName("roomtypeid");
 
+            entity.Property(r => r.ModuleId)
+                .HasColumnName("moduleid");
+
             entity.Property(r => r.RoomName)
                 .HasColumnName("roomname");
 
             entity.Property(r => r.Capacity)
                 .HasColumnName("capacity");
-
-            entity.Property(r => r.ModuleId)
-                .HasColumnName("moduleid");
 
             entity.Property(r => r.Status)
                 .HasColumnName("status");
@@ -191,91 +209,160 @@ public class ApplicationDbContext : DbContext
             entity.Property(r => r.IsBlocked)
                 .HasColumnName("isblocked");
 
+
             // Room -> RoomType
             entity.HasOne(r => r.RoomType)
-                .WithMany()
+                .WithMany(rt => rt.Rooms)
                 .HasForeignKey(r => r.RoomTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
 
             // Room -> Module
             entity.HasOne(r => r.Module)
                 .WithMany(m => m.Rooms)
                 .HasForeignKey(r => r.ModuleId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+
+            // Room -> RoomFacilities
+            entity.HasMany(r => r.RoomFacilities)
+                .WithOne(rf => rf.Room)
+                .HasForeignKey(rf => rf.RoomId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+
+            // Room -> Bookings
+            entity.HasMany(r => r.Bookings)
+                .WithOne(b => b.Room)
+                .HasForeignKey(b => b.RoomId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
+
         // =========================================================
-// BOOKING
-// =========================================================
+        // FACILITY
+        // =========================================================
 
-modelBuilder.Entity<Booking>(entity =>
-{
-    entity.ToTable("bookings");
+        modelBuilder.Entity<Facility>(entity =>
+        {
+            entity.ToTable("facilities");
 
-    entity.HasKey(b => b.BookingId);
+            entity.HasKey(f => f.FacilityId);
 
-    entity.Property(b => b.BookingId)
-        .HasColumnName("bookingid");
+            entity.Property(f => f.FacilityId)
+                .HasColumnName("facilityid");
 
-    entity.Property(b => b.RoomId)
-        .HasColumnName("roomid");
-
-    entity.Property(b => b.EmployeeId)
-        .HasColumnName("employeeid");
-
-    entity.Property(b => b.MeetingTitle)
-        .HasColumnName("meetingtitle");
-
-    entity.Property(b => b.Purpose)
-        .HasColumnName("purpose");
-
-    entity.Property(b => b.ParticipantCount)
-        .HasColumnName("participantcount");
-
-    entity.Property(b => b.BookingDate)
-        .HasColumnName("bookingdate");
-
-    entity.Property(b => b.StartTime)
-        .HasColumnName("starttime");
-
-    entity.Property(b => b.EndTime)
-        .HasColumnName("endtime");
-
-    entity.Property(b => b.BookedOn)
-        .HasColumnName("bookedon");
-
-    entity.Property(b => b.Status)
-        .HasColumnName("status");
+            entity.Property(f => f.FacilityName)
+                .HasColumnName("facilityname")
+                .HasMaxLength(100)
+                .IsRequired();
 
 
-    // Booking -> Employee
-    entity.HasOne(b => b.Employee)
-        .WithMany(e => e.Bookings)
-        .HasForeignKey(b => b.EmployeeId)
-        .OnDelete(DeleteBehavior.Restrict);
-        
-});
+            // Facility -> RoomFacilities
+            entity.HasMany(f => f.RoomFacilities)
+                .WithOne(rf => rf.Facility)
+                .HasForeignKey(rf => rf.FacilityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
 
-// =========================================================
-// ROOM TYPE
-// =========================================================
+        // =========================================================
+        // ROOM FACILITY
+        // =========================================================
 
-modelBuilder.Entity<RoomType>(entity =>
-{
-    entity.ToTable("roomtypes");
+        modelBuilder.Entity<RoomFacility>(entity =>
+        {
+            entity.ToTable("roomfacilities");
 
-    entity.HasKey(r => r.RoomTypeId);
+            entity.HasKey(rf => rf.RoomFacilityId);
 
-    entity.Property(r => r.RoomTypeId)
-        .HasColumnName("roomtypeid");
+            entity.Property(rf => rf.RoomFacilityId)
+                .HasColumnName("roomfacilityid");
 
-    entity.Property(r => r.TypeName)
-        .HasColumnName("roomtypename");
-});
-        // =====================================================
+            entity.Property(rf => rf.RoomId)
+                .HasColumnName("roomid");
+
+            entity.Property(rf => rf.FacilityId)
+                .HasColumnName("facilityid");
+
+
+            // RoomFacility -> Room
+            entity.HasOne(rf => rf.Room)
+                .WithMany(r => r.RoomFacilities)
+                .HasForeignKey(rf => rf.RoomId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+
+            // RoomFacility -> Facility
+            entity.HasOne(rf => rf.Facility)
+                .WithMany(f => f.RoomFacilities)
+                .HasForeignKey(rf => rf.FacilityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+
+        // =========================================================
+        // BOOKING
+        // =========================================================
+
+        modelBuilder.Entity<Booking>(entity =>
+        {
+            entity.ToTable("bookings");
+
+            entity.HasKey(b => b.BookingId);
+
+            entity.Property(b => b.BookingId)
+                .HasColumnName("bookingid");
+
+            entity.Property(b => b.RoomId)
+                .HasColumnName("roomid");
+
+            entity.Property(b => b.EmployeeId)
+                .HasColumnName("employeeid");
+
+            entity.Property(b => b.MeetingTitle)
+                .HasColumnName("meetingtitle");
+
+            entity.Property(b => b.Purpose)
+                .HasColumnName("purpose");
+
+            entity.Property(b => b.ParticipantCount)
+                .HasColumnName("participantcount");
+
+            entity.Property(b => b.BookingDate)
+                .HasColumnName("bookingdate");
+
+            entity.Property(b => b.StartTime)
+                .HasColumnName("starttime");
+
+            entity.Property(b => b.EndTime)
+                .HasColumnName("endtime");
+
+            entity.Property(b => b.BookedOn)
+                .HasColumnName("bookedon");
+
+            entity.Property(b => b.Status)
+                .HasColumnName("status");
+
+
+            // Booking -> Employee
+            entity.HasOne(b => b.Employee)
+                .WithMany(e => e.Bookings)
+                .HasForeignKey(b => b.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+
+            // Booking -> Room
+            entity.HasOne(b => b.Room)
+                .WithMany(r => r.Bookings)
+                .HasForeignKey(b => b.RoomId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+
+        // =========================================================
         // CHECK-IN
-        // =====================================================
+        // =========================================================
 
         modelBuilder.Entity<CheckIn>(entity =>
         {
@@ -297,6 +384,7 @@ modelBuilder.Entity<RoomType>(entity =>
                 .HasColumnName("status")
                 .HasMaxLength(50);
 
+
             // CheckIn -> Booking
             entity.HasOne(c => c.Booking)
                 .WithOne(b => b.CheckIn)
@@ -305,9 +393,9 @@ modelBuilder.Entity<RoomType>(entity =>
         });
 
 
-        // =====================================================
+        // =========================================================
         // NOTIFICATION
-        // =====================================================
+        // =========================================================
 
         modelBuilder.Entity<Notification>(entity =>
         {
@@ -333,6 +421,7 @@ modelBuilder.Entity<RoomType>(entity =>
 
             entity.Property(n => n.CreatedAt)
                 .HasColumnName("createdat");
+
 
             // Notification -> Booking
             entity.HasOne(n => n.Booking)
