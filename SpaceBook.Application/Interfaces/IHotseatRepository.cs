@@ -1,10 +1,10 @@
-using SpaceBook.Domain.Entities;
+using SpaceBook.Application.DTOs.Hotseat;
 
 namespace SpaceBook.Application.Interfaces;
 
 public interface IHotseatRepository
 {
-    Task<IEnumerable<HotseatBooking>> GetHotseatBookingsAsync(
+    Task<IEnumerable<HotseatSeatDto>> GetHotseatsAsync(
         DateOnly? date,
         string? city,
         string? building,
