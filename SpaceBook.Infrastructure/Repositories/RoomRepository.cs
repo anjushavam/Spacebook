@@ -16,32 +16,42 @@ public class RoomRepository : IRoomRepository
     }
 
     // =========================================================
-    // Dashboard
+    // DASHBOARD
     // =========================================================
 
     public async Task<RoomDashboardDto> GetDashboardAsync()
     {
         return new RoomDashboardDto
         {
-            TotalRooms = await _context.Rooms.CountAsync(),
+            TotalRooms =
+                await _context.Rooms.CountAsync(),
 
-            AvailableRooms = await _context.Rooms.CountAsync(
-                r => r.Status == "Available" && !r.IsBlocked),
+            AvailableRooms =
+                await _context.Rooms.CountAsync(
+                    r =>
+                        r.Status == "Available" &&
+                        !r.IsBlocked),
 
-            BookedRooms = await _context.Rooms.CountAsync(
-                r => r.Status == "Booked" && !r.IsBlocked)
+            BookedRooms =
+                await _context.Rooms.CountAsync(
+                    r =>
+                        r.Status == "Booked" &&
+                        !r.IsBlocked)
         };
     }
 
+
     // =========================================================
-    // Get All Rooms
+    // GET ALL ROOMS
     // =========================================================
 
     public async Task<IEnumerable<RoomDto>> GetAllAsync(
         RoomFilterDto filter)
     {
         var query = _context.Rooms
+            .AsNoTracking()
             .Include(r => r.RoomType)
+            .Include(r => r.Module)
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
             .Where(r =>
@@ -49,29 +59,51 @@ public class RoomRepository : IRoomRepository
                 !r.IsBlocked)
             .AsQueryable();
 
-        // Search
+
+        // -----------------------------------------------------
+        // SEARCH
+        // -----------------------------------------------------
+
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
+            var search = filter.Search.Trim();
+
             query = query.Where(r =>
-                r.RoomName.Contains(filter.Search) ||
-                r.Module.Contains(filter.Search));
+                r.RoomName.Contains(search) ||
+                (
+                    r.Module != null &&
+                    r.Module.ModuleName.Contains(search)
+                ));
         }
 
-        // Room Type Filter
+
+        // -----------------------------------------------------
+        // ROOM TYPE FILTER
+        // -----------------------------------------------------
+
         if (filter.RoomTypeId.HasValue)
         {
             query = query.Where(r =>
-                r.RoomTypeId == filter.RoomTypeId.Value);
+                r.RoomTypeId ==
+                filter.RoomTypeId.Value);
         }
 
-        // Status Filter
+
+        // -----------------------------------------------------
+        // STATUS FILTER
+        // -----------------------------------------------------
+
         if (!string.IsNullOrWhiteSpace(filter.Status))
         {
             query = query.Where(r =>
                 r.Status == filter.Status);
         }
 
-        // Return rooms INCLUDING FACILITIES
+
+        // -----------------------------------------------------
+        // RETURN ROOMS
+        // -----------------------------------------------------
+
         return await query
             .Select(r => new RoomDto
             {
@@ -79,36 +111,60 @@ public class RoomRepository : IRoomRepository
 
                 RoomName = r.RoomName,
 
-                RoomType = r.RoomType!.TypeName,
+                RoomType =
+                    r.RoomType != null
+                        ? r.RoomType.TypeName
+                        : string.Empty,
 
                 Capacity = r.Capacity,
 
-                Module = r.Module,
+                // Foreign Key
+                ModuleId = r.ModuleId,
+
+                // Module Name
+                Module =
+                    r.Module != null
+                        ? r.Module.ModuleName
+                        : string.Empty,
 
                 Status = r.Status,
 
-                Facilities = r.RoomFacilities
-                    .Select(rf => rf.Facility!.FacilityName)
-                    .ToList()
+                IsBlocked = r.IsBlocked,
+
+                Facilities =
+                    r.RoomFacilities
+                        .Where(rf =>
+                            rf.Facility != null)
+                        .Select(rf =>
+                            rf.Facility!.FacilityName)
+                        .ToList()
             })
             .ToListAsync();
     }
 
+
     // =========================================================
-    // Get Room By ID
+    // GET ROOM BY ID
     // =========================================================
 
     public async Task<RoomDetailsDto?> GetByIdAsync(
         int roomId)
     {
         return await _context.Rooms
+            .AsNoTracking()
+
             .Include(r => r.RoomType)
+
+            .Include(r => r.Module)
+
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
+
             .Where(r =>
                 r.RoomId == roomId &&
                 r.Status != "Blocked" &&
                 !r.IsBlocked)
+
             .Select(r => new RoomDetailsDto
             {
                 RoomId = r.RoomId,
@@ -119,19 +175,100 @@ public class RoomRepository : IRoomRepository
 
                 Capacity = r.Capacity,
 
-                Module = r.Module,
+                // Foreign Key
+                ModuleId = r.ModuleId,
+
+                // Module Name
+                Module =
+                    r.Module != null
+                        ? r.Module.ModuleName
+                        : string.Empty,
 
                 Status = r.Status,
 
-                Facilities = r.RoomFacilities
-                    .Select(rf => rf.Facility!.FacilityName)
-                    .ToList()
+                IsBlocked = r.IsBlocked,
+
+                Facilities =
+                    r.RoomFacilities
+                        .Where(rf =>
+                            rf.Facility != null)
+                        .Select(rf =>
+                            rf.Facility!.FacilityName)
+                        .ToList()
             })
+
             .FirstOrDefaultAsync();
     }
 
+
     // =========================================================
-    // Create Room
+    // GET ROOMS BY MODULE
+    // =========================================================
+
+    public async Task<List<RoomDetailsDto>>
+        GetRoomsByModuleAsync(string module)
+    {
+        if (string.IsNullOrWhiteSpace(module))
+        {
+            return new List<RoomDetailsDto>();
+        }
+
+        var moduleName = module.Trim();
+
+        return await _context.Rooms
+            .AsNoTracking()
+
+            .Include(r => r.RoomType)
+
+            .Include(r => r.Module)
+
+            .Include(r => r.RoomFacilities)
+                .ThenInclude(rf => rf.Facility)
+
+            .Where(r =>
+                r.Status != "Blocked" &&
+                !r.IsBlocked &&
+                r.Module != null &&
+                r.Module.ModuleName == moduleName)
+
+            .Select(r => new RoomDetailsDto
+            {
+                RoomId = r.RoomId,
+
+                RoomTypeId = r.RoomTypeId,
+
+                RoomName = r.RoomName,
+
+                Capacity = r.Capacity,
+
+                // Foreign Key
+                ModuleId = r.ModuleId,
+
+                // Module Name
+                Module =
+                    r.Module != null
+                        ? r.Module.ModuleName
+                        : string.Empty,
+
+                Status = r.Status,
+
+                IsBlocked = r.IsBlocked,
+
+                Facilities =
+                    r.RoomFacilities
+                        .Where(rf =>
+                            rf.Facility != null)
+                        .Select(rf =>
+                            rf.Facility!.FacilityName)
+                        .ToList()
+            })
+
+            .ToListAsync();
+    }
+
+
+    // =========================================================
+    // CREATE ROOM
     // =========================================================
 
     public async Task AddAsync(
@@ -139,25 +276,39 @@ public class RoomRepository : IRoomRepository
         List<int> facilityIds)
     {
         await using var transaction =
-            await _context.Database.BeginTransactionAsync();
+            await _context.Database
+                .BeginTransactionAsync();
 
         try
         {
-            // -----------------------------------------------
-            // 1. Add Room
-            // -----------------------------------------------
+            // -------------------------------------------------
+            // VALIDATE MODULE
+            // -------------------------------------------------
+
+            var moduleExists =
+                await _context.Modules
+                    .AnyAsync(m =>
+                        m.ModuleId == room.ModuleId);
+
+            if (!moduleExists)
+            {
+                throw new KeyNotFoundException(
+                    $"Module with ID {room.ModuleId} not found.");
+            }
+
+
+            // -------------------------------------------------
+            // ADD ROOM
+            // -------------------------------------------------
 
             await _context.Rooms.AddAsync(room);
 
             await _context.SaveChangesAsync();
 
-            // At this point RoomId has been generated.
-            // Example:
-            // room.RoomId = 15
 
-            // -----------------------------------------------
-            // 2. Add Facilities
-            // -----------------------------------------------
+            // -------------------------------------------------
+            // ADD FACILITIES
+            // -------------------------------------------------
 
             if (facilityIds != null &&
                 facilityIds.Count > 0)
@@ -165,8 +316,9 @@ public class RoomRepository : IRoomRepository
                 foreach (var facilityId in facilityIds)
                 {
                     var facilityExists =
-                        await _context.Facilities.AnyAsync(
-                            f => f.FacilityId == facilityId);
+                        await _context.Facilities
+                            .AnyAsync(f =>
+                                f.FacilityId == facilityId);
 
                     if (!facilityExists)
                     {
@@ -178,6 +330,7 @@ public class RoomRepository : IRoomRepository
                         new RoomFacility
                         {
                             RoomId = room.RoomId,
+
                             FacilityId = facilityId
                         });
                 }
@@ -185,21 +338,24 @@ public class RoomRepository : IRoomRepository
                 await _context.SaveChangesAsync();
             }
 
-            // -----------------------------------------------
-            // 3. Commit
-            // -----------------------------------------------
+
+            // -------------------------------------------------
+            // COMMIT
+            // -------------------------------------------------
 
             await transaction.CommitAsync();
         }
         catch
         {
             await transaction.RollbackAsync();
+
             throw;
         }
     }
 
+
     // =========================================================
-    // Update Room
+    // UPDATE ROOM
     // =========================================================
 
     public async Task UpdateAsync(
@@ -207,18 +363,20 @@ public class RoomRepository : IRoomRepository
         List<int> facilityIds)
     {
         await using var transaction =
-            await _context.Database.BeginTransactionAsync();
+            await _context.Database
+                .BeginTransactionAsync();
 
         try
         {
-            // -----------------------------------------------
-            // 1. Find existing room
-            // -----------------------------------------------
+            // -------------------------------------------------
+            // FIND EXISTING ROOM
+            // -------------------------------------------------
 
             var existingRoom =
                 await _context.Rooms
                     .FirstOrDefaultAsync(
-                        r => r.RoomId == room.RoomId);
+                        r =>
+                            r.RoomId == room.RoomId);
 
             if (existingRoom == null)
             {
@@ -226,23 +384,46 @@ public class RoomRepository : IRoomRepository
                     "Room not found.");
             }
 
-            // -----------------------------------------------
-            // 2. Update room fields
-            // -----------------------------------------------
 
-            existingRoom.RoomTypeId = room.RoomTypeId;
+            // -------------------------------------------------
+            // VALIDATE MODULE
+            // -------------------------------------------------
 
-            existingRoom.RoomName = room.RoomName;
+            var moduleExists =
+                await _context.Modules
+                    .AnyAsync(m =>
+                        m.ModuleId == room.ModuleId);
 
-            existingRoom.Capacity = room.Capacity;
+            if (!moduleExists)
+            {
+                throw new KeyNotFoundException(
+                    $"Module with ID {room.ModuleId} not found.");
+            }
 
-            existingRoom.Module = room.Module;
 
-            existingRoom.Status = room.Status;
+            // -------------------------------------------------
+            // UPDATE ROOM FIELDS
+            // -------------------------------------------------
 
-            // -----------------------------------------------
-            // 3. Remove old facilities
-            // -----------------------------------------------
+            existingRoom.RoomTypeId =
+                room.RoomTypeId;
+
+            existingRoom.RoomName =
+                room.RoomName;
+
+            existingRoom.Capacity =
+                room.Capacity;
+
+            existingRoom.ModuleId =
+                room.ModuleId;
+
+            existingRoom.Status =
+                room.Status;
+
+
+            // -------------------------------------------------
+            // REMOVE OLD FACILITIES
+            // -------------------------------------------------
 
             var existingFacilities =
                 await _context.RoomFacilities
@@ -250,14 +431,15 @@ public class RoomRepository : IRoomRepository
                         x.RoomId == room.RoomId)
                     .ToListAsync();
 
-            _context.RoomFacilities.RemoveRange(
-                existingFacilities);
+            _context.RoomFacilities
+                .RemoveRange(existingFacilities);
 
             await _context.SaveChangesAsync();
 
-            // -----------------------------------------------
-            // 4. Add new facilities
-            // -----------------------------------------------
+
+            // -------------------------------------------------
+            // ADD NEW FACILITIES
+            // -------------------------------------------------
 
             if (facilityIds != null &&
                 facilityIds.Count > 0)
@@ -265,8 +447,9 @@ public class RoomRepository : IRoomRepository
                 foreach (var facilityId in facilityIds)
                 {
                     var facilityExists =
-                        await _context.Facilities.AnyAsync(
-                            f => f.FacilityId == facilityId);
+                        await _context.Facilities
+                            .AnyAsync(f =>
+                                f.FacilityId == facilityId);
 
                     if (!facilityExists)
                     {
@@ -278,6 +461,7 @@ public class RoomRepository : IRoomRepository
                         new RoomFacility
                         {
                             RoomId = room.RoomId,
+
                             FacilityId = facilityId
                         });
                 }
@@ -285,27 +469,32 @@ public class RoomRepository : IRoomRepository
                 await _context.SaveChangesAsync();
             }
 
-            // -----------------------------------------------
-            // 5. Commit
-            // -----------------------------------------------
+
+            // -------------------------------------------------
+            // COMMIT
+            // -------------------------------------------------
 
             await transaction.CommitAsync();
         }
         catch
         {
             await transaction.RollbackAsync();
+
             throw;
         }
     }
 
+
     // =========================================================
-    // Delete / Block Room
+    // DELETE / BLOCK ROOM
     // =========================================================
 
-    public async Task DeleteAsync(int roomId)
+    public async Task DeleteAsync(
+        int roomId)
     {
         var room =
-            await _context.Rooms.FindAsync(roomId);
+            await _context.Rooms
+                .FindAsync(roomId);
 
         if (room == null)
         {
@@ -313,26 +502,31 @@ public class RoomRepository : IRoomRepository
         }
 
         room.Status = "Blocked";
+
         room.IsBlocked = true;
 
         await _context.SaveChangesAsync();
     }
 
+
     // =========================================================
-    // Check Room Exists
+    // CHECK ROOM EXISTS
     // =========================================================
 
-    public async Task<bool> ExistsAsync(int roomId)
+    public async Task<bool> ExistsAsync(
+        int roomId)
     {
-        return await _context.Rooms.AnyAsync(
-            r =>
-                r.RoomId == roomId &&
-                r.Status != "Blocked" &&
-                !r.IsBlocked);
+        return await _context.Rooms
+            .AnyAsync(
+                r =>
+                    r.RoomId == roomId &&
+                    r.Status != "Blocked" &&
+                    !r.IsBlocked);
     }
 
+
     // =========================================================
-    // Block / Unblock Room
+    // BLOCK / UNBLOCK ROOM
     // =========================================================
 
     public async Task<bool> UpdateRoomStatusAsync(
@@ -342,7 +536,8 @@ public class RoomRepository : IRoomRepository
         var room =
             await _context.Rooms
                 .FirstOrDefaultAsync(
-                    r => r.RoomId == roomId);
+                    r =>
+                        r.RoomId == roomId);
 
         if (room == null)
         {
@@ -363,42 +558,5 @@ public class RoomRepository : IRoomRepository
         await _context.SaveChangesAsync();
 
         return true;
-    }
-
-    // =========================================================
-    // Get Rooms By Module
-    // =========================================================
-
-    public async Task<List<RoomDetailsDto>>
-        GetRoomsByModuleAsync(string module)
-    {
-        return await _context.Rooms
-            .Include(r => r.RoomType)
-            .Include(r => r.RoomFacilities)
-                .ThenInclude(rf => rf.Facility)
-            .Where(r =>
-                r.Status != "Blocked" &&
-                !r.IsBlocked &&
-                r.Module == module)
-            .Select(r => new RoomDetailsDto
-            {
-                RoomId = r.RoomId,
-
-                RoomTypeId = r.RoomTypeId,
-
-                RoomName = r.RoomName,
-
-                Capacity = r.Capacity,
-
-                Module = r.Module,
-
-                Status = r.Status,
-
-                Facilities = r.RoomFacilities
-                    .Select(rf =>
-                        rf.Facility!.FacilityName)
-                    .ToList()
-            })
-            .ToListAsync();
     }
 }

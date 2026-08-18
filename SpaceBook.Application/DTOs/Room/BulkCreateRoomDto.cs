@@ -8,7 +8,7 @@ public class BulkCreateRoomDto
  
     public int Capacity { get; set; }
  
-    public string Module { get; set; } = string.Empty;
+    public int ModuleId { get; set; }
  
     public string Status { get; set; } = "Available";
  

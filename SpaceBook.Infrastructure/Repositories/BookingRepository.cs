@@ -16,7 +16,7 @@ public class BookingRepository : IBookingRepository
     }
 
     // =========================================================
-    // Dashboard
+    // DASHBOARD
     // =========================================================
 
     public async Task<BookingDashboardDto> GetDashboardAsync()
@@ -25,20 +25,24 @@ public class BookingRepository : IBookingRepository
         {
             PendingRequests =
                 await _context.Bookings
-                    .CountAsync(x => x.Status == "Pending"),
+                    .CountAsync(x =>
+                        x.Status == "Pending"),
 
             Confirmed =
                 await _context.Bookings
-                    .CountAsync(x => x.Status == "Approved"),
+                    .CountAsync(x =>
+                        x.Status == "Approved"),
 
             Cancelled =
                 await _context.Bookings
-                    .CountAsync(x => x.Status == "Cancelled")
+                    .CountAsync(x =>
+                        x.Status == "Cancelled")
         };
     }
 
+
     // =========================================================
-    // Get All Bookings
+    // GET ALL BOOKINGS
     // =========================================================
 
     public async Task<IEnumerable<BookingDto>> GetAllAsync(
@@ -46,15 +50,32 @@ public class BookingRepository : IBookingRepository
     {
         var query = _context.Bookings
             .Include(x => x.Room)
+                .ThenInclude(r => r!.Module)
             .Include(x => x.Employee)
             .AsQueryable();
 
+
+        // -----------------------------------------------------
+        // SEARCH
+        // -----------------------------------------------------
+
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
+            var search = filter.Search.Trim();
+
             query = query.Where(x =>
-                x.Purpose.Contains(filter.Search) ||
-                x.Room!.RoomName.Contains(filter.Search));
+                x.Purpose.Contains(search) ||
+                x.Room!.RoomName.Contains(search) ||
+                (
+                    x.Room.Module != null &&
+                    x.Room.Module.ModuleName.Contains(search)
+                ));
         }
+
+
+        // -----------------------------------------------------
+        // STATUS FILTER
+        // -----------------------------------------------------
 
         if (!string.IsNullOrWhiteSpace(filter.Status))
         {
@@ -62,26 +83,58 @@ public class BookingRepository : IBookingRepository
                 x.Status == filter.Status);
         }
 
+
+        // -----------------------------------------------------
+        // RETURN BOOKINGS
+        // -----------------------------------------------------
+
         return await query
             .OrderByDescending(x => x.BookedOn)
             .Select(x => new BookingDto
             {
-                BookingId = x.BookingId,
-                Purpose = x.Purpose,
-                RoomName = x.Room!.RoomName,
-               
-                Module = x.Room != null ? x.Room.Module : string.Empty,   // <-- Added
-                EmployeeName = x.Employee!.Name,
-                BookingDate = x.BookingDate,
-                StartTime = x.StartTime,
-                EndTime = x.EndTime,
-                Status = x.Status
+                BookingId =
+                    x.BookingId,
+
+                Purpose =
+                    x.Purpose,
+
+                RoomName =
+                    x.Room != null
+                        ? x.Room.RoomName
+                        : string.Empty,
+
+        
+
+                // Module name
+                Module =
+                    x.Room != null &&
+                    x.Room.Module != null
+                        ? x.Room.Module.ModuleName
+                        : string.Empty,
+
+                EmployeeName =
+                    x.Employee != null
+                        ? x.Employee.Name
+                        : string.Empty,
+
+                BookingDate =
+                    x.BookingDate,
+
+                StartTime =
+                    x.StartTime,
+
+                EndTime =
+                    x.EndTime,
+
+                Status =
+                    x.Status
             })
             .ToListAsync();
     }
 
+
     // =========================================================
-    // Get Booking By Id
+    // GET BOOKING BY ID
     // =========================================================
 
     public async Task<BookingDetailsDto?> GetByIdAsync(
@@ -89,84 +142,121 @@ public class BookingRepository : IBookingRepository
     {
         return await _context.Bookings
             .Include(x => x.Room)
+                .ThenInclude(r => r!.Module)
+
             .Include(x => x.Employee)
-            .Where(x => x.BookingId == bookingId)
+
+            .Where(x =>
+                x.BookingId == bookingId)
+
             .Select(x => new BookingDetailsDto
             {
-                BookingId = x.BookingId,
+                BookingId =
+                    x.BookingId,
 
-                // IMPORTANT: Required for employee notifications
-                EmployeeId = x.EmployeeId,
+                // Required for employee notifications
+                EmployeeId =
+                    x.EmployeeId,
 
-                MeetingTitle = x.MeetingTitle,
+                MeetingTitle =
+                    x.MeetingTitle,
 
-                Purpose = x.Purpose,
+                Purpose =
+                    x.Purpose,
 
-                ParticipantCount = x.ParticipantCount,
+                ParticipantCount =
+                    x.ParticipantCount,
 
-                RoomName = x.Room!.RoomName,
+                RoomName =
+                    x.Room != null
+                        ? x.Room.RoomName
+                        : string.Empty,
 
-              
 
-                Module = x.Room != null ? x.Room.Module : string.Empty,   // <-- Added
 
-                EmployeeName = x.Employee!.Name,
+                // Module name
+                Module =
+                    x.Room != null &&
+                    x.Room.Module != null
+                        ? x.Room.Module.ModuleName
+                        : string.Empty,
 
-                BookingDate = x.BookingDate,
+                EmployeeName =
+                    x.Employee != null
+                        ? x.Employee.Name
+                        : string.Empty,
 
-                StartTime = x.StartTime,
+                BookingDate =
+                    x.BookingDate,
 
-                EndTime = x.EndTime,
+                StartTime =
+                    x.StartTime,
 
-                Status = x.Status,
+                EndTime =
+                    x.EndTime,
 
-                BookedOn = x.BookedOn
+                Status =
+                    x.Status,
+
+                BookedOn =
+                    x.BookedOn
             })
             .FirstOrDefaultAsync();
     }
 
+
     // =========================================================
-    // Approve Booking
+    // APPROVE BOOKING
     // =========================================================
 
-    public async Task ApproveAsync(int bookingId)
+    public async Task ApproveAsync(
+        int bookingId)
     {
         var booking =
-            await _context.Bookings.FindAsync(bookingId);
+            await _context.Bookings
+                .FindAsync(bookingId);
 
         if (booking != null)
         {
-            booking.Status = "Approved";
+            booking.Status =
+                "Approved";
 
             await _context.SaveChangesAsync();
         }
     }
 
+
     // =========================================================
-    // Reject Booking
+    // REJECT BOOKING
     // =========================================================
 
-    public async Task RejectAsync(int bookingId)
+    public async Task RejectAsync(
+        int bookingId)
     {
         var booking =
-            await _context.Bookings.FindAsync(bookingId);
+            await _context.Bookings
+                .FindAsync(bookingId);
 
         if (booking != null)
         {
-            booking.Status = "Rejected";
+            booking.Status =
+                "Rejected";
 
             await _context.SaveChangesAsync();
         }
     }
 
+
     // =========================================================
-    // Delete Booking
+    // DELETE BOOKING
     // =========================================================
 
-    public async Task DeleteAsync(int bookingId)
+    public async Task DeleteAsync(
+        int bookingId)
     {
         var booking =
-            await _context.Bookings.FindAsync(bookingId);
+            await _context.Bookings
+                .FindAsync(bookingId);
 
         if (booking != null)
         {
@@ -176,18 +266,22 @@ public class BookingRepository : IBookingRepository
         }
     }
 
+
     // =========================================================
-    // Check Booking Exists
+    // CHECK BOOKING EXISTS
     // =========================================================
 
-    public async Task<bool> ExistsAsync(int bookingId)
+    public async Task<bool> ExistsAsync(
+        int bookingId)
     {
         return await _context.Bookings
-            .AnyAsync(x => x.BookingId == bookingId);
+            .AnyAsync(x =>
+                x.BookingId == bookingId);
     }
 
+
     // =========================================================
-    // Check Room Availability
+    // CHECK ROOM AVAILABILITY
     // =========================================================
 
     public async Task<bool> IsRoomAvailableAsync(
@@ -196,22 +290,26 @@ public class BookingRepository : IBookingRepository
         TimeOnly startTime,
         TimeOnly endTime)
     {
-        return !await _context.Bookings.AnyAsync(b =>
-            b.RoomId == roomId &&
-            b.BookingDate == bookingDate &&
-            b.Status != "Cancelled" &&
-            startTime < b.EndTime &&
-            endTime > b.StartTime
-        );
+        return !await _context.Bookings
+            .AnyAsync(b =>
+                b.RoomId == roomId &&
+                b.BookingDate == bookingDate &&
+                b.Status != "Cancelled" &&
+                b.Status != "Rejected" &&
+                startTime < b.EndTime &&
+                endTime > b.StartTime);
     }
 
+
     // =========================================================
-    // Create Booking
+    // CREATE BOOKING
     // =========================================================
 
-    public async Task AddAsync(Booking booking)
+    public async Task AddAsync(
+        Booking booking)
     {
-        await _context.Bookings.AddAsync(booking);
+        await _context.Bookings
+            .AddAsync(booking);
 
         await _context.SaveChangesAsync();
     }

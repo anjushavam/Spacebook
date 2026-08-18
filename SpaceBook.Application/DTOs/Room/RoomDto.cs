@@ -10,9 +10,15 @@ public class RoomDto
 
     public int Capacity { get; set; }
 
+    // Foreign key
+    public int ModuleId { get; set; }
+
+    // Display name
     public string Module { get; set; } = string.Empty;
 
     public string Status { get; set; } = string.Empty;
+
+    public bool IsBlocked { get; set; }
 
     public List<string> Facilities { get; set; } = new();
 }

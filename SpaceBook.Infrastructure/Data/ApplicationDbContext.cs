@@ -18,6 +18,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<Employee> Employees => Set<Employee>();
+    
 
     public DbSet<RoomType> RoomTypes => Set<RoomType>();
 
@@ -106,79 +107,42 @@ public class ApplicationDbContext : DbContext
         // =====================================================
 
         modelBuilder.Entity<Room>(entity =>
-        {
-            entity.ToTable("rooms");
+{
+    entity.ToTable("rooms");
 
-            // -------------------------------------------------
-            // PRIMARY KEY
-            // -------------------------------------------------
+    entity.HasKey(r => r.RoomId);
 
-            entity.HasKey(r => r.RoomId);
+    entity.Property(r => r.RoomId)
+        .HasColumnName("roomid");
 
-            entity.Property(r => r.RoomId)
-                .HasColumnName("roomid");
+    entity.Property(r => r.RoomTypeId)
+        .HasColumnName("roomtypeid");
 
-            // -------------------------------------------------
-            // ROOM TYPE
-            // -------------------------------------------------
+    entity.Property(r => r.RoomName)
+        .HasColumnName("roomname");
 
-            entity.Property(r => r.RoomTypeId)
-                .HasColumnName("roomtypeid");
+    entity.Property(r => r.Capacity)
+        .HasColumnName("capacity");
 
-            // -------------------------------------------------
-            // ROOM NAME
-            // -------------------------------------------------
+    entity.Property(r => r.ModuleId)
+        .HasColumnName("moduleid");
 
-            entity.Property(r => r.RoomName)
-                .HasColumnName("roomname");
+    entity.Property(r => r.Status)
+        .HasColumnName("status");
 
-            // -------------------------------------------------
-            // CAPACITY
-            // -------------------------------------------------
+    entity.Property(r => r.IsBlocked)
+        .HasColumnName("isblocked");
 
-            entity.Property(r => r.Capacity)
-                .HasColumnName("capacity");
+    entity.HasOne(r => r.RoomType)
+        .WithMany()
+        .HasForeignKey(r => r.RoomTypeId)
+        .OnDelete(DeleteBehavior.Restrict);
 
-            // -------------------------------------------------
-            // MODULE ID
-            // -------------------------------------------------
-
-            entity.Property(r => r.ModuleId)
-                .HasColumnName("moduleid");
-
-            // -------------------------------------------------
-            // STATUS
-            // -------------------------------------------------
-
-            entity.Property(r => r.Status)
-                .HasColumnName("status");
-
-            // -------------------------------------------------
-            // BLOCK STATUS
-            // -------------------------------------------------
-
-            entity.Property(r => r.IsBlocked)
-                .HasColumnName("isblocked");
-
-            // -------------------------------------------------
-            // ROOM -> ROOM TYPE
-            // -------------------------------------------------
-
-            entity.HasOne(r => r.RoomType)
-                .WithMany()
-                .HasForeignKey(r => r.RoomTypeId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // -------------------------------------------------
-            // ROOM -> MODULE
-            // -------------------------------------------------
-
-            entity.HasOne(r => r.Module)
-                .WithMany(m => m.Rooms)
-                .HasForeignKey(r => r.ModuleId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
+    entity.HasOne(r => r.Module)
+        .WithMany(m => m.Rooms)
+        .HasForeignKey(r => r.ModuleId)
+        .OnDelete(DeleteBehavior.Restrict);
+});
 
         // =====================================================
         // CHECK-IN MAPPING

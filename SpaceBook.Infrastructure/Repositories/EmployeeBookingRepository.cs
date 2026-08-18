@@ -89,23 +89,39 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         int employeeId)
     {
         return await _context.Bookings
+            .AsNoTracking()
+
             .Include(b => b.Room)
                 .ThenInclude(r => r!.RoomType)
+
+            .Include(b => b.Room)
+                .ThenInclude(r => r!.Module)
+
             .Include(b => b.Room)
                 .ThenInclude(r => r!.RoomFacilities)
                     .ThenInclude(rf => rf.Facility)
+
             .Where(b =>
                 b.BookingId == bookingId &&
                 b.EmployeeId == employeeId)
+
             .Select(b => new BookingDetailsDto
             {
                 BookingId = b.BookingId,
 
                 EmployeeId = b.EmployeeId,
 
-                RoomName = b.Room != null ? b.Room.RoomName : string.Empty,
+                RoomName =
+                    b.Room != null
+                        ? b.Room.RoomName
+                        : string.Empty,
 
-                Module = b.Room != null ? b.Room.Module : string.Empty,
+                // Module is an entity, so get ModuleName
+                Module =
+                    b.Room != null &&
+                    b.Room.Module != null
+                        ? b.Room.Module.ModuleName
+                        : string.Empty,
 
                 BookingDate = b.BookingDate,
 
@@ -123,6 +139,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
                 BookedOn = b.BookedOn
             })
+
             .FirstOrDefaultAsync();
     }
 
@@ -144,7 +161,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             return false;
         }
 
-        // Do not cancel an already cancelled booking
         if (string.Equals(
                 booking.Status,
                 "Cancelled",
@@ -301,8 +317,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
         // -----------------------------------------------------
         // CHECK ROOM AVAILABILITY
-        //
-        // Exclude the current booking.
+        // EXCLUDE CURRENT BOOKING
         // -----------------------------------------------------
 
         var roomAvailable =
@@ -377,14 +392,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             request.ParticipantCount;
 
         // -----------------------------------------------------
-        // IMPORTANT:
-        // EDITED BOOKINGS REQUIRE ADMIN APPROVAL AGAIN
+        // EDITED BOOKING REQUIRES ADMIN APPROVAL AGAIN
         // -----------------------------------------------------
 
         booking.Status = "Pending";
 
         // -----------------------------------------------------
-        // SAVE CHANGES
+        // SAVE
         // -----------------------------------------------------
 
         await _context.SaveChangesAsync();
@@ -401,12 +415,19 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             SearchRoomsRequestDto request)
     {
         var query = _context.Rooms
+            .AsNoTracking()
+
             .Include(r => r.RoomType)
+
+            .Include(r => r.Module)
+
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
+
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked")
+
             .AsQueryable();
 
         // -----------------------------------------------------
@@ -420,7 +441,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 request.Module.Trim();
 
             query = query.Where(r =>
-                r.Module == module);
+                r.Module != null &&
+                r.Module.ModuleName == module);
         }
 
         // -----------------------------------------------------
@@ -497,25 +519,35 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         return await query
             .Select(r => new AvailableRoomDto
             {
-                RoomId = r.RoomId,
+                RoomId =
+                    r.RoomId,
 
-                RoomName = r.RoomName,
+                RoomName =
+                    r.RoomName,
 
-                Module = r.Module,
+                // Module entity -> ModuleName string
+                Module =
+                    r.Module != null
+                        ? r.Module.ModuleName
+                        : string.Empty,
 
-                RoomType = r.RoomType != null
-                    ? r.RoomType.TypeName
-                    : string.Empty,
+                RoomType =
+                    r.RoomType != null
+                        ? r.RoomType.TypeName
+                        : string.Empty,
 
-                Capacity = r.Capacity,
+                Capacity =
+                    r.Capacity,
 
-                Facilities = r.RoomFacilities
-                    .Where(rf =>
-                        rf.Facility != null)
-                    .Select(rf =>
-                        rf.Facility!.FacilityName)
-                    .ToList()
+                Facilities =
+                    r.RoomFacilities
+                        .Where(rf =>
+                            rf.Facility != null)
+                        .Select(rf =>
+                            rf.Facility!.FacilityName)
+                        .ToList()
             })
+
             .ToListAsync();
     }
 
@@ -534,6 +566,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         var query = _context.Rooms
+            .AsNoTracking()
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked")
@@ -550,7 +583,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 request.Module.Trim();
 
             query = query.Where(r =>
-                r.Module == module);
+                r.Module != null &&
+                r.Module.ModuleName == module);
         }
 
         // -----------------------------------------------------
@@ -603,37 +637,56 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             return new List<AvailableRoomDto>();
         }
 
-        module = module.Trim();
+        var moduleName =
+            module.Trim();
 
         return await _context.Rooms
+            .AsNoTracking()
+
             .Include(r => r.RoomType)
+
+            .Include(r => r.Module)
+
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
+
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked" &&
-                r.Module == module)
+                r.Module != null &&
+                r.Module.ModuleName == moduleName)
+
             .Select(r => new AvailableRoomDto
             {
-                RoomId = r.RoomId,
+                RoomId =
+                    r.RoomId,
 
-                RoomName = r.RoomName,
+                RoomName =
+                    r.RoomName,
 
-                Module = r.Module,
+                // Module entity -> ModuleName
+                Module =
+                    r.Module != null
+                        ? r.Module.ModuleName
+                        : string.Empty,
 
-                RoomType = r.RoomType != null
-                    ? r.RoomType.TypeName
-                    : string.Empty,
+                RoomType =
+                    r.RoomType != null
+                        ? r.RoomType.TypeName
+                        : string.Empty,
 
-                Capacity = r.Capacity,
+                Capacity =
+                    r.Capacity,
 
-                Facilities = r.RoomFacilities
-                    .Where(rf =>
-                        rf.Facility != null)
-                    .Select(rf =>
-                        rf.Facility!.FacilityName)
-                    .ToList()
+                Facilities =
+                    r.RoomFacilities
+                        .Where(rf =>
+                            rf.Facility != null)
+                        .Select(rf =>
+                            rf.Facility!.FacilityName)
+                        .ToList()
             })
+
             .ToListAsync();
     }
 

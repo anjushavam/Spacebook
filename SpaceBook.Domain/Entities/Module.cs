@@ -16,10 +16,7 @@ public class Module
 
     public DateTime? RecordModifiedOn { get; set; }
 
-    // =========================================================
-    // ROOMS
-    // =========================================================
-
+    // Navigation property
     public ICollection<Room> Rooms { get; set; }
         = new List<Room>();
 }

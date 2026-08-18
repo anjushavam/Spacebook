@@ -15,148 +15,259 @@ public class ReportRepository : IReportRepository
     }
 
 
+    // =========================================================
+    // BOOKING TREND
+    // =========================================================
+
     public async Task<BookingTrendDto> GetBookingTrendAsync(
         ReportFilterDto filter)
     {
         var query = _context.Bookings
             .Include(b => b.Room)
-            .ThenInclude(r => r.RoomType)
+                .ThenInclude(r => r!.RoomType)
+            .Include(b => b.Room)
+                .ThenInclude(r => r!.Module)
             .AsQueryable();
 
 
-        if (!string.IsNullOrEmpty(filter.Module))
+        // -----------------------------------------------------
+        // MODULE FILTER
+        // -----------------------------------------------------
+
+        if (!string.IsNullOrWhiteSpace(filter.Module))
         {
+            var moduleName = filter.Module.Trim();
+
             query = query.Where(b =>
-                b.Room!.Module == filter.Module);
+                b.Room != null &&
+                b.Room.Module != null &&
+                b.Room.Module.ModuleName == moduleName);
         }
 
+
+        // -----------------------------------------------------
+        // ROOM TYPE FILTER
+        // -----------------------------------------------------
 
         if (filter.RoomTypeId.HasValue)
         {
             query = query.Where(b =>
-                b.Room!.RoomTypeId == filter.RoomTypeId);
+                b.Room != null &&
+                b.Room.RoomTypeId == filter.RoomTypeId.Value);
         }
 
 
-        if (!string.IsNullOrEmpty(filter.Status))
+        // -----------------------------------------------------
+        // STATUS FILTER
+        // -----------------------------------------------------
+
+        if (!string.IsNullOrWhiteSpace(filter.Status))
         {
             query = query.Where(b =>
                 b.Status == filter.Status);
         }
 
 
-        var bookings = await query.ToListAsync();
+        // -----------------------------------------------------
+        // GET BOOKINGS
+        // -----------------------------------------------------
+
+        var bookings =
+            await query.ToListAsync();
 
 
-        int totalBookings = bookings.Count;
+        // -----------------------------------------------------
+        // TOTAL BOOKINGS
+        // -----------------------------------------------------
+
+        int totalBookings =
+            bookings.Count;
 
 
-        int uniqueRooms = bookings
-            .Select(b => b.RoomId)
-            .Distinct()
-            .Count();
+        // -----------------------------------------------------
+        // UNIQUE ROOMS
+        // -----------------------------------------------------
+
+        int uniqueRooms =
+            bookings
+                .Select(b => b.RoomId)
+                .Distinct()
+                .Count();
 
 
-        double confirmedRate = totalBookings == 0
-            ? 0
-            : Math.Round(
-                bookings.Count(b => b.Status == "Approved")
-                * 100.0 / totalBookings, 2);
+        // -----------------------------------------------------
+        // CONFIRMED RATE
+        // -----------------------------------------------------
 
+        double confirmedRate =
+            totalBookings == 0
+                ? 0
+                : Math.Round(
+                    bookings.Count(
+                        b => b.Status == "Approved")
+                    * 100.0 /
+                    totalBookings,
+                    2);
+
+
+        // -----------------------------------------------------
+        // RETURN RESULT
+        // -----------------------------------------------------
 
         return new BookingTrendDto
         {
-            TotalBookings = totalBookings,
+            TotalBookings =
+                totalBookings,
 
-            UniqueRooms = uniqueRooms,
+            UniqueRooms =
+                uniqueRooms,
 
-            ConfirmedRate = confirmedRate,
+            ConfirmedRate =
+                confirmedRate,
 
-            AverageDuration = "0h 0m",
+            AverageDuration =
+                "0h 0m",
 
-            Chart = bookings
-                .GroupBy(b => b.Status)
-                .Select(g => new BookingTrendChartDto
-                {
-                    Label = g.Key,
-                    Count = g.Count()
-                })
-                .ToList()
+            Chart =
+                bookings
+                    .GroupBy(b => b.Status)
+                    .Select(g =>
+                        new BookingTrendChartDto
+                        {
+                            Label = g.Key,
+                            Count = g.Count()
+                        })
+                    .ToList()
         };
     }
 
 
+    // =========================================================
+    // BOOKING STATUS
+    // =========================================================
 
-    public async Task<List<BookingStatusDto>> GetBookingStatusAsync(
-        ReportFilterDto filter)
+    public async Task<List<BookingStatusDto>>
+        GetBookingStatusAsync(
+            ReportFilterDto filter)
     {
         var query = _context.Bookings
             .Include(b => b.Room)
+                .ThenInclude(r => r!.Module)
             .AsQueryable();
 
 
-        if (!string.IsNullOrEmpty(filter.Module))
+        // -----------------------------------------------------
+        // MODULE FILTER
+        // -----------------------------------------------------
+
+        if (!string.IsNullOrWhiteSpace(filter.Module))
         {
+            var moduleName = filter.Module.Trim();
+
             query = query.Where(b =>
-                b.Room!.Module == filter.Module);
+                b.Room != null &&
+                b.Room.Module != null &&
+                b.Room.Module.ModuleName == moduleName);
         }
 
+
+        // -----------------------------------------------------
+        // ROOM TYPE FILTER
+        // -----------------------------------------------------
 
         if (filter.RoomTypeId.HasValue)
         {
             query = query.Where(b =>
-                b.Room!.RoomTypeId == filter.RoomTypeId);
+                b.Room != null &&
+                b.Room.RoomTypeId ==
+                    filter.RoomTypeId.Value);
         }
 
 
-        var result = await query
-            .GroupBy(b => b.Status)
-            .Select(g => new BookingStatusDto
-            {
-                Status = g.Key,
-                Count = g.Count()
-            })
-            .ToListAsync();
+        // -----------------------------------------------------
+        // GROUP BY STATUS
+        // -----------------------------------------------------
+
+        var result =
+            await query
+                .GroupBy(b => b.Status)
+                .Select(g =>
+                    new BookingStatusDto
+                    {
+                        Status = g.Key,
+                        Count = g.Count()
+                    })
+                .ToListAsync();
 
 
         return result;
     }
 
 
+    // =========================================================
+    // ROOM USAGE
+    // =========================================================
 
-    public async Task<List<RoomUsageDto>> GetRoomUsageAsync(
-    ReportFilterDto filter)
-{
-    var query = _context.Bookings
-        .Include(b => b.Room)
-        .ThenInclude(r => r.RoomType)
-        .AsQueryable();
-
-
-    if (!string.IsNullOrEmpty(filter.Module))
+    public async Task<List<RoomUsageDto>>
+        GetRoomUsageAsync(
+            ReportFilterDto filter)
     {
-        query = query.Where(b =>
-            b.Room!.Module == filter.Module);
-    }
+        var query = _context.Bookings
+            .Include(b => b.Room)
+                .ThenInclude(r => r!.RoomType)
+            .Include(b => b.Room)
+                .ThenInclude(r => r!.Module)
+            .AsQueryable();
 
 
-    if (filter.RoomTypeId.HasValue)
-    {
-        query = query.Where(b =>
-            b.Room!.RoomTypeId == filter.RoomTypeId);
-    }
+        // -----------------------------------------------------
+        // MODULE FILTER
+        // -----------------------------------------------------
 
-
-    var result = await query
-        .GroupBy(b => b.Room!.RoomType!.TypeName)
-        .Select(g => new RoomUsageDto
+        if (!string.IsNullOrWhiteSpace(filter.Module))
         {
-            RoomType = g.Key,
-            Count = g.Count()
-        })
-        .ToListAsync();
+            var moduleName = filter.Module.Trim();
+
+            query = query.Where(b =>
+                b.Room != null &&
+                b.Room.Module != null &&
+                b.Room.Module.ModuleName == moduleName);
+        }
 
 
-    return result;
-}
+        // -----------------------------------------------------
+        // ROOM TYPE FILTER
+        // -----------------------------------------------------
+
+        if (filter.RoomTypeId.HasValue)
+        {
+            query = query.Where(b =>
+                b.Room != null &&
+                b.Room.RoomTypeId ==
+                    filter.RoomTypeId.Value);
+        }
+
+
+        // -----------------------------------------------------
+        // GROUP BY ROOM TYPE
+        // -----------------------------------------------------
+
+        var result =
+            await query
+                .Where(b =>
+                    b.Room != null &&
+                    b.Room.RoomType != null)
+                .GroupBy(b =>
+                    b.Room!.RoomType!.TypeName)
+                .Select(g =>
+                    new RoomUsageDto
+                    {
+                        RoomType = g.Key,
+                        Count = g.Count()
+                    })
+                .ToListAsync();
+
+
+        return result;
+    }
 }

@@ -22,6 +22,7 @@ public class RoomService : IRoomService
         return await _roomRepository.GetDashboardAsync();
     }
 
+
     // =========================================================
     // GET ALL ROOMS
     // =========================================================
@@ -32,6 +33,7 @@ public class RoomService : IRoomService
         return await _roomRepository.GetAllAsync(filter);
     }
 
+
     // =========================================================
     // GET ROOM BY ID
     // =========================================================
@@ -40,6 +42,7 @@ public class RoomService : IRoomService
     {
         return await _roomRepository.GetByIdAsync(roomId);
     }
+
 
     // =========================================================
     // CREATE ROOM
@@ -50,10 +53,20 @@ public class RoomService : IRoomService
         var room = new Room
         {
             RoomTypeId = dto.RoomTypeId,
+
             RoomName = dto.RoomName,
+
             Capacity = dto.Capacity,
-            Module = dto.Module,
+
+            // =====================================================
+            // MODULE ID
+            // rooms.moduleid -> modules.moduleid
+            // =====================================================
+
+            ModuleId = dto.ModuleId,
+
             Status = dto.Status,
+
             IsBlocked = false
         };
 
@@ -61,6 +74,7 @@ public class RoomService : IRoomService
             room,
             dto.FacilityIds ?? new List<int>());
     }
+
 
     // =========================================================
     // UPDATE ROOM
@@ -70,8 +84,8 @@ public class RoomService : IRoomService
         int roomId,
         UpdateRoomDto dto)
     {
-        var existingRoom = await _roomRepository
-            .GetByIdAsync(roomId);
+        var existingRoom =
+            await _roomRepository.GetByIdAsync(roomId);
 
         if (existingRoom == null)
         {
@@ -82,11 +96,22 @@ public class RoomService : IRoomService
         var room = new Room
         {
             RoomId = roomId,
+
             RoomTypeId = dto.RoomTypeId,
+
             RoomName = dto.RoomName,
+
             Capacity = dto.Capacity,
-            Module = dto.Module,
-            Status = dto.Status
+
+            // =====================================================
+            // MODULE ID
+            // =====================================================
+
+            ModuleId = dto.ModuleId,
+
+            Status = dto.Status,
+
+            IsBlocked = existingRoom.IsBlocked
         };
 
         await _roomRepository.UpdateAsync(
@@ -94,14 +119,15 @@ public class RoomService : IRoomService
             dto.FacilityIds ?? new List<int>());
     }
 
+
     // =========================================================
     // DELETE / BLOCK ROOM
     // =========================================================
 
     public async Task DeleteAsync(int roomId)
     {
-        var exists = await _roomRepository
-            .ExistsAsync(roomId);
+        var exists =
+            await _roomRepository.ExistsAsync(roomId);
 
         if (!exists)
         {
@@ -111,6 +137,7 @@ public class RoomService : IRoomService
 
         await _roomRepository.DeleteAsync(roomId);
     }
+
 
     // =========================================================
     // BLOCK / UNBLOCK ROOM
@@ -125,6 +152,7 @@ public class RoomService : IRoomService
                 roomId,
                 isBlocked);
     }
+
 
     // =========================================================
     // BULK CREATE ROOMS
@@ -145,15 +173,23 @@ public class RoomService : IRoomService
             {
                 RoomTypeId = dto.RoomTypeId,
 
+                // =================================================
                 // Creates:
+                //
                 // Room-01
                 // Room-02
                 // Room-03
+                // =================================================
+
                 RoomName = $"Room-{i:D2}",
 
                 Capacity = dto.Capacity,
 
-                Module = dto.Module,
+                // =================================================
+                // MODULE ID
+                // =================================================
+
+                ModuleId = dto.ModuleId,
 
                 Status = dto.Status,
 
