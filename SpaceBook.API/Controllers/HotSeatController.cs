@@ -621,7 +621,156 @@ namespace SpaceBook.API.Controllers
 
         }
 
-    }
+    // ============================================================
 
+// DELETE: api/Hotseat/{id}
+
+// Cancel a hotseat booking
+
+// ============================================================
+
+[HttpDelete("{id:int}")]
+
+public async Task<IActionResult> CancelBooking(int id)
+
+{
+
+    // 1. Get logged-in employee
+
+    var employeeIdClaim =
+
+        User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+ 
+    if (string.IsNullOrEmpty(employeeIdClaim) ||
+
+        !int.TryParse(employeeIdClaim, out int employeeId))
+
+    {
+
+        return Unauthorized(new
+
+        {
+
+            message = "Employee information could not be determined."
+
+        });
+
+    }
+ 
+    // 2. Find booking
+
+    var booking = await _context.HotseatBookings
+
+        .FirstOrDefaultAsync(b =>
+
+            b.HotseatBookingId == id);
+ 
+    if (booking == null)
+
+    {
+
+        return NotFound(new
+
+        {
+
+            message = "Hotseat booking not found."
+
+        });
+
+    }
+ 
+    // 3. Make sure employee owns this booking
+
+    if (booking.EmployeeId != employeeId)
+
+    {
+
+        return Forbid();
+
+    }
+ 
+    // 4. Check current status
+
+    if (booking.BookingStatus == "Cancelled")
+
+    {
+
+        return BadRequest(new
+
+        {
+
+            message = "This hotseat booking is already cancelled."
+
+        });
+
+    }
+ 
+    if (booking.BookingStatus == "Released")
+
+    {
+
+        return BadRequest(new
+
+        {
+
+            message = "This hotseat booking has already been released."
+
+        });
+
+    }
+ 
+    if (booking.BookingStatus == "Expired")
+
+    {
+
+        return BadRequest(new
+
+        {
+
+            message = "This hotseat booking has expired."
+
+        });
+
+    }
+ 
+    // 5. Cancel booking instead of deleting the row
+
+    booking.BookingStatus = "Cancelled";
+ 
+    // 6. Audit information
+
+    booking.RecordModifiedBy = employeeId.ToString();
+
+    booking.RecordModifiedOn = DateTime.UtcNow;
+ 
+    // 7. Save
+
+    await _context.SaveChangesAsync();
+ 
+    // 8. Return response
+
+    return Ok(new
+
+    {
+
+        message = "Hotseat booking cancelled successfully.",
+
+        bookingId = booking.HotseatBookingId,
+
+        seatId = booking.SeatId,
+
+        employeeId = booking.EmployeeId,
+
+        bookingDate = booking.BookingDate,
+
+        bookingStatus = booking.BookingStatus,
+
+        modifiedOn = booking.RecordModifiedOn
+
+    });
+
+}
+
+    }
 }
  
