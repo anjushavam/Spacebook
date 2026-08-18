@@ -253,6 +253,25 @@ modelBuilder.Entity<Booking>(entity =>
         .WithMany(e => e.Bookings)
         .HasForeignKey(b => b.EmployeeId)
         .OnDelete(DeleteBehavior.Restrict);
+        
+});
+
+
+// =========================================================
+// ROOM TYPE
+// =========================================================
+
+modelBuilder.Entity<RoomType>(entity =>
+{
+    entity.ToTable("roomtypes");
+
+    entity.HasKey(r => r.RoomTypeId);
+
+    entity.Property(r => r.RoomTypeId)
+        .HasColumnName("roomtypeid");
+
+    entity.Property(r => r.TypeName)
+        .HasColumnName("roomtypename");
 });
         // =====================================================
         // CHECK-IN
