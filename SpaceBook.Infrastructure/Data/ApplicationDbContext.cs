@@ -45,7 +45,8 @@ public class ApplicationDbContext : DbContext
         // APPLY ENTITY CONFIGURATIONS
         // =====================================================
 
-    
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(ApplicationDbContext).Assembly);
 
 
         // =====================================================
@@ -64,6 +65,18 @@ public class ApplicationDbContext : DbContext
             entity.Property(r => r.RoleName)
                 .HasColumnName("rolename")
                 .HasMaxLength(100);
+
+
+            // -------------------------------------------------
+            // ROLE -> EMPLOYEES
+            // -------------------------------------------------
+            // One Role can have many Employees.
+            // -------------------------------------------------
+
+            entity.HasMany(r => r.Employees)
+                .WithOne(e => e.Role)
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
 
@@ -84,19 +97,16 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("roleid");
 
             entity.Property(e => e.Name)
-                .HasColumnName("name")
-                .HasMaxLength(200);
+                .HasColumnName("name");
 
             entity.Property(e => e.Email)
-                .HasColumnName("email")
-                .HasMaxLength(255);
+                .HasColumnName("email");
 
             entity.Property(e => e.PasswordHash)
                 .HasColumnName("passwordhash");
 
             entity.Property(e => e.Department)
-                .HasColumnName("department")
-                .HasMaxLength(200);
+                .HasColumnName("department");
 
             entity.Property(e => e.IsActive)
                 .HasColumnName("isactive");
@@ -104,13 +114,13 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CreatedOn)
                 .HasColumnName("createdon");
 
-            // Employee -> Role
-            entity.HasOne(e => e.Role)
-                .WithMany()
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Restrict);
 
-            // Employee -> Bookings
+            // -------------------------------------------------
+            // EMPLOYEE -> BOOKINGS
+            // -------------------------------------------------
+            // One Employee can have many Bookings.
+            // -------------------------------------------------
+
             entity.HasMany(e => e.Bookings)
                 .WithOne(b => b.Employee)
                 .HasForeignKey(b => b.EmployeeId)
@@ -171,25 +181,6 @@ public class ApplicationDbContext : DbContext
 
 
         // =====================================================
-        // ROOM TYPE MAPPING
-        // =====================================================
-
-        modelBuilder.Entity<RoomType>(entity =>
-        {
-            entity.ToTable("roomtypes");
-
-            entity.HasKey(r => r.RoomTypeId);
-
-            entity.Property(r => r.RoomTypeId)
-                .HasColumnName("roomtypeid");
-
-            entity.Property(r => r.TypeName)
-                .HasColumnName("typename")
-                .HasMaxLength(100);
-        });
-
-
-        // =====================================================
         // ROOM MAPPING
         // =====================================================
 
@@ -220,49 +211,25 @@ public class ApplicationDbContext : DbContext
             entity.Property(r => r.IsBlocked)
                 .HasColumnName("isblocked");
 
-            // Room -> RoomType
+
+            // -------------------------------------------------
+            // ROOM -> ROOM TYPE
+            // -------------------------------------------------
+
             entity.HasOne(r => r.RoomType)
                 .WithMany()
                 .HasForeignKey(r => r.RoomTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Room -> Module
+
+            // -------------------------------------------------
+            // ROOM -> MODULE
+            // -------------------------------------------------
+
             entity.HasOne(r => r.Module)
                 .WithMany(m => m.Rooms)
                 .HasForeignKey(r => r.ModuleId)
                 .OnDelete(DeleteBehavior.Restrict);
-        });
-
-
-        // =====================================================
-        // ROOM FACILITY MAPPING
-        // =====================================================
-
-        modelBuilder.Entity<RoomFacility>(entity =>
-        {
-            entity.ToTable("roomfacilities");
-
-            entity.HasKey(rf => new
-            {
-                rf.RoomId,
-                rf.FacilityId
-            });
-
-            entity.Property(rf => rf.RoomId)
-                .HasColumnName("roomid");
-
-            entity.Property(rf => rf.FacilityId)
-                .HasColumnName("facilityid");
-
-            entity.HasOne(rf => rf.Room)
-                .WithMany(r => r.RoomFacilities)
-                .HasForeignKey(rf => rf.RoomId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(rf => rf.Facility)
-                .WithMany()
-                .HasForeignKey(rf => rf.FacilityId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
 
 
@@ -289,6 +256,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(c => c.Status)
                 .HasColumnName("status")
                 .HasMaxLength(50);
+
+
+            // -------------------------------------------------
+            // CHECK-IN -> BOOKING
+            // -------------------------------------------------
 
             entity.HasOne(c => c.Booking)
                 .WithOne(b => b.CheckIn)
@@ -325,6 +297,11 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(n => n.CreatedAt)
                 .HasColumnName("createdat");
+
+
+            // -------------------------------------------------
+            // NOTIFICATION -> BOOKING
+            // -------------------------------------------------
 
             entity.HasOne(n => n.Booking)
                 .WithMany()
