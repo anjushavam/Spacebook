@@ -45,8 +45,7 @@ public class ApplicationDbContext : DbContext
         // APPLY ENTITY CONFIGURATIONS
         // =====================================================
 
-        modelBuilder.ApplyConfigurationsFromAssembly(
-            typeof(ApplicationDbContext).Assembly);
+    
 
 
         // =====================================================
