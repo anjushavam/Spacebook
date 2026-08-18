@@ -6,8 +6,8 @@ INSERT INTO Offices
     RecordIngestedBy
 )
 VALUES
-(1, 1, 'Elcot Park - CMB', '105508'),
-(2, 1, 'Tidel Park - CMB', '105508');
+(1, 1, 'Elcot Park', '105508'),
+(2, 1, 'Tidel Park', '105508');
 
 SELECT * FROM Offices;
 
