@@ -2,7 +2,7 @@ CREATE TABLE RoomTypes
 (
     RoomTypeId SERIAL PRIMARY KEY,
 
-    TypeName VARCHAR(100) UNIQUE,
+    TypeName VARCHAR(100) NOT NULL UNIQUE,
 
     RecordIngestedBy VARCHAR(100),
     RecordIngestedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -10,5 +10,3 @@ CREATE TABLE RoomTypes
     RecordModifiedOn TIMESTAMPTZ
 );
 
-SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY';

@@ -44,6 +44,4 @@ CREATE TABLE Bookings
         CHECK (EndTime > StartTime)
 );
 
-SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY';
 

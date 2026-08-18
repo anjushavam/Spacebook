@@ -23,6 +23,3 @@ CREATE TABLE Employees
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
-
-SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY';

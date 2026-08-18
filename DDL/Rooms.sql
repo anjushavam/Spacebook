@@ -4,13 +4,13 @@ CREATE TABLE Rooms
 
     RoomTypeId INT NOT NULL,
 
-    RoomName VARCHAR(100) UNIQUE,
+    RoomName VARCHAR(100),
 
     Capacity INT CHECK (Capacity > 0),
 
     Module VARCHAR(100),
 
-    Status VARCHAR(20)
+    Status VARCHAR(30)
         DEFAULT 'Available'
         CHECK (Status IN ('Available', 'Booked', 'Maintenance')),
 
@@ -26,5 +26,3 @@ CREATE TABLE Rooms
         ON DELETE RESTRICT
 );
 
-SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY';

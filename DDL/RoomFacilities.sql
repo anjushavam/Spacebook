@@ -1,8 +1,8 @@
 CREATE TABLE RoomFacilities
 (
-    RoomNumber VARCHAR(100),
+    RoomNumber VARCHAR(100) NOT NULL,
 
-    FacilityId INT,
+    FacilityId INT NOT NULL,
 
     RecordIngestedBy VARCHAR(100),
     RecordIngestedOn TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -25,5 +25,3 @@ CREATE TABLE RoomFacilities
         ON DELETE CASCADE
 );
 
-SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY';
