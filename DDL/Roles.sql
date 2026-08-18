@@ -1,6 +1,3 @@
-SET TIME ZONE 'Asia/Kolkata';
-SET datestyle = 'SQL, MDY';
-
 CREATE TABLE Roles
 (
     RoleId SERIAL PRIMARY KEY,
