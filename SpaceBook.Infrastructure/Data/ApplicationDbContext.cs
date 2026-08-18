@@ -35,6 +35,14 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    public DbSet<HotseatBooking> HotseatBookings => Set<HotseatBooking>();
+
+    public DbSet<Seat> Seats => Set<Seat>();
+
+    public DbSet<Office> Offices => Set<Office>();
+
+    public DbSet<Location> Locations => Set<Location>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,7 +66,6 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("rolename")
                 .HasMaxLength(50)
                 .IsRequired();
-
 
             // One Role -> Many Employees
             entity.HasMany(r => r.Employees)
@@ -102,7 +109,6 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CreatedOn)
                 .HasColumnName("createdon");
 
-
             // Employee -> Bookings
             entity.HasMany(e => e.Bookings)
                 .WithOne(b => b.Employee)
@@ -129,11 +135,67 @@ public class ApplicationDbContext : DbContext
                 .HasMaxLength(100)
                 .IsRequired();
 
-
             // RoomType -> Rooms
             entity.HasMany(rt => rt.Rooms)
                 .WithOne(r => r.RoomType)
                 .HasForeignKey(r => r.RoomTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+
+        // =========================================================
+        // LOCATION
+        // =========================================================
+
+        modelBuilder.Entity<Location>(entity =>
+        {
+            entity.ToTable("locations");
+
+            entity.HasKey(x => x.LocationId);
+
+            entity.Property(x => x.LocationId)
+                .HasColumnName("locationid");
+
+            entity.Property(x => x.LocationName)
+                .HasColumnName("locationname");
+
+            // Location -> Offices
+            entity.HasMany(x => x.Offices)
+                .WithOne(x => x.Location)
+                .HasForeignKey(x => x.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+
+        // =========================================================
+        // OFFICE
+        // =========================================================
+
+        modelBuilder.Entity<Office>(entity =>
+        {
+            entity.ToTable("offices");
+
+            entity.HasKey(x => x.OfficeId);
+
+            entity.Property(x => x.OfficeId)
+                .HasColumnName("officeid");
+
+            entity.Property(x => x.LocationId)
+                .HasColumnName("locationid");
+
+            entity.Property(x => x.OfficeName)
+                .HasColumnName("officename");
+
+            // Office -> Location
+            entity.HasOne(x => x.Location)
+                .WithMany(x => x.Offices)
+                .HasForeignKey(x => x.LocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Office -> Modules
+            entity.HasMany(x => x.Modules)
+                .WithOne(x => x.Office)
+                .HasForeignKey(x => x.OfficeId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -146,34 +208,92 @@ public class ApplicationDbContext : DbContext
         {
             entity.ToTable("modules");
 
-            entity.HasKey(m => m.ModuleId);
+            entity.HasKey(x => x.ModuleId);
 
-            entity.Property(m => m.ModuleId)
+            entity.Property(x => x.ModuleId)
                 .HasColumnName("moduleid");
 
-            entity.Property(m => m.OfficeId)
+            entity.Property(x => x.OfficeId)
                 .HasColumnName("officeid");
 
-            entity.Property(m => m.ModuleName)
-                .HasColumnName("modulename");
+            entity.Property(x => x.ModuleName)
+                .HasColumnName("modulename")
+                .HasMaxLength(100)
+                .IsRequired();
 
-            entity.Property(m => m.RecordIngestedBy)
+            entity.Property(x => x.RecordIngestedBy)
                 .HasColumnName("recordingestedby");
 
-            entity.Property(m => m.RecordIngestedOn)
+            entity.Property(x => x.RecordIngestedOn)
                 .HasColumnName("recordingestedon");
 
-            entity.Property(m => m.RecordModifiedBy)
+            entity.Property(x => x.RecordModifiedBy)
                 .HasColumnName("recordmodifiedby");
 
-            entity.Property(m => m.RecordModifiedOn)
+            entity.Property(x => x.RecordModifiedOn)
                 .HasColumnName("recordmodifiedon");
 
+            // Module -> Office
+            entity.HasOne(x => x.Office)
+                .WithMany(x => x.Modules)
+                .HasForeignKey(x => x.OfficeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Module -> Rooms
-            entity.HasMany(m => m.Rooms)
-                .WithOne(r => r.Module)
-                .HasForeignKey(r => r.ModuleId)
+            entity.HasMany(x => x.Rooms)
+                .WithOne(x => x.Module)
+                .HasForeignKey(x => x.ModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Module -> Seats
+            entity.HasMany(x => x.Seats)
+                .WithOne(x => x.Module)
+                .HasForeignKey(x => x.ModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+
+        // =========================================================
+        // SEAT
+        // =========================================================
+
+        modelBuilder.Entity<Seat>(entity =>
+        {
+            entity.ToTable("seats");
+
+            entity.HasKey(x => x.SeatId);
+
+            entity.Property(x => x.SeatId)
+                .HasColumnName("seatid");
+
+            entity.Property(x => x.ModuleId)
+                .HasColumnName("moduleid");
+
+            entity.Property(x => x.Section)
+                .HasColumnName("section");
+
+            entity.Property(x => x.SeatNumber)
+                .HasColumnName("seatnumber");
+
+            entity.Property(x => x.RowNumber)
+                .HasColumnName("rownumber");
+
+            entity.Property(x => x.ColumnNumber)
+                .HasColumnName("columnnumber");
+
+            entity.Property(x => x.IsActive)
+                .HasColumnName("isactive");
+
+            // Seat -> Module
+            entity.HasOne(x => x.Module)
+                .WithMany(x => x.Seats)
+                .HasForeignKey(x => x.ModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Seat -> HotseatBookings
+            entity.HasMany(x => x.HotseatBookings)
+                .WithOne(x => x.Seat)
+                .HasForeignKey(x => x.SeatId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -209,13 +329,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(r => r.IsBlocked)
                 .HasColumnName("isblocked");
 
-
             // Room -> RoomType
             entity.HasOne(r => r.RoomType)
                 .WithMany(rt => rt.Rooms)
                 .HasForeignKey(r => r.RoomTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
-
 
             // Room -> Module
             entity.HasOne(r => r.Module)
@@ -223,13 +341,11 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(r => r.ModuleId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-
             // Room -> RoomFacilities
             entity.HasMany(r => r.RoomFacilities)
                 .WithOne(rf => rf.Room)
                 .HasForeignKey(rf => rf.RoomId)
                 .OnDelete(DeleteBehavior.Cascade);
-
 
             // Room -> Bookings
             entity.HasMany(r => r.Bookings)
@@ -256,7 +372,6 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("facilityname")
                 .HasMaxLength(100)
                 .IsRequired();
-
 
             // Facility -> RoomFacilities
             entity.HasMany(f => f.RoomFacilities)
@@ -285,13 +400,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(rf => rf.FacilityId)
                 .HasColumnName("facilityid");
 
-
             // RoomFacility -> Room
             entity.HasOne(rf => rf.Room)
                 .WithMany(r => r.RoomFacilities)
                 .HasForeignKey(rf => rf.RoomId)
                 .OnDelete(DeleteBehavior.Cascade);
-
 
             // RoomFacility -> Facility
             entity.HasOne(rf => rf.Facility)
@@ -344,13 +457,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(b => b.Status)
                 .HasColumnName("status");
 
-
             // Booking -> Employee
             entity.HasOne(b => b.Employee)
                 .WithMany(e => e.Bookings)
                 .HasForeignKey(b => b.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
-
 
             // Booking -> Room
             entity.HasOne(b => b.Room)
@@ -383,7 +494,6 @@ public class ApplicationDbContext : DbContext
             entity.Property(c => c.Status)
                 .HasColumnName("status")
                 .HasMaxLength(50);
-
 
             // CheckIn -> Booking
             entity.HasOne(c => c.Booking)
@@ -422,12 +532,68 @@ public class ApplicationDbContext : DbContext
             entity.Property(n => n.CreatedAt)
                 .HasColumnName("createdat");
 
-
             // Notification -> Booking
             entity.HasOne(n => n.Booking)
                 .WithMany()
                 .HasForeignKey(n => n.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+
+        // =========================================================
+        // HOTSEAT BOOKING
+        // =========================================================
+
+        modelBuilder.Entity<HotseatBooking>(entity =>
+        {
+            entity.ToTable("hotseatbookings");
+
+            entity.HasKey(x => x.HotseatBookingId);
+
+            entity.Property(x => x.HotseatBookingId)
+                .HasColumnName("hotseatbookingid");
+
+            entity.Property(x => x.SeatId)
+                .HasColumnName("seatid");
+
+            entity.Property(x => x.EmployeeId)
+                .HasColumnName("employeeid");
+
+            entity.Property(x => x.BookingDate)
+                .HasColumnName("bookingdate");
+
+            entity.Property(x => x.BookingStatus)
+                .HasColumnName("bookingstatus");
+
+            entity.Property(x => x.BookedOn)
+                .HasColumnName("bookedon");
+
+            entity.Property(x => x.CheckInDeadline)
+                .HasColumnName("checkindeadline");
+
+            entity.Property(x => x.CheckInTime)
+                .HasColumnName("checkintime");
+
+            entity.Property(x => x.ReleasedOn)
+                .HasColumnName("releasedon");
+
+            entity.Property(x => x.RecordIngestedBy)
+                .HasColumnName("recordingestedby");
+
+            entity.Property(x => x.RecordIngestedOn)
+                .HasColumnName("recordingestedon");
+
+            entity.Property(x => x.RecordModifiedBy)
+                .HasColumnName("recordmodifiedby");
+
+            entity.Property(x => x.RecordModifiedOn)
+                .HasColumnName("recordmodifiedon");
+
+            // HotseatBooking -> Seat
+            entity.HasOne(x => x.Seat)
+                .WithMany(x => x.HotseatBookings)
+                .HasForeignKey(x => x.SeatId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

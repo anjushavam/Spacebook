@@ -16,7 +16,13 @@ public class Module
 
     public DateTime? RecordModifiedOn { get; set; }
 
-    // Navigation property
+    // Navigation properties
+
+    public Office Office { get; set; } = null!;
+
     public ICollection<Room> Rooms { get; set; }
         = new List<Room>();
+
+    public ICollection<Seat> Seats { get; set; }
+        = new List<Seat>();
 }
