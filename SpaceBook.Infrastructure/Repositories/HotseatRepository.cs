@@ -14,120 +14,68 @@ public class HotseatRepository : IHotseatRepository
         _context = context;
     }
 
-    public async Task<IEnumerable<HotseatSeatDto>> GetHotseatsAsync(
+    public async Task<IEnumerable<HotseatSeatDto>> GetSeatsAsync(
         DateOnly? date,
         string? city,
         string? building,
         string? module)
     {
-        // =========================================================
-        // START FROM SEATS
-        // =========================================================
-
         var query = _context.Seats
             .Include(s => s.Module)
-                .ThenInclude(m => m.Office)
-                    .ThenInclude(o => o.Location)
-            .Include(s => s.HotseatBookings)
+            .ThenInclude(m => m!.Office)
+            .ThenInclude(o => o!.Location)
             .Where(s => s.IsActive)
             .AsQueryable();
 
-        // =========================================================
-        // CITY FILTER
-        // =========================================================
+        // Filter by module
+        if (!string.IsNullOrWhiteSpace(module))
+        {
+            query = query.Where(s =>
+                s.Module != null &&
+                s.Module.ModuleName == module);
+        }
 
+        // Filter by building
+        if (!string.IsNullOrWhiteSpace(building))
+        {
+            query = query.Where(s =>
+                s.Module != null &&
+                s.Module.Office != null &&
+                s.Module.Office.OfficeName == building);
+        }
+
+        // Filter by city
         if (!string.IsNullOrWhiteSpace(city))
         {
-            var cityValue = city.Trim().ToLower();
-
             query = query.Where(s =>
                 s.Module != null &&
                 s.Module.Office != null &&
                 s.Module.Office.Location != null &&
-                s.Module.Office.Location.LocationName
-                    .ToLower()
-                    .Contains(cityValue));
+                s.Module.Office.Location.LocationName == city);
         }
-
-        // =========================================================
-        // BUILDING / OFFICE FILTER
-        // =========================================================
-
-        if (!string.IsNullOrWhiteSpace(building))
-        {
-            var buildingValue = building.Trim().ToLower();
-
-            query = query.Where(s =>
-                s.Module != null &&
-                s.Module.Office != null &&
-                s.Module.Office.OfficeName
-                    .ToLower()
-                    .Contains(buildingValue));
-        }
-
-        // =========================================================
-        // MODULE FILTER
-        // =========================================================
-
-        if (!string.IsNullOrWhiteSpace(module))
-        {
-            var moduleValue = module.Trim().ToLower();
-
-            query = query.Where(s =>
-                s.Module != null &&
-                s.Module.ModuleName
-                    .ToLower()
-                    .Contains(moduleValue));
-        }
-
-        // =========================================================
-        // GET ALL ACTIVE SEATS
-        // =========================================================
 
         var seats = await query
-            .OrderBy(s => s.Section)
+            .OrderBy(s => s.ModuleId)
+            .ThenBy(s => s.Section)
             .ThenBy(s => s.RowNumber)
             .ThenBy(s => s.ColumnNumber)
+            .Select(s => new HotseatSeatDto
+            {
+                SeatNumber = s.SeatNumber,
+                Section = s.Section ?? "",
+                Row = s.RowNumber,
+
+                Status = date.HasValue
+                    ? _context.HotseatBookings.Any(h =>
+                        h.SeatId == s.SeatId &&
+                        h.BookingDate == date.Value &&
+                        h.BookingStatus == "Confirmed")
+                        ? "Reserved"
+                        : "Vacant"
+                    : "Vacant"
+            })
             .ToListAsync();
 
-        // =========================================================
-        // CONVERT TO DTO
-        // =========================================================
-
-        var result = seats.Select(seat =>
-        {
-            var booking = date.HasValue
-                ? seat.HotseatBookings
-                    .FirstOrDefault(b =>
-                        b.BookingDate == date.Value &&
-                        b.BookingStatus != "Cancelled" &&
-                        b.ReleasedOn == null)
-                : null;
-
-            string status;
-
-            if (booking == null)
-            {
-                status = "Vacant";
-            }
-            else if (booking.CheckInTime.HasValue)
-            {
-                status = "Occupied";
-            }
-            else
-            {
-                status = "Reserved";
-            }
-
-            return new HotseatSeatDto
-            {
-                SeatNumber = seat.SeatNumber,
-                Section = seat.Section ?? string.Empty,
-                Row = seat.RowNumber,
-                Status = status
-            };
-        });
-
-        return result;
+        return seats;
     }
 }

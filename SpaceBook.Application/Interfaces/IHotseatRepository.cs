@@ -4,7 +4,7 @@ namespace SpaceBook.Application.Interfaces;
 
 public interface IHotseatRepository
 {
-    Task<IEnumerable<HotseatSeatDto>> GetHotseatsAsync(
+    Task<IEnumerable<HotseatSeatDto>> GetSeatsAsync(
         DateOnly? date,
         string? city,
         string? building,
