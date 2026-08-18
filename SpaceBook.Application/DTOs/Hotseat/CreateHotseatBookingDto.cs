@@ -4,5 +4,5 @@ public class CreateHotseatBookingDto
  
     public DateOnly BookingDate { get; set; }
  
-    public TimeOnly ExpectedCheckInTime { get; set; }
+    public TimeOnly? ExpectedCheckInTime { get; set; }
 }

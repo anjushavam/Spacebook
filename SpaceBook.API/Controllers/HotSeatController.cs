@@ -1,9 +1,9 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SpaceBook.Application.DTOs.Hotseat;
 using SpaceBook.Domain.Entities;
 using SpaceBook.Infrastructure.Data;
+using System.Security.Claims;
  
 namespace SpaceBook.API.Controllers
 {
@@ -20,6 +20,7 @@ namespace SpaceBook.API.Controllers
  
         // ============================================================
         // GET: api/Hotseat
+        // Get all active hotseat seats
         // ============================================================
         [HttpGet]
         public async Task<ActionResult<IEnumerable<HotseatSeatDto>>> GetOfficeMap(
@@ -28,95 +29,44 @@ namespace SpaceBook.API.Controllers
             [FromQuery] string building,
             [FromQuery] string module)
         {
-            // --------------------------------------------------------
-            // 1. Validate date
-            // --------------------------------------------------------
- 
-            if (!DateOnly.TryParse(date, out var bookingDate))
-            {
-                return BadRequest(new
-                {
-                    message = "Invalid date format."
-                });
-            }
- 
- 
-            // --------------------------------------------------------
-            // 2. Get all active seats
-            // --------------------------------------------------------
- 
             var seats = await _context.Seats
                 .Where(s => s.IsActive)
                 .OrderBy(s => s.ModuleId)
                 .ThenBy(s => s.Section)
                 .ThenBy(s => s.RowNumber)
                 .ThenBy(s => s.ColumnNumber)
+                .Select(s => new HotseatSeatDto
+                {
+                    SeatNumber = s.SeatNumber,
+                    Section = s.Section ?? "",
+                    Row = s.RowNumber,
+ 
+                    // Currently returning Vacant.
+                    // Later this can be calculated from HotseatBooking.
+                    Status = "Vacant"
+                })
                 .ToListAsync();
  
- 
-            // --------------------------------------------------------
-            // 3. Get booked seats for selected date
-            // --------------------------------------------------------
-            //
-            // Only Confirmed and CheckedIn seats are considered
-            // occupied.
-            //
-            // Released, Cancelled and Expired seats are available.
-            // --------------------------------------------------------
- 
-            var bookedSeatIds = await _context.HotseatBookings
-                .Where(b =>
-                    b.BookingDate == bookingDate &&
-                    (
-                        b.BookingStatus == "Confirmed" ||
-                        b.BookingStatus == "CheckedIn"
-                    ))
-                .Select(b => b.SeatId)
-                .ToListAsync();
- 
- 
-            // --------------------------------------------------------
-            // 4. Build seat availability response
-            // --------------------------------------------------------
- 
-            var result = seats.Select(s => new HotseatSeatDto
-            {
-                SeatNumber = s.SeatNumber,
- 
-                Section = s.Section ?? "",
- 
-                Row = s.RowNumber,
- 
-                Status = bookedSeatIds.Contains(s.SeatId)
-                    ? "Occupied"
-                    : "Vacant"
- 
-            }).ToList();
- 
- 
-            return Ok(result);
+            return Ok(seats);
         }
  
  
         // ============================================================
         // POST: api/Hotseat
+        // Create a hotseat booking
         // ============================================================
         [HttpPost]
         public async Task<IActionResult> CreateBooking(
             [FromBody] CreateHotseatBookingDto request)
         {
             // --------------------------------------------------------
-            // 1. Get employee ID from JWT
+            // 1. Validate request
             // --------------------------------------------------------
- 
-            var employeeIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
- 
-            if (!int.TryParse(employeeIdClaim, out var employeeId))
+            if (request == null)
             {
-                return Unauthorized(new
+                return BadRequest(new
                 {
-                    message = "Employee ID not found in token."
+                    message = "Booking request is required."
                 });
             }
  
@@ -124,7 +74,6 @@ namespace SpaceBook.API.Controllers
             // --------------------------------------------------------
             // 2. Validate seat
             // --------------------------------------------------------
- 
             var seat = await _context.Seats
                 .FirstOrDefaultAsync(s =>
                     s.SeatId == request.SeatId &&
@@ -140,34 +89,53 @@ namespace SpaceBook.API.Controllers
  
  
             // --------------------------------------------------------
-            // 3. Check whether seat is already booked
+            // 3. Get employee ID from logged-in user
             // --------------------------------------------------------
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
  
-            var existingSeatBooking =
-                await _context.HotseatBookings
-                    .FirstOrDefaultAsync(b =>
-                        b.SeatId == request.SeatId &&
-                        b.BookingDate == request.BookingDate &&
-                        (
-                            b.BookingStatus == "Confirmed" ||
-                            b.BookingStatus == "CheckedIn"
-                        ));
- 
-            if (existingSeatBooking != null)
+            if (string.IsNullOrEmpty(employeeIdClaim))
             {
-                return Conflict(new
+                return Unauthorized(new
                 {
-                    message =
-                        "This seat is already booked for the selected date."
+                    message = "Employee information could not be determined."
+                });
+            }
+ 
+            if (!int.TryParse(employeeIdClaim, out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid employee ID."
                 });
             }
  
  
             // --------------------------------------------------------
-            // 4. Check whether employee already has a booking
+            // 4. Check whether the seat is already booked
             // --------------------------------------------------------
+            var existingBooking = await _context.HotseatBookings
+                .FirstOrDefaultAsync(b =>
+                    b.SeatId == request.SeatId &&
+                    b.BookingDate == request.BookingDate &&
+                    (
+                        b.BookingStatus == "Confirmed" ||
+                        b.BookingStatus == "CheckedIn"
+                    ));
  
-            var existingEmployeeBooking =
+            if (existingBooking != null)
+            {
+                return Conflict(new
+                {
+                    message = "This seat is already booked for the selected date."
+                });
+            }
+ 
+ 
+            // --------------------------------------------------------
+            // 5. Prevent employee from making duplicate booking
+            // --------------------------------------------------------
+            var employeeExistingBooking =
                 await _context.HotseatBookings
                     .FirstOrDefaultAsync(b =>
                         b.EmployeeId == employeeId &&
@@ -177,45 +145,75 @@ namespace SpaceBook.API.Controllers
                             b.BookingStatus == "CheckedIn"
                         ));
  
-            if (existingEmployeeBooking != null)
+            if (employeeExistingBooking != null)
             {
                 return Conflict(new
                 {
-                    message =
-                        "You already have a hotseat booking for the selected date."
+                    message = "You already have a hotseat booking for this date."
                 });
             }
  
  
             // --------------------------------------------------------
-            // 5. Create check-in time
+            // 6. Validate booking date
             // --------------------------------------------------------
+            var todayUtc = DateTime.UtcNow.Date;
+ 
+            if (request.BookingDate < DateOnly.FromDateTime(todayUtc))
+            {
+                return BadRequest(new
+                {
+                    message = "Booking date cannot be in the past."
+                });
+            }
+ 
+ 
+            // --------------------------------------------------------
+            // 7. Create UTC BookedOn
+            // --------------------------------------------------------
+            DateTime bookedOnUtc = DateTime.UtcNow;
+ 
+ 
+            // --------------------------------------------------------
+            // 8. Create Check-In Deadline
             //
-            // IMPORTANT:
-            // PostgreSQL column is timestamp with time zone.
+            // Example:
+            // bookingDate = 2026-08-19
             //
-            // Therefore we explicitly mark the DateTime as UTC.
-            //
-            // NOTE:
-            // This currently treats ExpectedCheckInTime as UTC.
-            // If your frontend sends IST, we can convert IST -> UTC
-            // in the next step.
+            // If your business rule says the employee must check in
+            // by 09:00, create the DateTime in UTC.
             // --------------------------------------------------------
  
-            var expectedCheckIn = DateTime.SpecifyKind(
-                request.BookingDate.ToDateTime(
-                    request.ExpectedCheckInTime),
-                DateTimeKind.Utc
-            );
+            DateTime checkInDeadlineUtc;
  
-            var checkInDeadline =
-                expectedCheckIn.AddMinutes(30);
+            if (request.ExpectedCheckInTime.HasValue)
+            {
+                checkInDeadlineUtc = new DateTime(
+                    request.BookingDate.Year,
+                    request.BookingDate.Month,
+                    request.BookingDate.Day,
+                    request.ExpectedCheckInTime.Value.Hour,
+                    request.ExpectedCheckInTime.Value.Minute,
+                    request.ExpectedCheckInTime.Value.Second,
+                    DateTimeKind.Utc);
+            }
+            else
+            {
+                // Default check-in deadline: 09:00 UTC
+                checkInDeadlineUtc = new DateTime(
+                    request.BookingDate.Year,
+                    request.BookingDate.Month,
+                    request.BookingDate.Day,
+                    9,
+                    0,
+                    0,
+                    DateTimeKind.Utc);
+            }
  
  
             // --------------------------------------------------------
-            // 6. Create booking entity
+            // 9. Create booking entity
             // --------------------------------------------------------
- 
             var booking = new HotseatBooking
             {
                 SeatId = request.SeatId,
@@ -226,9 +224,9 @@ namespace SpaceBook.API.Controllers
  
                 BookingStatus = "Confirmed",
  
-                BookedOn = DateTime.UtcNow,
+                BookedOn = bookedOnUtc,
  
-                CheckInDeadline = checkInDeadline,
+                CheckInDeadline = checkInDeadlineUtc,
  
                 CheckInTime = null,
  
@@ -245,18 +243,16 @@ namespace SpaceBook.API.Controllers
  
  
             // --------------------------------------------------------
-            // 7. Save booking
+            // 10. Save booking
             // --------------------------------------------------------
- 
             _context.HotseatBookings.Add(booking);
  
             await _context.SaveChangesAsync();
  
  
             // --------------------------------------------------------
-            // 8. Return booking details
+            // 11. Return successful response
             // --------------------------------------------------------
- 
             return Ok(new
             {
                 message = "Hotseat booked successfully.",
@@ -273,11 +269,9 @@ namespace SpaceBook.API.Controllers
  
                 bookingStatus = booking.BookingStatus,
  
-                expectedCheckInTime =
-                    request.ExpectedCheckInTime,
+                bookedOn = booking.BookedOn,
  
-                checkInDeadline =
-                    booking.CheckInDeadline
+                checkInDeadline = booking.CheckInDeadline
             });
         }
     }
