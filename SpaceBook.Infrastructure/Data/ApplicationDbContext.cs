@@ -204,7 +204,56 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // =========================================================
+// BOOKING
+// =========================================================
 
+modelBuilder.Entity<Booking>(entity =>
+{
+    entity.ToTable("bookings");
+
+    entity.HasKey(b => b.BookingId);
+
+    entity.Property(b => b.BookingId)
+        .HasColumnName("bookingid");
+
+    entity.Property(b => b.RoomId)
+        .HasColumnName("roomid");
+
+    entity.Property(b => b.EmployeeId)
+        .HasColumnName("employeeid");
+
+    entity.Property(b => b.MeetingTitle)
+        .HasColumnName("meetingtitle");
+
+    entity.Property(b => b.Purpose)
+        .HasColumnName("purpose");
+
+    entity.Property(b => b.ParticipantCount)
+        .HasColumnName("participantcount");
+
+    entity.Property(b => b.BookingDate)
+        .HasColumnName("bookingdate");
+
+    entity.Property(b => b.StartTime)
+        .HasColumnName("starttime");
+
+    entity.Property(b => b.EndTime)
+        .HasColumnName("endtime");
+
+    entity.Property(b => b.BookedOn)
+        .HasColumnName("bookedon");
+
+    entity.Property(b => b.Status)
+        .HasColumnName("status");
+
+
+    // Booking -> Employee
+    entity.HasOne(b => b.Employee)
+        .WithMany(e => e.Bookings)
+        .HasForeignKey(b => b.EmployeeId)
+        .OnDelete(DeleteBehavior.Restrict);
+});
         // =====================================================
         // CHECK-IN
         // =====================================================
