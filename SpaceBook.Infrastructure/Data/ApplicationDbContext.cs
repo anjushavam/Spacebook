@@ -18,7 +18,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<Employee> Employees => Set<Employee>();
-    
 
     public DbSet<RoomType> RoomTypes => Set<RoomType>();
 
@@ -48,6 +47,76 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly);
+
+
+        // =====================================================
+        // ROLE MAPPING
+        // =====================================================
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.ToTable("roles");
+
+            entity.HasKey(r => r.RoleId);
+
+            entity.Property(r => r.RoleId)
+                .HasColumnName("roleid");
+
+            entity.Property(r => r.RoleName)
+                .HasColumnName("rolename")
+                .HasMaxLength(100);
+        });
+
+
+        // =====================================================
+        // EMPLOYEE MAPPING
+        // =====================================================
+
+        modelBuilder.Entity<Employee>(entity =>
+        {
+            entity.ToTable("employees");
+
+            entity.HasKey(e => e.EmployeeId);
+
+            entity.Property(e => e.EmployeeId)
+                .HasColumnName("employeeid");
+
+            entity.Property(e => e.RoleId)
+                .HasColumnName("roleid");
+
+            entity.Property(e => e.Name)
+                .HasColumnName("name")
+                .HasMaxLength(200);
+
+            entity.Property(e => e.Email)
+                .HasColumnName("email")
+                .HasMaxLength(255);
+
+            entity.Property(e => e.PasswordHash)
+                .HasColumnName("passwordhash");
+
+            entity.Property(e => e.Department)
+                .HasColumnName("department")
+                .HasMaxLength(200);
+
+            entity.Property(e => e.IsActive)
+                .HasColumnName("isactive");
+
+            entity.Property(e => e.CreatedOn)
+                .HasColumnName("createdon");
+
+            // Employee -> Role
+            entity.HasOne(e => e.Role)
+                .WithMany()
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Employee -> Bookings
+            entity.HasMany(e => e.Bookings)
+                .WithOne(b => b.Employee)
+                .HasForeignKey(b => b.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
 
         // =====================================================
@@ -103,46 +172,100 @@ public class ApplicationDbContext : DbContext
 
 
         // =====================================================
+        // ROOM TYPE MAPPING
+        // =====================================================
+
+        modelBuilder.Entity<RoomType>(entity =>
+        {
+            entity.ToTable("roomtypes");
+
+            entity.HasKey(r => r.RoomTypeId);
+
+            entity.Property(r => r.RoomTypeId)
+                .HasColumnName("roomtypeid");
+
+            entity.Property(r => r.TypeName)
+                .HasColumnName("typename")
+                .HasMaxLength(100);
+        });
+
+
+        // =====================================================
         // ROOM MAPPING
         // =====================================================
 
         modelBuilder.Entity<Room>(entity =>
-{
-    entity.ToTable("rooms");
+        {
+            entity.ToTable("rooms");
 
-    entity.HasKey(r => r.RoomId);
+            entity.HasKey(r => r.RoomId);
 
-    entity.Property(r => r.RoomId)
-        .HasColumnName("roomid");
+            entity.Property(r => r.RoomId)
+                .HasColumnName("roomid");
 
-    entity.Property(r => r.RoomTypeId)
-        .HasColumnName("roomtypeid");
+            entity.Property(r => r.RoomTypeId)
+                .HasColumnName("roomtypeid");
 
-    entity.Property(r => r.RoomName)
-        .HasColumnName("roomname");
+            entity.Property(r => r.RoomName)
+                .HasColumnName("roomname");
 
-    entity.Property(r => r.Capacity)
-        .HasColumnName("capacity");
+            entity.Property(r => r.Capacity)
+                .HasColumnName("capacity");
 
-    entity.Property(r => r.ModuleId)
-        .HasColumnName("moduleid");
+            entity.Property(r => r.ModuleId)
+                .HasColumnName("moduleid");
 
-    entity.Property(r => r.Status)
-        .HasColumnName("status");
+            entity.Property(r => r.Status)
+                .HasColumnName("status");
 
-    entity.Property(r => r.IsBlocked)
-        .HasColumnName("isblocked");
+            entity.Property(r => r.IsBlocked)
+                .HasColumnName("isblocked");
 
-    entity.HasOne(r => r.RoomType)
-        .WithMany()
-        .HasForeignKey(r => r.RoomTypeId)
-        .OnDelete(DeleteBehavior.Restrict);
+            // Room -> RoomType
+            entity.HasOne(r => r.RoomType)
+                .WithMany()
+                .HasForeignKey(r => r.RoomTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-    entity.HasOne(r => r.Module)
-        .WithMany(m => m.Rooms)
-        .HasForeignKey(r => r.ModuleId)
-        .OnDelete(DeleteBehavior.Restrict);
-});
+            // Room -> Module
+            entity.HasOne(r => r.Module)
+                .WithMany(m => m.Rooms)
+                .HasForeignKey(r => r.ModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+
+        // =====================================================
+        // ROOM FACILITY MAPPING
+        // =====================================================
+
+        modelBuilder.Entity<RoomFacility>(entity =>
+        {
+            entity.ToTable("roomfacilities");
+
+            entity.HasKey(rf => new
+            {
+                rf.RoomId,
+                rf.FacilityId
+            });
+
+            entity.Property(rf => rf.RoomId)
+                .HasColumnName("roomid");
+
+            entity.Property(rf => rf.FacilityId)
+                .HasColumnName("facilityid");
+
+            entity.HasOne(rf => rf.Room)
+                .WithMany(r => r.RoomFacilities)
+                .HasForeignKey(rf => rf.RoomId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(rf => rf.Facility)
+                .WithMany()
+                .HasForeignKey(rf => rf.FacilityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
 
         // =====================================================
         // CHECK-IN MAPPING
