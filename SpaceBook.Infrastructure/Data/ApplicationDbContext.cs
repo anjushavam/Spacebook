@@ -11,6 +11,10 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+    // =========================================================
+    // DB SETS
+    // =========================================================
+
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<Employee> Employees => Set<Employee>();
@@ -18,6 +22,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RoomType> RoomTypes => Set<RoomType>();
 
     public DbSet<Room> Rooms => Set<Room>();
+
+    public DbSet<Module> Modules => Set<Module>();
 
     public DbSet<Facility> Facilities => Set<Facility>();
 
@@ -29,18 +35,24 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // =====================================================
+        // APPLY ENTITY CONFIGURATIONS
+        // =====================================================
+
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly);
 
 
-        // ==========================================
-        // Facility Mapping
-        // ==========================================
+        // =====================================================
+        // FACILITY MAPPING
+        // =====================================================
+
         modelBuilder.Entity<Facility>(entity =>
         {
             entity.ToTable("facilities");
@@ -56,36 +68,122 @@ public class ApplicationDbContext : DbContext
         });
 
 
-        // ==========================================
-        // Room Mapping
-        // ==========================================
+        // =====================================================
+        // MODULE MAPPING
+        // =====================================================
+
+        modelBuilder.Entity<Module>(entity =>
+        {
+            entity.ToTable("modules");
+
+            entity.HasKey(m => m.ModuleId);
+
+            entity.Property(m => m.ModuleId)
+                .HasColumnName("moduleid");
+
+            entity.Property(m => m.OfficeId)
+                .HasColumnName("officeid");
+
+            entity.Property(m => m.ModuleName)
+                .HasColumnName("modulename");
+
+            entity.Property(m => m.RecordIngestedBy)
+                .HasColumnName("recordingestedby");
+
+            entity.Property(m => m.RecordIngestedOn)
+                .HasColumnName("recordingestedon");
+
+            entity.Property(m => m.RecordModifiedBy)
+                .HasColumnName("recordmodifiedby");
+
+            entity.Property(m => m.RecordModifiedOn)
+                .HasColumnName("recordmodifiedon");
+        });
+
+
+        // =====================================================
+        // ROOM MAPPING
+        // =====================================================
+
         modelBuilder.Entity<Room>(entity =>
         {
             entity.ToTable("rooms");
 
+            // -------------------------------------------------
+            // PRIMARY KEY
+            // -------------------------------------------------
+
+            entity.HasKey(r => r.RoomId);
+
             entity.Property(r => r.RoomId)
                 .HasColumnName("roomid");
+
+            // -------------------------------------------------
+            // ROOM TYPE
+            // -------------------------------------------------
+
+            entity.Property(r => r.RoomTypeId)
+                .HasColumnName("roomtypeid");
+
+            // -------------------------------------------------
+            // ROOM NAME
+            // -------------------------------------------------
 
             entity.Property(r => r.RoomName)
                 .HasColumnName("roomname");
 
+            // -------------------------------------------------
+            // CAPACITY
+            // -------------------------------------------------
+
             entity.Property(r => r.Capacity)
                 .HasColumnName("capacity");
 
-            entity.Property(r => r.Module)
-                .HasColumnName("module");
+            // -------------------------------------------------
+            // MODULE ID
+            // -------------------------------------------------
+
+            entity.Property(r => r.ModuleId)
+                .HasColumnName("moduleid");
+
+            // -------------------------------------------------
+            // STATUS
+            // -------------------------------------------------
 
             entity.Property(r => r.Status)
                 .HasColumnName("status");
 
+            // -------------------------------------------------
+            // BLOCK STATUS
+            // -------------------------------------------------
+
             entity.Property(r => r.IsBlocked)
                 .HasColumnName("isblocked");
+
+            // -------------------------------------------------
+            // ROOM -> ROOM TYPE
+            // -------------------------------------------------
+
+            entity.HasOne(r => r.RoomType)
+                .WithMany()
+                .HasForeignKey(r => r.RoomTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // -------------------------------------------------
+            // ROOM -> MODULE
+            // -------------------------------------------------
+
+            entity.HasOne(r => r.Module)
+                .WithMany(m => m.Rooms)
+                .HasForeignKey(r => r.ModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
 
-        // ==========================================
-        // CheckIn Mapping
-        // ==========================================
+        // =====================================================
+        // CHECK-IN MAPPING
+        // =====================================================
+
         modelBuilder.Entity<CheckIn>(entity =>
         {
             entity.ToTable("checkins");
@@ -113,9 +211,10 @@ public class ApplicationDbContext : DbContext
         });
 
 
-        // ==========================================
-        // Notification Mapping
-        // ==========================================
+        // =====================================================
+        // NOTIFICATION MAPPING
+        // =====================================================
+
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.ToTable("notifications");
