@@ -88,7 +88,7 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IMissedCheckInRepository, MissedCheckInRepository>();
 builder.Services.AddScoped<IEmployeeCheckInRepository, EmployeeCheckInRepository>();
 builder.Services.AddScoped<IEmployeeCheckInService, EmployeeCheckInService>();
-
+builder.Services.AddScoped<IHotseatRepository, HotseatRepository>();
 // =====================================================
 // JWT Authentication
 // =====================================================
