@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpaceBook.Application.Interfaces;
 
@@ -5,6 +6,7 @@ namespace SpaceBook.API.Controllers;
 
 [ApiController]
 [Route("api/copilot")]
+[Authorize(Roles = "Employee")]
 public class CopilotController : ControllerBase
 {
     private readonly IEmployeeDashboardService _dashboardService;
@@ -17,13 +19,22 @@ public class CopilotController : ControllerBase
 
     [HttpGet("availability")]
     public async Task<IActionResult> GetAvailability(
-        [FromQuery] DateOnly date,
+        [FromQuery] DateOnly? date,
         [FromQuery] int? roomTypeId)
     {
         try
         {
+            // Date is required
+            if (!date.HasValue)
+            {
+                return BadRequest(new
+                {
+                    message = "Date is required."
+                });
+            }
+
             var result = await _dashboardService
-                .GetAvailabilityAsync(date, roomTypeId);
+                .GetAvailabilityAsync(date.Value, roomTypeId);
 
             return Ok(result);
         }
@@ -31,8 +42,8 @@ public class CopilotController : ControllerBase
         {
             return StatusCode(500, new
             {
-                Message = "Something went wrong.",
-                Error = ex.Message
+                message = "Something went wrong.",
+                error = ex.Message
             });
         }
     }
