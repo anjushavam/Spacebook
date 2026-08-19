@@ -212,7 +212,14 @@ VALUES
     '105508'
 );
 
+UPDATE Employees
+SET RoleId = 1
+WHERE EmployeeId = 105517;
+
+SELECT * FROM Employees;
 SELECT * FROM Rooms;
 SELECT * FROM Notifications;
+
+
 
 
