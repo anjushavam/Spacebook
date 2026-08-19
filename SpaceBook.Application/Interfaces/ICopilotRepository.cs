@@ -4,7 +4,7 @@ namespace SpaceBook.Application.Interfaces;
 
 public interface ICopilotRepository
 {
-    Task<List<OfficeCopilotDto>> GetOfficesAsync();
+    Task<List<OfficeCopilotDto>> GetOfficesAsync(string? search);
 
     Task<List<RoomCopilotDto>> GetRoomsAsync(
         string? search,

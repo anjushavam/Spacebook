@@ -22,24 +22,24 @@ public class CopilotController : ControllerBase
     // =====================================================
 
     [HttpGet("offices")]
-    public async Task<IActionResult> GetOffices()
+public async Task<IActionResult> GetOffices(
+    [FromQuery] string? search)
+{
+    try
     {
-        try
-        {
-            var result = await _copilotService.GetOfficesAsync();
+        var result = await _copilotService.GetOfficesAsync(search);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new
-            {
-                message = "Something went wrong.",
-                error = ex.Message
-            });
-        }
+        return Ok(result);
     }
-
+    catch (Exception ex)
+    {
+        return StatusCode(500, new
+        {
+            message = "Something went wrong.",
+            error = ex.Message
+        });
+    }
+}
     // =====================================================
     // GET / SEARCH ROOMS
     // =====================================================

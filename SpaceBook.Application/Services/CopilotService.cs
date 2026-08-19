@@ -12,10 +12,11 @@ public class CopilotService : ICopilotService
         _copilotRepository = copilotRepository;
     }
 
-    public async Task<List<OfficeCopilotDto>> GetOfficesAsync()
-    {
-        return await _copilotRepository.GetOfficesAsync();
-    }
+    public async Task<List<OfficeCopilotDto>> GetOfficesAsync(
+    string? search)
+{
+    return await _copilotRepository.GetOfficesAsync(search);
+}
 
     public async Task<List<RoomCopilotDto>> GetRoomsAsync(
         string? search,

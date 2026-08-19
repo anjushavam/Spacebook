@@ -18,25 +18,41 @@ public class CopilotRepository : ICopilotRepository
     // GET OFFICES
     // =========================================================
 
-    public async Task<List<OfficeCopilotDto>> GetOfficesAsync()
+    public async Task<List<OfficeCopilotDto>> GetOfficesAsync(
+    string? search)
+{
+    var query = _context.Offices
+        .AsNoTracking()
+        .Include(o => o.Location)
+        .AsQueryable();
+
+    if (!string.IsNullOrWhiteSpace(search))
     {
-        return await _context.Offices
-            .AsNoTracking()
-            .Include(o => o.Location)
-            .OrderBy(o => o.OfficeName)
-            .Select(o => new OfficeCopilotDto
-            {
-                OfficeId = o.OfficeId,
+        search = search.Trim();
 
-                OfficeName = o.OfficeName,
-
-                LocationName =
-                    o.Location != null
-                        ? o.Location.LocationName
-                        : string.Empty
-            })
-            .ToListAsync();
+        query = query.Where(o =>
+            o.OfficeName.Contains(search) ||
+            (
+                o.Location != null &&
+                o.Location.LocationName.Contains(search)
+            ));
     }
+
+    return await query
+        .OrderBy(o => o.OfficeName)
+        .Select(o => new OfficeCopilotDto
+        {
+            OfficeId = o.OfficeId,
+
+            OfficeName = o.OfficeName,
+
+            LocationName =
+                o.Location != null
+                    ? o.Location.LocationName
+                    : string.Empty
+        })
+        .ToListAsync();
+}
 
     // =========================================================
     // GET / SEARCH ROOMS
