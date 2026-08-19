@@ -4,8 +4,17 @@ namespace SpaceBook.Application.Interfaces;
 
 public interface ICopilotService
 {
-Task<List<OfficeCopilotDto>> GetOfficesAsync(
-    string? search);
+    // =========================================================
+    // OFFICES
+    // =========================================================
+
+    Task<List<OfficeCopilotDto>> GetOfficesAsync(
+        string? search);
+
+    // =========================================================
+    // ROOMS
+    // =========================================================
+
     Task<List<RoomCopilotDto>> GetRoomsAsync(
         string? search,
         int? officeId,
@@ -13,9 +22,18 @@ Task<List<OfficeCopilotDto>> GetOfficesAsync(
         int? minCapacity,
         string? facility);
 
+    // =========================================================
+    // AVAILABILITY
+    // =========================================================
+
     Task<CopilotAvailabilityResponseDto> GetAvailabilityAsync(
         DateOnly date,
         int? roomTypeId);
+
+    // =========================================================
+    // RECOMMENDATIONS
+    // =========================================================
+
     Task<List<CopilotRecommendationDto>> GetRecommendationsAsync(
-    CopilotRecommendationRequestDto request);    
+        CopilotRecommendationRequestDto request);
 }

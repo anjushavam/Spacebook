@@ -19,40 +19,53 @@ public class CopilotRepository : ICopilotRepository
     // =========================================================
 
     public async Task<List<OfficeCopilotDto>> GetOfficesAsync(
-    string? search)
-{
-    var query = _context.Offices
-        .AsNoTracking()
-        .Include(o => o.Location)
-        .AsQueryable();
-
-    if (!string.IsNullOrWhiteSpace(search))
+        string? search)
     {
-        search = search.Trim();
+        var query = _context.Offices
+            .AsNoTracking()
+            .Include(o => o.Location)
+            .AsQueryable();
 
-        query = query.Where(o =>
-            o.OfficeName.Contains(search) ||
-            (
-                o.Location != null &&
-                o.Location.LocationName.Contains(search)
-            ));
-    }
+        // -----------------------------------------------------
+        // SEARCH OFFICE OR LOCATION
+        // -----------------------------------------------------
 
-    return await query
-        .OrderBy(o => o.OfficeName)
-        .Select(o => new OfficeCopilotDto
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            OfficeId = o.OfficeId,
+            search = search.Trim();
 
-            OfficeName = o.OfficeName,
+            query = query.Where(o =>
+                EF.Functions.ILike(
+                    o.OfficeName,
+                    $"%{search}%")
+                ||
+                (
+                    o.Location != null &&
+                    EF.Functions.ILike(
+                        o.Location.LocationName,
+                        $"%{search}%")
+                ));
+        }
 
-            LocationName =
-                o.Location != null
-                    ? o.Location.LocationName
-                    : string.Empty
-        })
-        .ToListAsync();
-}
+        // -----------------------------------------------------
+        // RESULT
+        // -----------------------------------------------------
+
+        return await query
+            .OrderBy(o => o.OfficeName)
+            .Select(o => new OfficeCopilotDto
+            {
+                OfficeId = o.OfficeId,
+
+                OfficeName = o.OfficeName,
+
+                LocationName =
+                    o.Location != null
+                        ? o.Location.LocationName
+                        : string.Empty
+            })
+            .ToListAsync();
+    }
 
     // =========================================================
     // GET / SEARCH ROOMS
@@ -67,11 +80,16 @@ public class CopilotRepository : ICopilotRepository
     {
         var query = _context.Rooms
             .AsNoTracking()
+
+            .Include(r => r.RoomType)
+
             .Include(r => r.Module)
                 .ThenInclude(m => m!.Office)
                     .ThenInclude(o => o.Location)
+
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
+
             .AsQueryable();
 
         // =====================================================
@@ -83,25 +101,56 @@ public class CopilotRepository : ICopilotRepository
             search = search.Trim();
 
             query = query.Where(r =>
-                r.RoomName.Contains(search) ||
 
+                // Room name
+                EF.Functions.ILike(
+                    r.RoomName,
+                    $"%{search}%")
+
+                ||
+
+                // Module name
                 (
                     r.Module != null &&
-                    r.Module.ModuleName.Contains(search)
-                ) ||
+                    EF.Functions.ILike(
+                        r.Module.ModuleName,
+                        $"%{search}%")
+                )
 
+                ||
+
+                // Office name
                 (
                     r.Module != null &&
                     r.Module.Office != null &&
-                    r.Module.Office.OfficeName.Contains(search)
-                ) ||
+                    EF.Functions.ILike(
+                        r.Module.Office.OfficeName,
+                        $"%{search}%")
+                )
 
+                ||
+
+                // Location name
                 (
                     r.Module != null &&
                     r.Module.Office != null &&
                     r.Module.Office.Location != null &&
-                    r.Module.Office.Location.LocationName.Contains(search)
-                ));
+                    EF.Functions.ILike(
+                        r.Module.Office.Location.LocationName,
+                        $"%{search}%")
+                )
+
+                ||
+
+                // Facility name
+                (
+                    r.RoomFacilities.Any(rf =>
+                        rf.Facility != null &&
+                        EF.Functions.ILike(
+                            rf.Facility.FacilityName,
+                            $"%{search}%"))
+                )
+            );
         }
 
         // =====================================================
@@ -146,11 +195,13 @@ public class CopilotRepository : ICopilotRepository
             query = query.Where(r =>
                 r.RoomFacilities.Any(rf =>
                     rf.Facility != null &&
-                    rf.Facility.FacilityName.Contains(facility)));
+                    EF.Functions.ILike(
+                        rf.Facility.FacilityName,
+                        $"%{facility}%")));
         }
 
         // =====================================================
-        // PROJECT TO DTO
+        // RETURN ROOM DETAILS
         // =====================================================
 
         return await query
@@ -187,8 +238,10 @@ public class CopilotRepository : ICopilotRepository
 
                 Facilities =
                     r.RoomFacilities
-                        .Where(rf => rf.Facility != null)
-                        .Select(rf => rf.Facility!.FacilityName)
+                        .Where(rf =>
+                            rf.Facility != null)
+                        .Select(rf =>
+                            rf.Facility!.FacilityName)
                         .ToList()
             })
             .ToListAsync();
@@ -198,23 +251,30 @@ public class CopilotRepository : ICopilotRepository
     // GET ROOM AVAILABILITY
     // =========================================================
 
-    public async Task<CopilotAvailabilityResponseDto> GetAvailabilityAsync(
-        DateOnly date,
-        int? roomTypeId)
+    public async Task<CopilotAvailabilityResponseDto>
+        GetAvailabilityAsync(
+            DateOnly date,
+            int? roomTypeId)
     {
         var roomsQuery = _context.Rooms
             .AsNoTracking()
+
             .Include(r => r.RoomType)
+
             .Include(r => r.Module)
+                .ThenInclude(m => m!.Office)
+                    .ThenInclude(o => o.Location)
+
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
+
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked");
 
-        // =====================================================
-        // FILTER BY ROOM TYPE
-        // =====================================================
+        // -----------------------------------------------------
+        // ROOM TYPE FILTER
+        // -----------------------------------------------------
 
         if (roomTypeId.HasValue)
         {
@@ -226,9 +286,9 @@ public class CopilotRepository : ICopilotRepository
             .OrderBy(r => r.RoomName)
             .ToListAsync();
 
-        // =====================================================
-        // GET BOOKINGS FOR DATE
-        // =====================================================
+        // -----------------------------------------------------
+        // GET BOOKINGS
+        // -----------------------------------------------------
 
         var bookings = await _context.Bookings
             .AsNoTracking()
@@ -239,13 +299,13 @@ public class CopilotRepository : ICopilotRepository
             .ToListAsync();
 
         // =====================================================
-        // OFFICE TIME SLOTS
-        // 09:00 AM - 07:30 PM
+        // OFFICE HOURS
+        // 09:00 - 19:30
         // =====================================================
 
         var timeSlots = new List<(TimeOnly Start, TimeOnly End)>
         {
-            (new TimeOnly(9, 0),  new TimeOnly(10, 0)),
+            (new TimeOnly(9, 0), new TimeOnly(10, 0)),
             (new TimeOnly(10, 0), new TimeOnly(11, 0)),
             (new TimeOnly(11, 0), new TimeOnly(12, 0)),
             (new TimeOnly(12, 0), new TimeOnly(13, 0)),
@@ -258,13 +318,14 @@ public class CopilotRepository : ICopilotRepository
             (new TimeOnly(19, 0), new TimeOnly(19, 30))
         };
 
-        var result = new CopilotAvailabilityResponseDto
-        {
-            Date = date
-        };
+        var result =
+            new CopilotAvailabilityResponseDto
+            {
+                Date = date
+            };
 
         // =====================================================
-        // BUILD ROOM AVAILABILITY
+        // BUILD AVAILABILITY
         // =====================================================
 
         foreach (var room in rooms)
@@ -293,55 +354,59 @@ public class CopilotRepository : ICopilotRepository
                 .OrderBy(b => b.StartTime)
                 .FirstOrDefault();
 
-            result.Rooms.Add(new CopilotRoomAvailabilityDto
-            {
-                RoomId = room.RoomId,
+            result.Rooms.Add(
+                new CopilotRoomAvailabilityDto
+                {
+                    RoomId = room.RoomId,
 
-                RoomName = room.RoomName,
+                    RoomName = room.RoomName,
 
-                RoomType =
-                    room.RoomType != null
-                        ? room.RoomType.TypeName
-                        : string.Empty,
+                    RoomType =
+                        room.RoomType != null
+                            ? room.RoomType.TypeName
+                            : string.Empty,
 
-                Module =
-                    room.Module != null
-                        ? room.Module.ModuleName
-                        : string.Empty,
+                    Module =
+                        room.Module != null
+                            ? room.Module.ModuleName
+                            : string.Empty,
 
-                Capacity = room.Capacity,
+                    Capacity = room.Capacity,
 
-                Facilities =
-                    room.RoomFacilities
-                        .Where(rf => rf.Facility != null)
-                        .Select(rf => rf.Facility!.FacilityName)
-                        .ToList(),
+                    Facilities =
+                        room.RoomFacilities
+                            .Where(rf =>
+                                rf.Facility != null)
+                            .Select(rf =>
+                                rf.Facility!.FacilityName)
+                            .ToList(),
 
-                Status = room.Status,
+                    Status = room.Status,
 
-                AvailableSlots =
-                    slots.Count(s => !s.IsBooked),
+                    AvailableSlots =
+                        slots.Count(s => !s.IsBooked),
 
-                TimeSlots = slots,
+                    TimeSlots = slots,
 
-                CurrentBooking =
-                    currentBooking == null
-                        ? null
-                        : new CopilotCurrentBookingDto
-                        {
-                            Purpose =
-                                currentBooking.Purpose ?? string.Empty,
+                    CurrentBooking =
+                        currentBooking == null
+                            ? null
+                            : new CopilotCurrentBookingDto
+                            {
+                                Purpose =
+                                    currentBooking.Purpose
+                                    ?? string.Empty,
 
-                            StartTime =
-                                currentBooking.StartTime,
+                                StartTime =
+                                    currentBooking.StartTime,
 
-                            EndTime =
-                                currentBooking.EndTime,
+                                EndTime =
+                                    currentBooking.EndTime,
 
-                            Status =
-                                currentBooking.Status
-                        }
-            });
+                                Status =
+                                    currentBooking.Status
+                            }
+                });
         }
 
         return result;
@@ -351,12 +416,19 @@ public class CopilotRepository : ICopilotRepository
     // GET ROOM RECOMMENDATIONS
     // =========================================================
 
-    public async Task<List<CopilotRecommendationDto>> GetRecommendationsAsync(
-        CopilotRecommendationRequestDto request)
+    public async Task<List<CopilotRecommendationDto>>
+        GetRecommendationsAsync(
+            CopilotRecommendationRequestDto request)
     {
         // =====================================================
-        // VALIDATE REQUEST
+        // VALIDATION
         // =====================================================
+
+        if (request.Date == default)
+        {
+            throw new ArgumentException(
+                "A valid date is required.");
+        }
 
         if (request.ParticipantCount <= 0)
         {
@@ -376,12 +448,16 @@ public class CopilotRepository : ICopilotRepository
 
         var query = _context.Rooms
             .AsNoTracking()
+
             .Include(r => r.RoomType)
+
             .Include(r => r.Module)
                 .ThenInclude(m => m!.Office)
                     .ThenInclude(o => o.Location)
+
             .Include(r => r.RoomFacilities)
                 .ThenInclude(rf => rf.Facility)
+
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked");
@@ -408,28 +484,30 @@ public class CopilotRepository : ICopilotRepository
         }
 
         // =====================================================
-        // CAPACITY FILTER
+        // CAPACITY
         // =====================================================
 
         query = query.Where(r =>
             r.Capacity >= request.ParticipantCount);
 
         // =====================================================
-        // FACILITY FILTER
+        // FACILITY
         // =====================================================
 
         if (!string.IsNullOrWhiteSpace(request.Facility))
         {
-            var facility = request.Facility.Trim();
+            var facility =
+                request.Facility.Trim();
 
             query = query.Where(r =>
                 r.RoomFacilities.Any(rf =>
                     rf.Facility != null &&
-                    rf.Facility.FacilityName.Contains(facility)));
+                    EF.Functions.ILike(
+                        rf.Facility.FacilityName,
+                        $"%{facility}%")));
         }
 
         var rooms = await query
-            .OrderBy(r => r.RoomName)
             .ToListAsync();
 
         // =====================================================
@@ -444,7 +522,8 @@ public class CopilotRepository : ICopilotRepository
                 b.Status != "Rejected")
             .ToListAsync();
 
-        var recommendations = new List<CopilotRecommendationDto>();
+        var recommendations =
+            new List<CopilotRecommendationDto>();
 
         // =====================================================
         // CHECK EACH ROOM
@@ -453,16 +532,14 @@ public class CopilotRepository : ICopilotRepository
         foreach (var room in rooms)
         {
             var roomBookings = bookings
-                .Where(b => b.RoomId == room.RoomId)
+                .Where(b =>
+                    b.RoomId == room.RoomId)
                 .ToList();
 
-            // =================================================
-            // CHECK BOOKING OVERLAP
-            // =================================================
-
-            var isBooked = roomBookings.Any(b =>
-                b.StartTime < request.EndTime &&
-                b.EndTime > request.StartTime);
+            var isBooked =
+                roomBookings.Any(b =>
+                    b.StartTime < request.EndTime &&
+                    b.EndTime > request.StartTime);
 
             if (isBooked)
             {
@@ -470,13 +547,14 @@ public class CopilotRepository : ICopilotRepository
             }
 
             // =================================================
-            // CALCULATE MATCH SCORE
+            // MATCH SCORE
             // =================================================
 
             var score = 0;
 
-            // Exact capacity is preferred
-            if (room.Capacity == request.ParticipantCount)
+            // Exact capacity
+            if (room.Capacity ==
+                request.ParticipantCount)
             {
                 score += 40;
             }
@@ -485,14 +563,18 @@ public class CopilotRepository : ICopilotRepository
                 score += 25;
             }
 
-            // Requested facility
-            if (!string.IsNullOrWhiteSpace(request.Facility))
+            // Facility
+            if (!string.IsNullOrWhiteSpace(
+                request.Facility))
             {
-                var facilityMatch = room.RoomFacilities.Any(rf =>
-                    rf.Facility != null &&
-                    rf.Facility.FacilityName.Contains(
-                        request.Facility.Trim(),
-                        StringComparison.OrdinalIgnoreCase));
+                var facilityMatch =
+                    room.RoomFacilities.Any(rf =>
+                        rf.Facility != null &&
+                        rf.Facility.FacilityName
+                            .Contains(
+                                request.Facility.Trim(),
+                                StringComparison
+                                    .OrdinalIgnoreCase));
 
                 if (facilityMatch)
                 {
@@ -500,71 +582,79 @@ public class CopilotRepository : ICopilotRepository
                 }
             }
 
-            // Requested room type
+            // Room type
             if (request.RoomTypeId.HasValue &&
-                room.RoomTypeId == request.RoomTypeId.Value)
+                room.RoomTypeId ==
+                request.RoomTypeId.Value)
             {
                 score += 20;
             }
 
-            // Room is available
+            // Available
             score += 10;
 
             // =================================================
-            // ADD RECOMMENDATION
+            // ADD RESULT
             // =================================================
 
-            recommendations.Add(new CopilotRecommendationDto
-            {
-                RoomId = room.RoomId,
+            recommendations.Add(
+                new CopilotRecommendationDto
+                {
+                    RoomId = room.RoomId,
 
-                RoomName = room.RoomName,
+                    RoomName = room.RoomName,
 
-                RoomType =
-                    room.RoomType != null
-                        ? room.RoomType.TypeName
-                        : string.Empty,
+                    RoomType =
+                        room.RoomType != null
+                            ? room.RoomType.TypeName
+                            : string.Empty,
 
-                OfficeName =
-                    room.Module != null &&
-                    room.Module.Office != null
-                        ? room.Module.Office.OfficeName
-                        : string.Empty,
+                    OfficeName =
+                        room.Module != null &&
+                        room.Module.Office != null
+                            ? room.Module.Office.OfficeName
+                            : string.Empty,
 
-                LocationName =
-                    room.Module != null &&
-                    room.Module.Office != null &&
-                    room.Module.Office.Location != null
-                        ? room.Module.Office.Location.LocationName
-                        : string.Empty,
+                    LocationName =
+                        room.Module != null &&
+                        room.Module.Office != null &&
+                        room.Module.Office.Location != null
+                            ? room.Module.Office
+                                .Location.LocationName
+                            : string.Empty,
 
-                ModuleName =
-                    room.Module != null
-                        ? room.Module.ModuleName
-                        : string.Empty,
+                    ModuleName =
+                        room.Module != null
+                            ? room.Module.ModuleName
+                            : string.Empty,
 
-                Capacity = room.Capacity,
+                    Capacity = room.Capacity,
 
-                Facilities =
-                    room.RoomFacilities
-                        .Where(rf => rf.Facility != null)
-                        .Select(rf => rf.Facility!.FacilityName)
-                        .ToList(),
+                    Facilities =
+                        room.RoomFacilities
+                            .Where(rf =>
+                                rf.Facility != null)
+                            .Select(rf =>
+                                rf.Facility!.FacilityName)
+                            .ToList(),
 
-                IsAvailable = true,
+                    IsAvailable = true,
 
-                MatchScore = score
-            });
+                    MatchScore = score
+                });
         }
 
         // =====================================================
-        // SORT RESULTS
+        // SORT
         // =====================================================
 
         return recommendations
-            .OrderByDescending(r => r.MatchScore)
-            .ThenBy(r => r.Capacity)
-            .ThenBy(r => r.RoomName)
+            .OrderByDescending(r =>
+                r.MatchScore)
+            .ThenBy(r =>
+                r.Capacity)
+            .ThenBy(r =>
+                r.RoomName)
             .ToList();
     }
 }
