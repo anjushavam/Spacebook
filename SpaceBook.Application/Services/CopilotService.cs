@@ -40,4 +40,9 @@ public class CopilotService : ICopilotService
             date,
             roomTypeId);
     }
+    public async Task<List<CopilotRecommendationDto>> GetRecommendationsAsync(
+    CopilotRecommendationRequestDto request)
+{
+    return await _copilotRepository.GetRecommendationsAsync(request);
+}
 }

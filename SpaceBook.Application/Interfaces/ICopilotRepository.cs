@@ -16,4 +16,7 @@ public interface ICopilotRepository
     Task<CopilotAvailabilityResponseDto> GetAvailabilityAsync(
         DateOnly date,
         int? roomTypeId);
+
+    Task<List<CopilotRecommendationDto>> GetRecommendationsAsync(
+        CopilotRecommendationRequestDto request);
 }

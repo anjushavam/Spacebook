@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpaceBook.Application.Interfaces;
+using SpaceBook.Application.DTOs.Copilot;
 
 namespace SpaceBook.API.Controllers;
 
@@ -98,4 +99,23 @@ public class CopilotController : ControllerBase
             });
         }
     }
+    [HttpPost("recommendations")]
+public async Task<IActionResult> GetRecommendations(
+    [FromBody] CopilotRecommendationRequestDto request)
+{
+    try
+    {
+        var result = await _copilotService.GetRecommendationsAsync(request);
+
+        return Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new
+        {
+            message = "Something went wrong.",
+            error = ex.Message
+        });
+    }
+}
 }

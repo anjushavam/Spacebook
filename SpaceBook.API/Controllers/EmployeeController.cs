@@ -664,7 +664,7 @@ public class EmployeeController : ControllerBase
                     new TimeOnly(10, 0);
 
                 var officeEnd =
-                    new TimeOnly(19, 30);
+                    new TimeOnly(19, 0);
 
                 if (request.StartTime.Value <
                     officeStart ||
