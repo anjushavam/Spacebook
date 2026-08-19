@@ -1,23 +1,22 @@
 using SpaceBook.Application.DTOs.Copilot;
 using SpaceBook.Application.Interfaces;
- 
+
 namespace SpaceBook.Application.Services;
- 
+
 public class CopilotService : ICopilotService
 {
     private readonly ICopilotRepository _copilotRepository;
- 
-    public CopilotService(
-        ICopilotRepository copilotRepository)
+
+    public CopilotService(ICopilotRepository copilotRepository)
     {
         _copilotRepository = copilotRepository;
     }
- 
+
     public async Task<List<OfficeCopilotDto>> GetOfficesAsync()
     {
         return await _copilotRepository.GetOfficesAsync();
     }
- 
+
     public async Task<List<RoomCopilotDto>> GetRoomsAsync(
         string? search,
         int? officeId,
@@ -31,5 +30,14 @@ public class CopilotService : ICopilotService
             roomTypeId,
             minCapacity,
             facility);
+    }
+
+    public async Task<CopilotAvailabilityResponseDto> GetAvailabilityAsync(
+        DateOnly date,
+        int? roomTypeId)
+    {
+        return await _copilotRepository.GetAvailabilityAsync(
+            date,
+            roomTypeId);
     }
 }

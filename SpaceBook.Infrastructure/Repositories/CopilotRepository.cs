@@ -174,4 +174,135 @@ public class CopilotRepository : ICopilotRepository
             })
             .ToListAsync();
     }
+    public async Task<CopilotAvailabilityResponseDto> GetAvailabilityAsync(
+    DateOnly date,
+    int? roomTypeId)
+{
+    var roomsQuery = _context.Rooms
+        .AsNoTracking()
+        .Include(r => r.RoomType)
+        .Include(r => r.Module)
+        .Include(r => r.RoomFacilities)
+            .ThenInclude(rf => rf.Facility)
+        .Where(r =>
+            !r.IsBlocked &&
+            r.Status != "Blocked");
+
+    if (roomTypeId.HasValue)
+    {
+        roomsQuery = roomsQuery.Where(r =>
+            r.RoomTypeId == roomTypeId.Value);
+    }
+
+    var rooms = await roomsQuery
+        .OrderBy(r => r.RoomName)
+        .ToListAsync();
+
+    var bookings = await _context.Bookings
+        .AsNoTracking()
+        .Where(b =>
+            b.BookingDate == date &&
+            b.Status != "Cancelled" &&
+            b.Status != "Rejected")
+        .ToListAsync();
+
+    var timeSlots = new List<(TimeOnly Start, TimeOnly End)>
+    {
+        (new TimeOnly(9, 0), new TimeOnly(10, 0)),
+        (new TimeOnly(10, 0), new TimeOnly(11, 0)),
+        (new TimeOnly(11, 0), new TimeOnly(12, 0)),
+        (new TimeOnly(12, 0), new TimeOnly(13, 0)),
+        (new TimeOnly(13, 0), new TimeOnly(14, 0)),
+        (new TimeOnly(14, 0), new TimeOnly(15, 0)),
+        (new TimeOnly(15, 0), new TimeOnly(16, 0)),
+        (new TimeOnly(16, 0), new TimeOnly(17, 0)),
+        (new TimeOnly(17, 0), new TimeOnly(18, 0)),
+        (new TimeOnly(18, 0), new TimeOnly(19, 0)),
+        (new TimeOnly(19, 0), new TimeOnly(19, 30))
+    };
+
+    var result = new CopilotAvailabilityResponseDto
+    {
+        Date = date
+    };
+
+    foreach (var room in rooms)
+    {
+        var roomBookings = bookings
+            .Where(b => b.RoomId == room.RoomId)
+            .ToList();
+
+        var slots = timeSlots
+            .Select(slot =>
+            {
+                var booked = roomBookings.Any(b =>
+                    b.StartTime < slot.End &&
+                    b.EndTime > slot.Start);
+
+                return new CopilotTimeSlotDto
+                {
+                    StartTime = slot.Start,
+                    EndTime = slot.End,
+                    IsBooked = booked
+                };
+            })
+            .ToList();
+
+        var currentBooking = roomBookings
+            .OrderBy(b => b.StartTime)
+            .FirstOrDefault();
+
+        result.Rooms.Add(new CopilotRoomAvailabilityDto
+        {
+            RoomId = room.RoomId,
+
+            RoomName = room.RoomName,
+
+            RoomType =
+                room.RoomType != null
+                    ? room.RoomType.TypeName
+                    : string.Empty,
+
+            Module =
+                room.Module != null
+                    ? room.Module.ModuleName
+                    : string.Empty,
+
+            Capacity = room.Capacity,
+
+            Facilities =
+                room.RoomFacilities
+                    .Where(rf => rf.Facility != null)
+                    .Select(rf => rf.Facility!.FacilityName)
+                    .ToList(),
+
+            Status = room.Status,
+
+            AvailableSlots =
+                slots.Count(s => !s.IsBooked),
+
+            TimeSlots = slots,
+
+            CurrentBooking =
+                currentBooking == null
+                    ? null
+                    : new CopilotCurrentBookingDto
+                    {
+                        Purpose =
+                            currentBooking.Purpose ?? string.Empty,
+
+                        StartTime =
+                            currentBooking.StartTime,
+
+                        EndTime =
+                            currentBooking.EndTime,
+
+                        Status =
+                            currentBooking.Status
+                    }
+        });
+    }
+
+    return result;
+}
 }
