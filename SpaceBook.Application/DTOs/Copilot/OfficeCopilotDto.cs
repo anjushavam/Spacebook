@@ -8,7 +8,7 @@ public class OfficeCopilotDto
  
     public string OfficeName { get; set; } = string.Empty;
  
-    public string LocationName { get; set; } = string. Empty;
+    public string LocationName { get; set; } = string.Empty;
 
 }
  

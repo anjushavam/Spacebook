@@ -1,98 +1,130 @@
 using Microsoft.AspNetCore.Authorization;
+
 using Microsoft.AspNetCore.Mvc;
+
 using SpaceBook.Application.Interfaces;
-using System.Security.Claims;
-
+ 
 namespace SpaceBook.API.Controllers;
-
+ 
 [ApiController]
+
 [Route("api/copilot")]
+
 [Authorize(Roles = "Employee")]
+
 public class CopilotController : ControllerBase
+
 {
-    private readonly IEmployeeDashboardService _dashboardService;
 
-    public CopilotController(
-        IEmployeeDashboardService dashboardService)
+    private readonly ICopilotService _copilotService;
+ 
+    public CopilotController(ICopilotService copilotService)
+
     {
-        _dashboardService = dashboardService;
+
+        _copilotService = copilotService;
+
     }
-
-    // =====================================================
-    // GET AVAILABILITY
+ 
     // =====================================================
 
-    [HttpGet("availability")]
-    public async Task<IActionResult> GetAvailability(
-        [FromQuery] DateOnly? date,
-        [FromQuery] int? roomTypeId)
+    // GET OFFICES
+
+    // =====================================================
+ 
+    [HttpGet("offices")]
+
+    public async Task<IActionResult> GetOffices()
+
     {
+
         try
+
         {
-            if (!date.HasValue)
-            {
-                return BadRequest(new
-                {
-                    message = "Date is required."
-                });
-            }
 
-            var result = await _dashboardService
-                .GetAvailabilityAsync(date.Value, roomTypeId);
-
+            var result = await _copilotService.GetOfficesAsync();
+ 
             return Ok(result);
+
         }
+
         catch (Exception ex)
+
         {
+
             return StatusCode(500, new
+
             {
+
                 message = "Something went wrong.",
+
                 error = ex.Message
+
             });
+
         }
+
     }
-
-    // =====================================================
-    // GET MY BOOKINGS
+ 
     // =====================================================
 
-    [HttpGet("my-bookings")]
-    public async Task<IActionResult> GetMyBookings()
+    // GET / SEARCH ROOMS
+
+    // =====================================================
+ 
+    [HttpGet("rooms")]
+
+    public async Task<IActionResult> GetRooms(
+
+        [FromQuery] string? search,
+
+        [FromQuery] int? officeId,
+
+        [FromQuery] int? roomTypeId,
+
+        [FromQuery] int? minCapacity,
+
+        [FromQuery] string? facility)
+
     {
+
         try
+
         {
-            // EmployeeId comes from the authenticated JWT
-            var employeeIdClaim =
-                User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            if (string.IsNullOrWhiteSpace(employeeIdClaim))
-            {
-                return Unauthorized(new
-                {
-                    message = "Employee information not found in token."
-                });
-            }
+            var result = await _copilotService.GetRoomsAsync(
 
-            if (!int.TryParse(employeeIdClaim, out var employeeId))
-            {
-                return Unauthorized(new
-                {
-                    message = "Invalid employee information in token."
-                });
-            }
+                search,
 
-            var result = await _dashboardService
-                .GetMyBookingsAsync(employeeId);
+                officeId,
 
+                roomTypeId,
+
+                minCapacity,
+
+                facility);
+ 
             return Ok(result);
+
         }
+
         catch (Exception ex)
+
         {
+
             return StatusCode(500, new
+
             {
+
                 message = "Something went wrong.",
+
                 error = ex.Message
+
             });
+
         }
+
     }
+
 }
+ 

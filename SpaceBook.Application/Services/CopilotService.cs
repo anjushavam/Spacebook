@@ -13,19 +13,10 @@ public class CopilotService : ICopilotService
         _copilotRepository = copilotRepository;
     }
  
-    // =========================================================
-    // GET OFFICES
-    // =========================================================
- 
     public async Task<List<OfficeCopilotDto>> GetOfficesAsync()
     {
-        return await _copilotRepository
-            .GetOfficesAsync();
+        return await _copilotRepository.GetOfficesAsync();
     }
- 
-    // =========================================================
-    // GET / SEARCH ROOMS
-    // =========================================================
  
     public async Task<List<RoomCopilotDto>> GetRoomsAsync(
         string? search,
@@ -34,12 +25,11 @@ public class CopilotService : ICopilotService
         int? minCapacity,
         string? facility)
     {
-        return await _copilotRepository
-            .GetRoomsAsync(
-                search,
-                officeId,
-                roomTypeId,
-                minCapacity,
-                facility);
+        return await _copilotRepository.GetRoomsAsync(
+            search,
+            officeId,
+            roomTypeId,
+            minCapacity,
+            facility);
     }
 }

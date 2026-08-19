@@ -199,6 +199,8 @@ builder.Services.AddScoped<IReportService, ReportService>();
 // =====================================================
 // Employee Dashboard
 // =====================================================
+builder.Services.AddScoped<ICopilotRepository, CopilotRepository>();
+builder.Services.AddScoped<ICopilotService, CopilotService>();
 
 builder.Services.AddScoped<IEmployeeDashboardRepository, EmployeeDashboardRepository>();
 builder.Services.AddScoped<IEmployeeDashboardService, EmployeeDashboardService>();
