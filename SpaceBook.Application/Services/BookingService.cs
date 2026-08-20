@@ -68,9 +68,6 @@ public class BookingService : IBookingService
         // -----------------------------------------------------
         // 2. GET BOOKING DETAILS BEFORE STATUS UPDATE
         // -----------------------------------------------------
-        // We need EmployeeId, Purpose and MeetingTitle
-        // for creating the employee notification.
-        // -----------------------------------------------------
 
         var booking =
             await _bookingRepository.GetByIdAsync(bookingId);
@@ -84,19 +81,11 @@ public class BookingService : IBookingService
         // -----------------------------------------------------
         // 3. APPROVE BOOKING
         // -----------------------------------------------------
-        // This is the MAIN operation.
-        // If this succeeds, the booking is approved.
-        // -----------------------------------------------------
 
         await _bookingRepository.ApproveAsync(bookingId);
 
         // -----------------------------------------------------
         // 4. CREATE EMPLOYEE NOTIFICATION
-        // -----------------------------------------------------
-        // Notification is a SECONDARY operation.
-        //
-        // If notification insertion fails, the booking should
-        // still remain approved.
         // -----------------------------------------------------
 
         try
@@ -111,19 +100,27 @@ public class BookingService : IBookingService
             var message =
                 $"Your booking for {purpose} has been approved by the admin.";
 
-            // -------------------------------------------------
             // Database column:
-            //
             // message varchar(500)
-            //
-            // Therefore make sure the application never sends
-            // more than 500 characters.
-            // -------------------------------------------------
 
             if (message.Length > 500)
             {
                 message = message[..500];
             }
+
+            // -------------------------------------------------
+            // IMPORTANT:
+            //
+            // PostgreSQL column is:
+            // timestamp without time zone
+            //
+            // Therefore DateTime must be Kind = Unspecified.
+            // -------------------------------------------------
+
+            var createdAt = DateTime.SpecifyKind(
+                DateTime.UtcNow,
+                DateTimeKind.Unspecified
+            );
 
             var employeeNotification = new Notification
             {
@@ -135,7 +132,7 @@ public class BookingService : IBookingService
 
                 IsRead = false,
 
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = createdAt
             };
 
             await _notificationRepository
@@ -151,11 +148,6 @@ public class BookingService : IBookingService
             // -------------------------------------------------
             // Do NOT fail the approval because notification
             // persistence failed.
-            //
-            // The booking has already been approved.
-            //
-            // Log the actual exception so that we can diagnose
-            // notification problems from Render logs.
             // -------------------------------------------------
 
             Console.WriteLine(
@@ -221,16 +213,27 @@ public class BookingService : IBookingService
             var message =
                 $"Your booking for {purpose} has been rejected by the admin.";
 
-            // -------------------------------------------------
             // Database column:
-            //
             // message varchar(500)
-            // -------------------------------------------------
 
             if (message.Length > 500)
             {
                 message = message[..500];
             }
+
+            // -------------------------------------------------
+            // IMPORTANT:
+            //
+            // PostgreSQL column is:
+            // timestamp without time zone
+            //
+            // Therefore DateTime must be Kind = Unspecified.
+            // -------------------------------------------------
+
+            var createdAt = DateTime.SpecifyKind(
+                DateTime.UtcNow,
+                DateTimeKind.Unspecified
+            );
 
             var employeeNotification = new Notification
             {
@@ -242,7 +245,7 @@ public class BookingService : IBookingService
 
                 IsRead = false,
 
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = createdAt
             };
 
             await _notificationRepository
@@ -258,8 +261,6 @@ public class BookingService : IBookingService
             // -------------------------------------------------
             // Do NOT fail the rejection because notification
             // persistence failed.
-            //
-            // The booking has already been rejected.
             // -------------------------------------------------
 
             Console.WriteLine(

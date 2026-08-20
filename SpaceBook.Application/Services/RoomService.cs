@@ -1,148 +1,272 @@
 using SpaceBook.Application.DTOs.Room;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
-
+ 
 namespace SpaceBook.Application.Services;
-
+ 
 public class RoomService : IRoomService
 {
     private readonly IRoomRepository _roomRepository;
-
+ 
     public RoomService(IRoomRepository roomRepository)
     {
         _roomRepository = roomRepository;
     }
-
+ 
     // =========================================================
     // GET ROOM DASHBOARD
     // =========================================================
-
+ 
     public async Task<RoomDashboardDto> GetDashboardAsync()
     {
         return await _roomRepository.GetDashboardAsync();
     }
-
-
+ 
+ 
     // =========================================================
     // GET ALL ROOMS
     // =========================================================
-
+ 
     public async Task<IEnumerable<RoomDto>> GetAllAsync(
         RoomFilterDto filter)
     {
         return await _roomRepository.GetAllAsync(filter);
     }
-
-
+ 
+ 
     // =========================================================
     // GET ROOM BY ID
     // =========================================================
-
+ 
     public async Task<RoomDetailsDto?> GetByIdAsync(int roomId)
     {
         return await _roomRepository.GetByIdAsync(roomId);
     }
-
-
+ 
+ 
     // =========================================================
     // CREATE ROOM
     // =========================================================
-
+ 
     public async Task CreateAsync(CreateRoomDto dto)
     {
+        // =====================================================
+        // VALIDATE ROOM NAME
+        // =====================================================
+ 
+        if (string.IsNullOrWhiteSpace(dto.RoomName))
+        {
+            throw new ArgumentException(
+                "Room name is required.");
+        }
+ 
+        // Remove accidental leading/trailing spaces
+        dto.RoomName = dto.RoomName.Trim();
+ 
+        // =====================================================
+        // VALIDATE ROOM NAME LENGTH
+        // =====================================================
+ 
+        if (dto.RoomName.Length > 100)
+        {
+            throw new ArgumentException(
+                "Room name cannot exceed 100 characters.");
+        }
+ 
+        // =====================================================
+        // VALIDATE CAPACITY
+        // =====================================================
+ 
+        if (dto.Capacity <= 0)
+        {
+            throw new ArgumentException(
+                "Room capacity must be greater than zero.");
+        }
+ 
+        // =====================================================
+        // VALIDATE ROOM TYPE
+        // =====================================================
+ 
+        if (dto.RoomTypeId <= 0)
+        {
+            throw new ArgumentException(
+                "Room type is required.");
+        }
+ 
+        // =====================================================
+        // VALIDATE MODULE
+        // =====================================================
+ 
+        if (dto.ModuleId <= 0)
+        {
+            throw new ArgumentException(
+                "Module is required.");
+        }
+ 
+        // =====================================================
+        // VALIDATE STATUS
+        // =====================================================
+ 
+        if (string.IsNullOrWhiteSpace(dto.Status))
+        {
+            dto.Status = "Available";
+        }
+        else
+        {
+            dto.Status = dto.Status.Trim();
+        }
+ 
+        // =====================================================
+        // CREATE ROOM ENTITY
+        // =====================================================
+ 
         var room = new Room
         {
             RoomTypeId = dto.RoomTypeId,
-
+ 
             RoomName = dto.RoomName,
-
+ 
             Capacity = dto.Capacity,
-
-            // =====================================================
-            // MODULE ID
+ 
             // rooms.moduleid -> modules.moduleid
-            // =====================================================
-
             ModuleId = dto.ModuleId,
-
+ 
             Status = dto.Status,
-
+ 
             IsBlocked = false
         };
-
+ 
+        // =====================================================
+        // SAVE ROOM
+        // =====================================================
+ 
         await _roomRepository.AddAsync(
             room,
             dto.FacilityIds ?? new List<int>());
     }
-
-
+ 
+ 
     // =========================================================
     // UPDATE ROOM
     // =========================================================
-
+ 
     public async Task UpdateAsync(
         int roomId,
         UpdateRoomDto dto)
     {
+        // =====================================================
+        // VALIDATE ROOM NAME
+        // =====================================================
+ 
+        if (string.IsNullOrWhiteSpace(dto.RoomName))
+        {
+            throw new ArgumentException(
+                "Room name is required.");
+        }
+ 
+        dto.RoomName = dto.RoomName.Trim();
+ 
+        if (dto.RoomName.Length > 100)
+        {
+            throw new ArgumentException(
+                "Room name cannot exceed 100 characters.");
+        }
+ 
+        // =====================================================
+        // VALIDATE CAPACITY
+        // =====================================================
+ 
+        if (dto.Capacity <= 0)
+        {
+            throw new ArgumentException(
+                "Room capacity must be greater than zero.");
+        }
+ 
+        // =====================================================
+        // VALIDATE ROOM TYPE
+        // =====================================================
+ 
+        if (dto.RoomTypeId <= 0)
+        {
+            throw new ArgumentException(
+                "Room type is required.");
+        }
+ 
+        // =====================================================
+        // VALIDATE MODULE
+        // =====================================================
+ 
+        if (dto.ModuleId <= 0)
+        {
+            throw new ArgumentException(
+                "Module is required.");
+        }
+ 
+        // =====================================================
+        // CHECK EXISTING ROOM
+        // =====================================================
+ 
         var existingRoom =
             await _roomRepository.GetByIdAsync(roomId);
-
+ 
         if (existingRoom == null)
         {
             throw new KeyNotFoundException(
                 "Room not found.");
         }
-
+ 
+        // =====================================================
+        // CREATE UPDATED ROOM
+        // =====================================================
+ 
         var room = new Room
         {
             RoomId = roomId,
-
+ 
             RoomTypeId = dto.RoomTypeId,
-
+ 
             RoomName = dto.RoomName,
-
+ 
             Capacity = dto.Capacity,
-
-            // =====================================================
-            // MODULE ID
-            // =====================================================
-
+ 
+            // rooms.moduleid -> modules.moduleid
             ModuleId = dto.ModuleId,
-
+ 
             Status = dto.Status,
-
+ 
+            // Preserve existing blocked state
             IsBlocked = existingRoom.IsBlocked
         };
-
+ 
         await _roomRepository.UpdateAsync(
             room,
             dto.FacilityIds ?? new List<int>());
     }
-
-
+ 
+ 
     // =========================================================
-    // DELETE / BLOCK ROOM
+    // DELETE ROOM
     // =========================================================
-
+ 
     public async Task DeleteAsync(int roomId)
     {
         var exists =
             await _roomRepository.ExistsAsync(roomId);
-
+ 
         if (!exists)
         {
             throw new KeyNotFoundException(
                 "Room not found.");
         }
-
+ 
         await _roomRepository.DeleteAsync(roomId);
     }
-
-
+ 
+ 
     // =========================================================
     // BLOCK / UNBLOCK ROOM
     // =========================================================
-
+ 
     public async Task<bool> UpdateRoomStatusAsync(
         int roomId,
         bool isBlocked)
@@ -152,50 +276,84 @@ public class RoomService : IRoomService
                 roomId,
                 isBlocked);
     }
-
-
+ 
+ 
     // =========================================================
     // BULK CREATE ROOMS
     // =========================================================
-
+ 
     public async Task BulkCreateAsync(
         BulkCreateRoomDto dto)
     {
+        // =====================================================
+        // VALIDATE COUNT
+        // =====================================================
+ 
         if (dto.Count <= 0)
         {
             throw new ArgumentException(
                 "Room count must be greater than zero.");
         }
-
+ 
+        // =====================================================
+        // VALIDATE CAPACITY
+        // =====================================================
+ 
+        if (dto.Capacity <= 0)
+        {
+            throw new ArgumentException(
+                "Room capacity must be greater than zero.");
+        }
+ 
+        // =====================================================
+        // VALIDATE ROOM TYPE
+        // =====================================================
+ 
+        if (dto.RoomTypeId <= 0)
+        {
+            throw new ArgumentException(
+                "Room type is required.");
+        }
+ 
+        // =====================================================
+        // VALIDATE MODULE
+        // =====================================================
+ 
+        if (dto.ModuleId <= 0)
+        {
+            throw new ArgumentException(
+                "Module is required.");
+        }
+ 
+        // =====================================================
+        // CREATE ROOMS
+        // =====================================================
+ 
         for (int i = 1; i <= dto.Count; i++)
         {
             var room = new Room
             {
                 RoomTypeId = dto.RoomTypeId,
-
-                // =================================================
+ 
                 // Creates:
-                //
                 // Room-01
                 // Room-02
                 // Room-03
-                // =================================================
-
+ 
                 RoomName = $"Room-{i:D2}",
-
+ 
                 Capacity = dto.Capacity,
-
-                // =================================================
-                // MODULE ID
-                // =================================================
-
+ 
+                // rooms.moduleid -> modules.moduleid
                 ModuleId = dto.ModuleId,
-
-                Status = dto.Status,
-
+ 
+                Status = string.IsNullOrWhiteSpace(dto.Status)
+                    ? "Available"
+                    : dto.Status.Trim(),
+ 
                 IsBlocked = false
             };
-
+ 
             await _roomRepository.AddAsync(
                 room,
                 dto.FacilityIds ?? new List<int>());

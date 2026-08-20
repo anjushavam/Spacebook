@@ -13,14 +13,14 @@ public class EmployeeBookingService : IEmployeeBookingService
     // OFFICE HOURS
     // =========================================================
     // Configured Office Hours:
-    // 10:00 AM to 07:00 PM
+    // 10:00 AM to 07:30 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
         new TimeOnly(10, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(19, 30);
+        new TimeOnly(19, 0);
 
     public EmployeeBookingService(
         IEmployeeBookingRepository bookingRepository,
@@ -28,6 +28,27 @@ public class EmployeeBookingService : IEmployeeBookingService
     {
         _bookingRepository = bookingRepository;
         _notificationRepository = notificationRepository;
+    }
+
+    // =========================================================
+    // DATABASE DATETIME
+    // =========================================================
+    // PostgreSQL columns are currently:
+    //
+    // timestamp without time zone
+    //
+    // Npgsql does not allow DateTime with Kind=UTC to be written
+    // to timestamp without time zone.
+    //
+    // Therefore, explicitly use DateTimeKind.Unspecified for
+    // timestamps that are stored in these database columns.
+    // =========================================================
+
+    private static DateTime GetDatabaseDateTime()
+    {
+        return DateTime.SpecifyKind(
+            DateTime.UtcNow,
+            DateTimeKind.Unspecified);
     }
 
     // =========================================================
@@ -131,7 +152,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:00 PM.");
+                "Bookings must end by 07:30 PM.");
         }
 
         // -----------------------------------------------------
@@ -236,8 +257,10 @@ public class EmployeeBookingService : IEmployeeBookingService
             EndTime =
                 request.EndTime,
 
+            // PostgreSQL:
+            // timestamp without time zone
             BookedOn =
-                DateTime.UtcNow,
+                GetDatabaseDateTime(),
 
             // New bookings must always require approval.
             Status = "Pending"
@@ -269,7 +292,10 @@ public class EmployeeBookingService : IEmployeeBookingService
 
                 IsRead = false,
 
-                CreatedAt = DateTime.UtcNow
+                // PostgreSQL:
+                // timestamp without time zone
+                CreatedAt =
+                    GetDatabaseDateTime()
             };
 
             await _notificationRepository.AddAsync(
@@ -361,7 +387,10 @@ public class EmployeeBookingService : IEmployeeBookingService
 
             IsRead = false,
 
-            CreatedAt = DateTime.UtcNow
+            // PostgreSQL:
+            // timestamp without time zone
+            CreatedAt =
+                GetDatabaseDateTime()
         };
 
         await _notificationRepository.AddAsync(
@@ -457,7 +486,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:00 PM.");
+                "Bookings must end by 07:30 PM.");
         }
 
         // -----------------------------------------------------
@@ -571,7 +600,6 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
         // UPDATE / RESCHEDULE BOOKING
         //
-        // IMPORTANT:
         // Repository must reset the booking status to Pending.
         // -----------------------------------------------------
 
@@ -588,9 +616,6 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // -----------------------------------------------------
         // CREATE ADMIN NOTIFICATION
-        //
-        // Admin notification repository will identify messages
-        // containing "rescheduled".
         // -----------------------------------------------------
 
         var notification = new Notification
@@ -604,7 +629,10 @@ public class EmployeeBookingService : IEmployeeBookingService
 
             IsRead = false,
 
-            CreatedAt = DateTime.UtcNow
+            // PostgreSQL:
+            // timestamp without time zone
+            CreatedAt =
+                GetDatabaseDateTime()
         };
 
         await _notificationRepository.AddAsync(
@@ -735,7 +763,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             if (endTime > OfficeEndTime)
             {
                 throw new Exception(
-                    "Rooms can only be searched until 07:00 PM.");
+                    "Rooms can only be searched until 07:30 PM.");
             }
 
             if (hasBookingDate &&
