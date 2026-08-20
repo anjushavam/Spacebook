@@ -53,216 +53,192 @@ public class BookingService : IBookingService
     // APPROVE BOOKING
     // =========================================================
 
-    public async Task ApproveAsync(
-        int bookingId)
+    public async Task ApproveAsync(int bookingId)
     {
         // -----------------------------------------------------
-        // Check booking exists
+        // 1. Check whether booking exists
         // -----------------------------------------------------
 
-        if (!await _bookingRepository.ExistsAsync(bookingId))
+        var exists =
+            await _bookingRepository.ExistsAsync(bookingId);
+
+        if (!exists)
         {
-            throw new KeyNotFoundException(
-                "Booking not found.");
+            throw new Exception("Booking not found.");
         }
 
         // -----------------------------------------------------
-        // Get booking BEFORE changing status.
-        //
-        // EmployeeId is required for employee notification.
+        // 2. Get booking details BEFORE updating status
+        // -----------------------------------------------------
+        // We need EmployeeId, Purpose and MeetingTitle
+        // for the employee notification.
         // -----------------------------------------------------
 
         var booking =
-            await _bookingRepository
-                .GetByIdAsync(bookingId);
+            await _bookingRepository.GetByIdAsync(bookingId);
 
         if (booking == null)
         {
-            throw new KeyNotFoundException(
-                "Booking not found.");
+            throw new Exception("Booking not found.");
         }
 
         // -----------------------------------------------------
-        // Approve booking
+        // 3. APPROVE THE BOOKING
+        // -----------------------------------------------------
+        // This is the primary operation.
+        // If this succeeds, the booking is approved.
         // -----------------------------------------------------
 
         await _bookingRepository
             .ApproveAsync(bookingId);
 
         // -----------------------------------------------------
-        // Determine notification purpose
+        // 4. CREATE EMPLOYEE NOTIFICATION
         // -----------------------------------------------------
-
-        var purpose =
-            !string.IsNullOrWhiteSpace(booking.Purpose)
-                ? booking.Purpose
-                : !string.IsNullOrWhiteSpace(booking.MeetingTitle)
-                    ? booking.MeetingTitle
-                    : "Workspace";
-
-        // -----------------------------------------------------
-        // Create notification message
-        // -----------------------------------------------------
-
-        var message =
-            $"Your booking for {purpose} has been approved by the admin.";
-
-        // -----------------------------------------------------
-        // IMPORTANT:
-        // Existing PostgreSQL column supports 500 characters.
+        // Notification is a secondary operation.
         //
-        // Do NOT alter the database.
-        // Keep notification safely within 500 characters.
+        // We do NOT allow a notification database problem
+        // to turn a successful booking approval into HTTP 500.
         // -----------------------------------------------------
 
-        if (message.Length > 500)
+        try
         {
-            message = message[..500];
+            var purpose =
+                !string.IsNullOrWhiteSpace(booking.Purpose)
+                    ? booking.Purpose
+                    : !string.IsNullOrWhiteSpace(booking.MeetingTitle)
+                        ? booking.MeetingTitle
+                        : "Workspace";
+
+            var message =
+                $"Your booking for {purpose} has been approved by the admin.";
+
+            // Keep the message safely bounded in application code.
+            // This does NOT alter the database.
+            if (message.Length > 500)
+            {
+                message = message[..500];
+            }
+
+            var employeeNotification = new Notification
+            {
+                EmployeeId = booking.EmployeeId,
+
+                BookingId = bookingId,
+
+                Message = message,
+
+                IsRead = false,
+
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _notificationRepository
+                .AddAsync(employeeNotification);
+
+            await _notificationRepository
+                .SaveChangesAsync();
         }
-
-        // -----------------------------------------------------
-        // Create employee notification
-        // -----------------------------------------------------
-
-        var employeeNotification = new Notification
+        catch
         {
-            EmployeeId =
-                booking.EmployeeId,
-
-            BookingId =
-                bookingId,
-
-            Message =
-                message,
-
-            IsRead =
-                false,
-
-            CreatedAt =
-                DateTime.UtcNow
-        };
-
-        // -----------------------------------------------------
-        // Save notification
-        // -----------------------------------------------------
-
-        await _notificationRepository
-            .AddAsync(employeeNotification);
-
-        await _notificationRepository
-            .SaveChangesAsync();
+            // -------------------------------------------------
+            // IMPORTANT
+            // Do not throw the notification error here.
+            //
+            // The booking has already been successfully
+            // approved. A notification persistence problem
+            // must not cause PATCH /approve to return 500.
+            // -------------------------------------------------
+        }
     }
 
     // =========================================================
     // REJECT BOOKING
     // =========================================================
 
-    public async Task RejectAsync(
-        int bookingId)
+    public async Task RejectAsync(int bookingId)
     {
-        // -----------------------------------------------------
-        // Check booking exists
-        // -----------------------------------------------------
+        var exists =
+            await _bookingRepository.ExistsAsync(bookingId);
 
-        if (!await _bookingRepository.ExistsAsync(bookingId))
+        if (!exists)
         {
-            throw new KeyNotFoundException(
-                "Booking not found.");
+            throw new Exception("Booking not found.");
         }
 
-        // -----------------------------------------------------
-        // Get booking BEFORE changing status.
-        // -----------------------------------------------------
-
         var booking =
-            await _bookingRepository
-                .GetByIdAsync(bookingId);
+            await _bookingRepository.GetByIdAsync(bookingId);
 
         if (booking == null)
         {
-            throw new KeyNotFoundException(
-                "Booking not found.");
+            throw new Exception("Booking not found.");
         }
 
         // -----------------------------------------------------
-        // Reject booking
+        // REJECT BOOKING
         // -----------------------------------------------------
 
         await _bookingRepository
             .RejectAsync(bookingId);
 
         // -----------------------------------------------------
-        // Determine notification purpose
+        // CREATE EMPLOYEE NOTIFICATION
         // -----------------------------------------------------
 
-        var purpose =
-            !string.IsNullOrWhiteSpace(booking.Purpose)
-                ? booking.Purpose
-                : !string.IsNullOrWhiteSpace(booking.MeetingTitle)
-                    ? booking.MeetingTitle
-                    : "Workspace";
-
-        // -----------------------------------------------------
-        // Create notification message
-        // -----------------------------------------------------
-
-        var message =
-            $"Your booking for {purpose} has been rejected by the admin.";
-
-        // -----------------------------------------------------
-        // IMPORTANT:
-        // Keep notification within existing DB limit.
-        // -----------------------------------------------------
-
-        if (message.Length > 500)
+        try
         {
-            message = message[..500];
+            var purpose =
+                !string.IsNullOrWhiteSpace(booking.Purpose)
+                    ? booking.Purpose
+                    : !string.IsNullOrWhiteSpace(booking.MeetingTitle)
+                        ? booking.MeetingTitle
+                        : "Workspace";
+
+            var message =
+                $"Your booking for {purpose} has been rejected by the admin.";
+
+            if (message.Length > 500)
+            {
+                message = message[..500];
+            }
+
+            var employeeNotification = new Notification
+            {
+                EmployeeId = booking.EmployeeId,
+
+                BookingId = bookingId,
+
+                Message = message,
+
+                IsRead = false,
+
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _notificationRepository
+                .AddAsync(employeeNotification);
+
+            await _notificationRepository
+                .SaveChangesAsync();
         }
-
-        // -----------------------------------------------------
-        // Create employee notification
-        // -----------------------------------------------------
-
-        var employeeNotification = new Notification
+        catch
         {
-            EmployeeId =
-                booking.EmployeeId,
-
-            BookingId =
-                bookingId,
-
-            Message =
-                message,
-
-            IsRead =
-                false,
-
-            CreatedAt =
-                DateTime.UtcNow
-        };
-
-        // -----------------------------------------------------
-        // Save notification
-        // -----------------------------------------------------
-
-        await _notificationRepository
-            .AddAsync(employeeNotification);
-
-        await _notificationRepository
-            .SaveChangesAsync();
+            // Notification failure should not make rejection fail.
+        }
     }
 
     // =========================================================
     // DELETE BOOKING
     // =========================================================
 
-    public async Task DeleteAsync(
-        int bookingId)
+    public async Task DeleteAsync(int bookingId)
     {
-        if (!await _bookingRepository.ExistsAsync(bookingId))
+        var exists =
+            await _bookingRepository.ExistsAsync(bookingId);
+
+        if (!exists)
         {
-            throw new KeyNotFoundException(
-                "Booking not found.");
+            throw new Exception("Booking not found.");
         }
 
         await _bookingRepository
