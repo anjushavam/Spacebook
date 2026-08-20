@@ -89,8 +89,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.IsActive)
                 .HasColumnName("isactive");
 
+            // IMPORTANT:
+            // Employee creation timestamp is stored as UTC.
             entity.Property(x => x.CreatedOn)
-                .HasColumnName("createdon");
+                .HasColumnName("createdon")
+                .HasColumnType("timestamp with time zone");
 
             entity.HasMany(x => x.Bookings)
                 .WithOne(x => x.Employee)
@@ -199,13 +202,15 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("recordingestedby");
 
             entity.Property(x => x.RecordIngestedOn)
-                .HasColumnName("recordingestedon");
+                .HasColumnName("recordingestedon")
+                .HasColumnType("timestamp with time zone");
 
             entity.Property(x => x.RecordModifiedBy)
                 .HasColumnName("recordmodifiedby");
 
             entity.Property(x => x.RecordModifiedOn)
-                .HasColumnName("recordmodifiedon");
+                .HasColumnName("recordmodifiedon")
+                .HasColumnType("timestamp with time zone");
 
             entity.HasOne(x => x.Office)
                 .WithMany(x => x.Modules)
@@ -408,8 +413,12 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.EndTime)
                 .HasColumnName("endtime");
 
+            // IMPORTANT:
+            // PostgreSQL timestamp with time zone.
+            // Application must always provide DateTime.UtcNow.
             entity.Property(x => x.BookedOn)
-                .HasColumnName("bookedon");
+                .HasColumnName("bookedon")
+                .HasColumnType("timestamp with time zone");
 
             entity.Property(x => x.Status)
                 .HasColumnName("status");
@@ -443,7 +452,8 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("bookingid");
 
             entity.Property(x => x.CheckedInAt)
-                .HasColumnName("checkedinat");
+                .HasColumnName("checkedinat")
+                .HasColumnType("timestamp with time zone");
 
             entity.Property(x => x.Status)
                 .HasColumnName("status")
@@ -487,29 +497,27 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("isread")
                 .HasDefaultValue(false);
 
+            // IMPORTANT:
+            // Store notification timestamp as UTC.
             entity.Property(x => x.CreatedAt)
                 .HasColumnName("createdat")
-                .HasColumnType("timestamp without time zone")
+                .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            // Notification -> Employee
             entity.HasOne(x => x.Employee)
                 .WithMany()
                 .HasForeignKey(x => x.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Notification -> Normal Booking
             entity.HasOne(x => x.Booking)
                 .WithMany()
                 .HasForeignKey(x => x.BookingId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Notification -> Hotseat Booking
             entity.HasOne(x => x.HotseatBooking)
                 .WithMany()
                 .HasForeignKey(x => x.HotseatBookingId)
                 .OnDelete(DeleteBehavior.Restrict);
-                
         });
 
         // =========================================================
@@ -536,6 +544,10 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(x => x.BookingStatus)
                 .HasColumnName("bookingstatus");
+
+            // =====================================================
+            // ALL HOTSEAT DATETIME VALUES ARE UTC
+            // =====================================================
 
             entity.Property(x => x.BookedOn)
                 .HasColumnName("bookedon")

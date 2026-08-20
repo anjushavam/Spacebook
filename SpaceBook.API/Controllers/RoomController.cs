@@ -46,6 +46,7 @@ public class RoomController : ControllerBase
 
     }
  
+ 
     // =========================================================
 
     // GET: api/admin/rooms
@@ -65,6 +66,7 @@ public class RoomController : ControllerBase
         return Ok(rooms);
 
     }
+ 
  
     // =========================================================
 
@@ -112,6 +114,7 @@ public class RoomController : ControllerBase
 
     }
  
+ 
     // =========================================================
 
     // POST: api/admin/rooms
@@ -126,11 +129,11 @@ public class RoomController : ControllerBase
 
     {
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
 
-        // Validate request body
+        // Request body validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto == null)
 
@@ -146,13 +149,14 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
         // TC080 FIX
 
-        // roomName is mandatory
+        // Room name is mandatory
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (string.IsNullOrWhiteSpace(dto.RoomName))
 
@@ -168,11 +172,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Room Type
+        // Room Type validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.RoomTypeId <= 0)
 
@@ -188,11 +193,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Module
+        // Module validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.ModuleId <= 0)
 
@@ -208,11 +214,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Capacity
+        // Capacity validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.Capacity <= 0)
 
@@ -228,11 +235,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Status
+        // Status validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (string.IsNullOrWhiteSpace(dto.Status))
 
@@ -248,11 +256,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Create room only after validation succeeds
+        // Create only after all validation succeeds
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         await _roomService.CreateAsync(dto);
  
@@ -265,6 +274,7 @@ public class RoomController : ControllerBase
         });
 
     }
+ 
  
     // =========================================================
 
@@ -296,6 +306,7 @@ public class RoomController : ControllerBase
 
         }
  
+ 
         if (dto == null)
 
         {
@@ -310,11 +321,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate mandatory room name
+        // Room name
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (string.IsNullOrWhiteSpace(dto.RoomName))
 
@@ -330,11 +342,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Room Type
+        // Room Type
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.RoomTypeId <= 0)
 
@@ -350,11 +363,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Module
+        // Module
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.ModuleId <= 0)
 
@@ -370,11 +384,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Capacity
+        // Capacity
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.Capacity <= 0)
 
@@ -390,11 +405,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate Status
+        // Status
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (string.IsNullOrWhiteSpace(dto.Status))
 
@@ -409,6 +425,7 @@ public class RoomController : ControllerBase
             });
 
         }
+ 
  
         try
 
@@ -442,6 +459,7 @@ public class RoomController : ControllerBase
 
     }
  
+ 
     // =========================================================
 
     // DELETE: api/admin/rooms/{id}
@@ -467,6 +485,7 @@ public class RoomController : ControllerBase
             });
 
         }
+ 
  
         try
 
@@ -500,6 +519,7 @@ public class RoomController : ControllerBase
 
     }
  
+ 
     // =========================================================
 
     // PATCH: api/admin/rooms/{id}/status
@@ -530,6 +550,7 @@ public class RoomController : ControllerBase
 
         }
  
+ 
         if (dto == null)
 
         {
@@ -544,11 +565,15 @@ public class RoomController : ControllerBase
 
         }
  
-        var result = await _roomService.UpdateRoomStatusAsync(
+ 
+        var result =
 
-            id,
+            await _roomService.UpdateRoomStatusAsync(
 
-            dto.IsBlocked);
+                id,
+
+                dto.IsBlocked);
+ 
  
         if (!result)
 
@@ -564,6 +589,7 @@ public class RoomController : ControllerBase
 
         }
  
+ 
         return Ok(new
 
         {
@@ -577,6 +603,7 @@ public class RoomController : ControllerBase
         });
 
     }
+ 
  
     // =========================================================
 
@@ -592,6 +619,12 @@ public class RoomController : ControllerBase
 
     {
 
+        // -----------------------------------------------------
+
+        // Request body validation
+
+        // -----------------------------------------------------
+ 
         if (dto == null)
 
         {
@@ -606,11 +639,14 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate count
+        // TC086 FIX
 
-        // ---------------------------------------------------------
+        // Count must be greater than zero
+
+        // -----------------------------------------------------
  
         if (dto.Count <= 0)
 
@@ -626,11 +662,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate room type
+        // Room Type validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.RoomTypeId <= 0)
 
@@ -646,11 +683,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate module
+        // Module validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.ModuleId <= 0)
 
@@ -666,11 +704,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate capacity
+        // Capacity validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (dto.Capacity <= 0)
 
@@ -686,11 +725,12 @@ public class RoomController : ControllerBase
 
         }
  
-        // ---------------------------------------------------------
+ 
+        // -----------------------------------------------------
 
-        // Validate status
+        // Status validation
 
-        // ---------------------------------------------------------
+        // -----------------------------------------------------
  
         if (string.IsNullOrWhiteSpace(dto.Status))
 
@@ -705,6 +745,13 @@ public class RoomController : ControllerBase
             });
 
         }
+ 
+ 
+        // -----------------------------------------------------
+
+        // Create rooms only after validation succeeds
+
+        // -----------------------------------------------------
  
         await _roomService.BulkCreateAsync(dto);
  
