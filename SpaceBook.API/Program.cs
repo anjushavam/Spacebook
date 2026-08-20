@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -7,8 +8,9 @@ using SpaceBook.Application.Services;
 using SpaceBook.Infrastructure.Authentication;
 using SpaceBook.Infrastructure.Data;
 using SpaceBook.Infrastructure.Repositories;
-using System.Text;
 using SpaceBook.API.Middleware;
+using System.Reflection;
+using System.Text;
 
 // =====================================================
 // Render / Linux configuration
@@ -198,11 +200,15 @@ builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
 // =====================================================
-// Employee Dashboard
+// Copilot
 // =====================================================
 
 builder.Services.AddScoped<ICopilotRepository, CopilotRepository>();
 builder.Services.AddScoped<ICopilotService, CopilotService>();
+
+// =====================================================
+// Employee Dashboard
+// =====================================================
 
 builder.Services.AddScoped<IEmployeeDashboardRepository, EmployeeDashboardRepository>();
 builder.Services.AddScoped<IEmployeeDashboardService, EmployeeDashboardService>();
@@ -225,7 +231,8 @@ builder.Services.AddSwaggerGen(c =>
     // JWT Bearer Authentication
     // =================================================
 
-    c.AddSecurityDefinition("Bearer",
+    c.AddSecurityDefinition(
+        "Bearer",
         new OpenApiSecurityScheme
         {
             Description =
@@ -237,13 +244,15 @@ builder.Services.AddSwaggerGen(c =>
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
             BearerFormat = "JWT"
-        });
+        }
+    );
 
     // =================================================
     // Copilot API Key
     // =================================================
 
-    c.AddSecurityDefinition("CopilotApiKey",
+    c.AddSecurityDefinition(
+        "CopilotApiKey",
         new OpenApiSecurityScheme
         {
             Description =
@@ -253,14 +262,25 @@ builder.Services.AddSwaggerGen(c =>
             In = ParameterLocation.Header,
 
             Type = SecuritySchemeType.ApiKey
-        });
+        }
+    );
 
-    // IMPORTANT:
-    // No global AddSecurityRequirement here.
+    // =================================================
+    // IMPORTANT
     //
-    // JWT and Copilot API key are defined separately.
-    // Copilot endpoints are protected by
-    // CopilotApiKeyMiddleware.
+    // Add security requirements PER ENDPOINT.
+    //
+    // [Authorize] endpoints
+    //     -> Bearer
+    //
+    // /api/copilot/* endpoints
+    //     -> CopilotApiKey
+    //
+    // [AllowAnonymous] endpoints
+    //     -> No lock
+    // =================================================
+
+    c.OperationFilter<SwaggerSecurityOperationFilter>();
 });
 
 // =====================================================
@@ -274,7 +294,14 @@ var app = builder.Build();
 // =====================================================
 
 app.UseSwagger();
-app.UseSwaggerUI();
+
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint(
+        "/swagger/v1/swagger.json",
+        "SpaceBook API v1"
+    );
+});
 
 // =====================================================
 // HTTPS
@@ -318,3 +345,147 @@ app.MapControllers();
 // =====================================================
 
 app.Run();
+
+
+// =====================================================
+// Swagger Security Operation Filter
+// =====================================================
+//
+// This tells Swagger which authentication method belongs
+// to each individual API operation.
+//
+// JWT:
+//     [Authorize] endpoints
+//
+// Copilot:
+//     /api/copilot/* endpoints
+//
+// Public:
+//     [AllowAnonymous] endpoints
+//
+// =====================================================
+
+public class SwaggerSecurityOperationFilter
+    : Swashbuckle.AspNetCore.SwaggerGen.IOperationFilter
+{
+    public void Apply(
+        Microsoft.OpenApi.Models.OpenApiOperation operation,
+        Swashbuckle.AspNetCore.SwaggerGen.OperationFilterContext context)
+    {
+        var apiDescription = context.ApiDescription;
+
+        var relativePath =
+            apiDescription.RelativePath?
+                .TrimStart('/')
+                .ToLowerInvariant();
+
+        // =================================================
+        // Check whether this is a Copilot endpoint
+        // =================================================
+
+        var isCopilotEndpoint =
+            relativePath != null &&
+            relativePath.StartsWith("api/copilot/");
+
+        // =================================================
+        // Check AllowAnonymous
+        // =================================================
+
+        var endpointMetadata =
+            apiDescription.ActionDescriptor.EndpointMetadata;
+
+        var allowAnonymous =
+            endpointMetadata
+                .OfType<AllowAnonymousAttribute>()
+                .Any();
+
+        // =================================================
+        // Copilot API
+        // =================================================
+
+        if (isCopilotEndpoint)
+        {
+            operation.Security =
+                new List<OpenApiSecurityRequirement>
+                {
+                    new OpenApiSecurityRequirement
+                    {
+                        {
+                            new OpenApiSecurityScheme
+                            {
+                                Reference =
+                                    new OpenApiReference
+                                    {
+                                        Type =
+                                            ReferenceType.SecurityScheme,
+
+                                        Id =
+                                            "CopilotApiKey"
+                                    }
+                            },
+                            Array.Empty<string>()
+                        }
+                    }
+                };
+
+            return;
+        }
+
+        // =================================================
+        // Public endpoint
+        // =================================================
+
+        if (allowAnonymous)
+        {
+            operation.Security = null;
+            return;
+        }
+
+        // =================================================
+        // Check [Authorize]
+        // =================================================
+
+        var hasAuthorize =
+            endpointMetadata
+                .OfType<IAuthorizeData>()
+                .Any();
+
+        // =================================================
+        // JWT protected endpoint
+        // =================================================
+
+        if (hasAuthorize)
+        {
+            operation.Security =
+                new List<OpenApiSecurityRequirement>
+                {
+                    new OpenApiSecurityRequirement
+                    {
+                        {
+                            new OpenApiSecurityScheme
+                            {
+                                Reference =
+                                    new OpenApiReference
+                                    {
+                                        Type =
+                                            ReferenceType.SecurityScheme,
+
+                                        Id =
+                                            "Bearer"
+                                    }
+                            },
+                            Array.Empty<string>()
+                        }
+                    }
+                };
+
+            return;
+        }
+
+        // =================================================
+        // No authentication
+        // =================================================
+
+        operation.Security = null;
+    }
+}
