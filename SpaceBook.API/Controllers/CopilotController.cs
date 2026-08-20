@@ -192,40 +192,6 @@ public class CopilotController : ControllerBase
     // }
     // =========================================================
 
-    [HttpPost("recommendations")]
-    public async Task<IActionResult> GetRecommendations(
-        [FromBody] CopilotRecommendationRequestDto request)
-    {
-        try
-        {
-            if (request == null)
-            {
-                return BadRequest(new
-                {
-                    message = "Request body is required."
-                });
-            }
-
-            var result =
-                await _copilotService
-                    .GetRecommendationsAsync(request);
-
-            return Ok(result);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new
-            {
-                message = "Something went wrong.",
-                error = ex.Message
-            });
-        }
-    }
+    
+    
 }
