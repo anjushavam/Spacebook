@@ -64,8 +64,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 "End time must be later than start time.");
         }
 
-        await _context.Bookings.AddAsync(
-            booking);
+        // -----------------------------------------------------
+        // NEW BOOKING SHOULD NOT HAVE CANCELLATION REASON
+        // -----------------------------------------------------
+
+        booking.CancellationReason = null;
+
+        await _context.Bookings.AddAsync(booking);
     }
 
     // =========================================================
@@ -116,6 +121,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // Cancelled and Rejected bookings do not block it.
         //
         // Overlap:
+        //
         // Existing Start < Requested End
         // Existing End   > Requested Start
         // -----------------------------------------------------
@@ -123,6 +129,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         return !await _context.Bookings
             .AnyAsync(b =>
                 b.RoomId == roomId &&
+
                 b.BookingDate == bookingDate &&
 
                 b.Status != "Cancelled" &&
@@ -290,13 +297,26 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE CANCELLATION REASON
+        // VALIDATE REASON
         // -----------------------------------------------------
 
         if (string.IsNullOrWhiteSpace(reason))
         {
             throw new Exception(
                 "Cancellation reason is required.");
+        }
+
+        var cancellationReason =
+            reason.Trim();
+
+        // -----------------------------------------------------
+        // MAXIMUM REASON LENGTH
+        // -----------------------------------------------------
+
+        if (cancellationReason.Length > 500)
+        {
+            throw new Exception(
+                "Cancellation reason cannot exceed 500 characters.");
         }
 
         // -----------------------------------------------------
@@ -332,18 +352,30 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
+        // PREVENT CANCELLING REJECTED BOOKING
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                booking.Status,
+                "Rejected",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "Rejected bookings cannot be cancelled.");
+        }
+
+        // -----------------------------------------------------
         // CANCEL BOOKING
         // -----------------------------------------------------
 
-        booking.Status =
-            "Cancelled";
+        booking.Status = "Cancelled";
 
         // -----------------------------------------------------
         // SAVE CANCELLATION REASON
         // -----------------------------------------------------
 
         booking.CancellationReason =
-            reason.Trim();
+            cancellationReason;
 
         // -----------------------------------------------------
         // SAVE CHANGES
@@ -432,7 +464,10 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
 
         if (room.IsBlocked ||
-            room.Status == "Blocked")
+            string.Equals(
+                room.Status,
+                "Blocked",
+                StringComparison.OrdinalIgnoreCase))
         {
             throw new Exception(
                 "Selected room is currently blocked.");
@@ -482,7 +517,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE SAME-DAY START TIME
+        // SAME-DAY START TIME VALIDATION
         // -----------------------------------------------------
 
         if (request.BookingDate == today)
@@ -614,9 +649,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             request.ParticipantCount;
 
         // -----------------------------------------------------
-        // CLEAR OLD CANCELLATION REASON
-        // -----------------------------------------------------
-        // If a booking is being rescheduled, it is not cancelled.
+        // CLEAR CANCELLATION DATA
         // -----------------------------------------------------
 
         booking.CancellationReason =
@@ -852,7 +885,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // =====================================================
 
         return await query
-
             .Select(r => new AvailableRoomDto
             {
                 RoomId =
@@ -884,7 +916,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
                         .ToList()
             })
-
             .ToListAsync();
     }
 
@@ -896,6 +927,12 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         HasRoomWithRequiredCapacityAsync(
             SearchRoomsRequestDto request)
     {
+        if (request == null)
+        {
+            throw new Exception(
+                "Search request is required.");
+        }
+
         if (!request.ParticipantCount.HasValue ||
             request.ParticipantCount.Value <= 0)
         {
@@ -982,7 +1019,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             module.Trim();
 
         return await _context.Rooms
-
             .AsNoTracking()
 
             .Include(r => r.RoomType)
@@ -1022,7 +1058,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
                 Facilities =
                     r.RoomFacilities
-
                         .Where(rf =>
                             rf.Facility != null)
 
@@ -1043,7 +1078,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         int roomId)
     {
         return await _context.Rooms
-
             .Where(r =>
                 r.RoomId == roomId &&
 
