@@ -422,6 +422,9 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(x => x.Status)
                 .HasColumnName("status");
+            entity.Property(x => x.CancellationReason)
+    .HasColumnName("cancellationreason")
+    .HasMaxLength(500);    
 
             entity.HasOne(x => x.Employee)
                 .WithMany(x => x.Bookings)

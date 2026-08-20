@@ -12,7 +12,7 @@ public class EmployeeBookingService : IEmployeeBookingService
     // =========================================================
     // OFFICE HOURS
     // =========================================================
-    // Configured Office Hours:
+    // Booking/Search Hours:
     // 10:00 AM to 07:30 PM
     // =========================================================
 
@@ -20,7 +20,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         new TimeOnly(10, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(19, 0);
+        new TimeOnly(19, 30);
 
     public EmployeeBookingService(
         IEmployeeBookingRepository bookingRepository,
@@ -33,21 +33,17 @@ public class EmployeeBookingService : IEmployeeBookingService
     // =========================================================
     // DATABASE DATETIME
     // =========================================================
-    // PostgreSQL columns are currently:
-    //
+    // PostgreSQL columns:
     // timestamp without time zone
     //
-    // Npgsql does not allow DateTime with Kind=UTC to be written
-    // to timestamp without time zone.
-    //
-    // Therefore, explicitly use DateTimeKind.Unspecified for
-    // timestamps that are stored in these database columns.
+    // Therefore DateTime must be written with
+    // DateTimeKind.Unspecified.
     // =========================================================
 
     private static DateTime GetDatabaseDateTime()
     {
         return DateTime.SpecifyKind(
-            DateTime.UtcNow,
+            DateTime.Now,
             DateTimeKind.Unspecified);
     }
 
@@ -237,13 +233,17 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         var booking = new Booking
         {
-            RoomId = request.RoomId,
+            RoomId =
+                request.RoomId,
 
-            EmployeeId = employeeId,
+            EmployeeId =
+                employeeId,
 
-            MeetingTitle = resolvedTitle,
+            MeetingTitle =
+                resolvedTitle,
 
-            Purpose = resolvedPurpose,
+            Purpose =
+                resolvedPurpose,
 
             ParticipantCount =
                 request.ParticipantCount,
@@ -257,13 +257,11 @@ public class EmployeeBookingService : IEmployeeBookingService
             EndTime =
                 request.EndTime,
 
-            // PostgreSQL:
-            // timestamp without time zone
             BookedOn =
                 GetDatabaseDateTime(),
 
-            // New bookings must always require approval.
-            Status = "Pending"
+            Status =
+                "Pending"
         };
 
         try
@@ -278,22 +276,23 @@ public class EmployeeBookingService : IEmployeeBookingService
             await _bookingRepository.SaveChangesAsync();
 
             // -------------------------------------------------
-            // CREATE BOOKING REQUEST NOTIFICATION
+            // CREATE NOTIFICATION
             // -------------------------------------------------
 
             var notification = new Notification
             {
-                EmployeeId = employeeId,
+                EmployeeId =
+                    employeeId,
 
-                BookingId = booking.BookingId,
+                BookingId =
+                    booking.BookingId,
 
                 Message =
                     $"New booking request submitted for {resolvedTitle}.",
 
-                IsRead = false,
+                IsRead =
+                    false,
 
-                // PostgreSQL:
-                // timestamp without time zone
                 CreatedAt =
                     GetDatabaseDateTime()
             };
@@ -341,16 +340,33 @@ public class EmployeeBookingService : IEmployeeBookingService
     // =========================================================
     // CANCEL BOOKING
     // =========================================================
+    // IMPORTANT:
+    // Interface expects:
+    //
+    // CancelBookingAsync(
+    //     int bookingId,
+    //     int employeeId,
+    //     string reason)
+    // =========================================================
 
     public async Task<bool> CancelBookingAsync(
         int bookingId,
-        int employeeId)
+        int employeeId,
+        string reason)
     {
+        // -----------------------------------------------------
+        // VALIDATE BOOKING ID
+        // -----------------------------------------------------
+
         if (bookingId <= 0)
         {
             throw new Exception(
                 "Invalid booking ID.");
         }
+
+        // -----------------------------------------------------
+        // VALIDATE EMPLOYEE
+        // -----------------------------------------------------
 
         if (employeeId <= 0)
         {
@@ -359,13 +375,26 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
+        // VALIDATE CANCELLATION REASON
+        // -----------------------------------------------------
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new Exception(
+                "Cancellation reason is required.");
+        }
+
+        reason = reason.Trim();
+
+        // -----------------------------------------------------
         // CANCEL BOOKING
         // -----------------------------------------------------
 
         var result =
             await _bookingRepository.CancelBookingAsync(
                 bookingId,
-                employeeId);
+                employeeId,
+                reason);
 
         if (!result)
         {
@@ -378,17 +407,18 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         var notification = new Notification
         {
-            EmployeeId = employeeId,
+            EmployeeId =
+                employeeId,
 
-            BookingId = bookingId,
+            BookingId =
+                bookingId,
 
             Message =
-                $"Booking #{bookingId} was cancelled by employee.",
+                $"Booking #{bookingId} was cancelled by employee. Reason: {reason}",
 
-            IsRead = false,
+            IsRead =
+                false,
 
-            // PostgreSQL:
-            // timestamp without time zone
             CreatedAt =
                 GetDatabaseDateTime()
         };
@@ -540,9 +570,6 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // -----------------------------------------------------
         // CHECK RESCHEDULE RESTRICTION
-        //
-        // Booking cannot be changed within 1 hour before
-        // its original start time.
         // -----------------------------------------------------
 
         var bookingStartDateTime =
@@ -579,8 +606,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // -----------------------------------------------------
         // CHECK ROOM AVAILABILITY
-        //
-        // Exclude current booking.
+        // EXCLUDE CURRENT BOOKING
         // -----------------------------------------------------
 
         var isAvailable =
@@ -598,9 +624,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // UPDATE / RESCHEDULE BOOKING
-        //
-        // Repository must reset the booking status to Pending.
+        // UPDATE BOOKING
         // -----------------------------------------------------
 
         var updated =
@@ -620,17 +644,18 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         var notification = new Notification
         {
-            EmployeeId = employeeId,
+            EmployeeId =
+                employeeId,
 
-            BookingId = bookingId,
+            BookingId =
+                bookingId,
 
             Message =
                 $"Booking #{bookingId} was rescheduled by employee and requires approval.",
 
-            IsRead = false,
+            IsRead =
+                false,
 
-            // PostgreSQL:
-            // timestamp without time zone
             CreatedAt =
                 GetDatabaseDateTime()
         };
@@ -815,6 +840,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         return await _bookingRepository
-            .GetRoomsByModuleAsync(module.Trim());
+            .GetRoomsByModuleAsync(
+                module.Trim());
     }
 }

@@ -398,60 +398,88 @@ public class EmployeeController : ControllerBase
     // =========================================================
 
     [HttpPut("bookings/{bookingId:int}/cancel")]
-    public async Task<IActionResult> CancelBooking(
-        int bookingId)
+public async Task<IActionResult> CancelBooking(
+    int bookingId,
+    [FromBody] CancelBookingRequestDto request)
+{
+    try
     {
-        try
+        if (!TryGetEmployeeId(out int employeeId))
         {
-            if (!TryGetEmployeeId(out int employeeId))
-            {
-                return Unauthorized(new
-                {
-                    Message =
-                        "Invalid token. Employee Id not found."
-                });
-            }
-
-            if (bookingId <= 0)
-            {
-                return BadRequest(new
-                {
-                    Message =
-                        "Invalid booking ID."
-                });
-            }
-
-            var result =
-                await _employeeBookingService
-                    .CancelBookingAsync(
-                        bookingId,
-                        employeeId);
-
-            if (!result)
-            {
-                return NotFound(new
-                {
-                    Message =
-                        "Booking not found."
-                });
-            }
-
-            return Ok(new
+            return Unauthorized(new
             {
                 Message =
-                    "Booking cancelled successfully."
+                    "Invalid token. Employee Id not found."
             });
         }
-        catch (Exception ex)
+
+        if (bookingId <= 0)
         {
             return BadRequest(new
             {
                 Message =
-                    ex.Message
+                    "Invalid booking ID."
             });
         }
-    }
 
+        if (request == null)
+        {
+            return BadRequest(new
+            {
+                Message =
+                    "Cancellation request is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return BadRequest(new
+            {
+                Message =
+                    "Cancellation reason is required."
+            });
+        }
+
+        var result =
+            await _employeeBookingService
+                .CancelBookingAsync(
+                    bookingId,
+                    employeeId,
+                    request.Reason);
+
+        if (!result)
+        {
+            return NotFound(new
+            {
+                Message =
+                    "Booking not found."
+            });
+        }
+
+        return Ok(new
+        {
+            Message =
+                "Booking cancelled successfully.",
+
+            BookingId =
+                bookingId,
+
+            Status =
+                "Cancelled",
+
+            CancellationReason =
+                request.Reason.Trim()
+        });
+    }
+    catch (Exception ex)
+    {
+        return BadRequest(new
+        {
+            Message =
+                ex.Message
+        });
+    }
+}
     // =========================================================
     // UPDATE / RESCHEDULE BOOKING
     // =========================================================

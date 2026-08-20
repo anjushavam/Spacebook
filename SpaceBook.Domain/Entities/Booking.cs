@@ -7,6 +7,7 @@ public class Booking
     public int BookingId { get; set; }
 
     public int RoomId { get; set; }
+    public string? CancellationReason { get; set; }
 
     public int EmployeeId { get; set; }
 

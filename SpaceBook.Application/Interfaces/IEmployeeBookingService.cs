@@ -27,8 +27,9 @@ public interface IEmployeeBookingService
     // =========================================================
 
     Task<bool> CancelBookingAsync(
-        int bookingId,
-        int employeeId);
+    int bookingId,
+    int employeeId,
+    string cancellationReason);
 
 
     // =========================================================
