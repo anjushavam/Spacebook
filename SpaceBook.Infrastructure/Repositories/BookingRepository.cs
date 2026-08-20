@@ -40,7 +40,6 @@ public class BookingRepository : IBookingRepository
         };
     }
 
-
     // =========================================================
     // GET ALL BOOKINGS
     // =========================================================
@@ -54,7 +53,6 @@ public class BookingRepository : IBookingRepository
             .Include(x => x.Employee)
             .AsQueryable();
 
-
         // -----------------------------------------------------
         // SEARCH
         // -----------------------------------------------------
@@ -65,13 +63,14 @@ public class BookingRepository : IBookingRepository
 
             query = query.Where(x =>
                 x.Purpose.Contains(search) ||
-                x.Room!.RoomName.Contains(search) ||
+                (x.Room != null &&
+                 x.Room.RoomName.Contains(search)) ||
                 (
+                    x.Room != null &&
                     x.Room.Module != null &&
                     x.Room.Module.ModuleName.Contains(search)
                 ));
         }
-
 
         // -----------------------------------------------------
         // STATUS FILTER
@@ -82,7 +81,6 @@ public class BookingRepository : IBookingRepository
             query = query.Where(x =>
                 x.Status == filter.Status);
         }
-
 
         // -----------------------------------------------------
         // RETURN BOOKINGS
@@ -103,9 +101,6 @@ public class BookingRepository : IBookingRepository
                         ? x.Room.RoomName
                         : string.Empty,
 
-        
-
-                // Module name
                 Module =
                     x.Room != null &&
                     x.Room.Module != null
@@ -132,7 +127,6 @@ public class BookingRepository : IBookingRepository
             .ToListAsync();
     }
 
-
     // =========================================================
     // GET BOOKING BY ID
     // =========================================================
@@ -141,6 +135,8 @@ public class BookingRepository : IBookingRepository
         int bookingId)
     {
         return await _context.Bookings
+            .AsNoTracking()
+
             .Include(x => x.Room)
                 .ThenInclude(r => r!.Module)
 
@@ -154,7 +150,6 @@ public class BookingRepository : IBookingRepository
                 BookingId =
                     x.BookingId,
 
-                // Required for employee notifications
                 EmployeeId =
                     x.EmployeeId,
 
@@ -172,9 +167,6 @@ public class BookingRepository : IBookingRepository
                         ? x.Room.RoomName
                         : string.Empty,
 
-
-
-                // Module name
                 Module =
                     x.Room != null &&
                     x.Room.Module != null
@@ -204,7 +196,6 @@ public class BookingRepository : IBookingRepository
             .FirstOrDefaultAsync();
     }
 
-
     // =========================================================
     // APPROVE BOOKING
     // =========================================================
@@ -214,17 +205,35 @@ public class BookingRepository : IBookingRepository
     {
         var booking =
             await _context.Bookings
-                .FindAsync(bookingId);
+                .FirstOrDefaultAsync(x =>
+                    x.BookingId == bookingId);
 
-        if (booking != null)
+        if (booking == null)
         {
-            booking.Status =
-                "Approved";
-
-            await _context.SaveChangesAsync();
+            throw new KeyNotFoundException(
+                "Booking not found.");
         }
-    }
 
+        // -----------------------------------------------------
+        // Already approved
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                booking.Status,
+                "Approved",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // -----------------------------------------------------
+        // Approve booking
+        // -----------------------------------------------------
+
+        booking.Status = "Approved";
+
+        await _context.SaveChangesAsync();
+    }
 
     // =========================================================
     // REJECT BOOKING
@@ -235,17 +244,35 @@ public class BookingRepository : IBookingRepository
     {
         var booking =
             await _context.Bookings
-                .FindAsync(bookingId);
+                .FirstOrDefaultAsync(x =>
+                    x.BookingId == bookingId);
 
-        if (booking != null)
+        if (booking == null)
         {
-            booking.Status =
-                "Rejected";
-
-            await _context.SaveChangesAsync();
+            throw new KeyNotFoundException(
+                "Booking not found.");
         }
-    }
 
+        // -----------------------------------------------------
+        // Already rejected
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                booking.Status,
+                "Rejected",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // -----------------------------------------------------
+        // Reject booking
+        // -----------------------------------------------------
+
+        booking.Status = "Rejected";
+
+        await _context.SaveChangesAsync();
+    }
 
     // =========================================================
     // DELETE BOOKING
@@ -256,16 +283,19 @@ public class BookingRepository : IBookingRepository
     {
         var booking =
             await _context.Bookings
-                .FindAsync(bookingId);
+                .FirstOrDefaultAsync(x =>
+                    x.BookingId == bookingId);
 
-        if (booking != null)
+        if (booking == null)
         {
-            _context.Bookings.Remove(booking);
-
-            await _context.SaveChangesAsync();
+            throw new KeyNotFoundException(
+                "Booking not found.");
         }
-    }
 
+        _context.Bookings.Remove(booking);
+
+        await _context.SaveChangesAsync();
+    }
 
     // =========================================================
     // CHECK BOOKING EXISTS
@@ -278,7 +308,6 @@ public class BookingRepository : IBookingRepository
             .AnyAsync(x =>
                 x.BookingId == bookingId);
     }
-
 
     // =========================================================
     // CHECK ROOM AVAILABILITY
@@ -299,7 +328,6 @@ public class BookingRepository : IBookingRepository
                 startTime < b.EndTime &&
                 endTime > b.StartTime);
     }
-
 
     // =========================================================
     // CREATE BOOKING

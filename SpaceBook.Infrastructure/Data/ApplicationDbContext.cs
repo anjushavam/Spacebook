@@ -690,49 +690,51 @@ public class ApplicationDbContext : DbContext
 
         // =========================================================
  
-        modelBuilder.Entity<Notification>(entity =>
+        // =========================================================
+// NOTIFICATION
+// =========================================================
 
-        {
+// =========================================================
+// NOTIFICATION
+// =========================================================
 
-            entity.ToTable("notifications");
- 
-            entity.HasKey(n => n.NotificationId);
- 
-            entity.Property(n => n.NotificationId)
+modelBuilder.Entity<Notification>(entity =>
+{
+    entity.ToTable("notifications");
 
-                .HasColumnName("notificationid");
- 
-            entity.Property(n => n.EmployeeId)
+    entity.HasKey(n => n.NotificationId);
 
-                .HasColumnName("employeeid");
- 
-            entity.Property(n => n.BookingId)
+    entity.Property(n => n.NotificationId)
+        .HasColumnName("notificationid")
+        .ValueGeneratedOnAdd();
 
-                .HasColumnName("bookingid");
- 
-            entity.Property(n => n.Message)
+    entity.Property(n => n.EmployeeId)
+        .HasColumnName("employeeid");
 
-                .HasColumnName("message")
+    entity.Property(n => n.BookingId)
+        .HasColumnName("bookingid");
 
-                .HasMaxLength(500);
- 
-            entity.Property(n => n.IsRead)
+    entity.Property(n => n.Message)
+        .HasColumnName("message")
+        .HasMaxLength(800)
+        .IsRequired();
 
-                .HasColumnName("isread");
- 
-            entity.Property(n => n.CreatedAt)
+    entity.Property(n => n.IsRead)
+        .HasColumnName("isread");
 
-                .HasColumnName("createdat");
- 
-            entity.HasOne(n => n.Booking)
+    entity.Property(n => n.CreatedAt)
+        .HasColumnName("createdat");
 
-                .WithMany()
+    entity.HasOne(n => n.Employee)
+        .WithMany()
+        .HasForeignKey(n => n.EmployeeId)
+        .OnDelete(DeleteBehavior.Restrict);
 
-                .HasForeignKey(n => n.BookingId)
-
-                .OnDelete(DeleteBehavior.Cascade);
-
-        });
+    entity.HasOne(n => n.Booking)
+        .WithMany()
+        .HasForeignKey(n => n.BookingId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
  
  
         // =========================================================
