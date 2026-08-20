@@ -265,44 +265,62 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // CANCEL BOOKING
     // =========================================================
 
-    public async Task<bool> CancelBookingAsync(
-        int bookingId,
-        int employeeId)
+    // =========================================================
+// CANCEL BOOKING
+// =========================================================
+
+public async Task<bool> CancelBookingAsync(
+    int bookingId,
+    int employeeId,
+    string reason)
+{
+    // -----------------------------------------------------
+    // VALIDATE CANCELLATION REASON
+    // -----------------------------------------------------
+
+    if (string.IsNullOrWhiteSpace(reason))
     {
-        var booking =
-            await _context.Bookings
-                .FirstOrDefaultAsync(b =>
-                    b.BookingId == bookingId &&
-                    b.EmployeeId == employeeId);
-
-        if (booking == null)
-        {
-            return false;
-        }
-
-        // -----------------------------------------------------
-        // ALREADY CANCELLED
-        // -----------------------------------------------------
-
-        if (string.Equals(
-                booking.Status,
-                "Cancelled",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new Exception(
-                "This booking is already cancelled.");
-        }
-
-        // -----------------------------------------------------
-        // CANCEL
-        // -----------------------------------------------------
-
-        booking.Status = "Cancelled";
-
-        await _context.SaveChangesAsync();
-
-        return true;
+        throw new Exception(
+            "Cancellation reason is required.");
     }
+
+    // -----------------------------------------------------
+    // FIND BOOKING
+    // -----------------------------------------------------
+
+    var booking = await _context.Bookings
+        .FirstOrDefaultAsync(b =>
+            b.BookingId == bookingId &&
+            b.EmployeeId == employeeId);
+
+    if (booking == null)
+    {
+        return false;
+    }
+
+    // -----------------------------------------------------
+    // ALREADY CANCELLED
+    // -----------------------------------------------------
+
+    if (string.Equals(
+            booking.Status,
+            "Cancelled",
+            StringComparison.OrdinalIgnoreCase))
+    {
+        throw new Exception(
+            "This booking is already cancelled.");
+    }
+
+    // -----------------------------------------------------
+    // CANCEL BOOKING
+    // -----------------------------------------------------
+
+    booking.Status = "Cancelled";
+
+    await _context.SaveChangesAsync();
+
+    return true;
+}
 
     // =========================================================
     // UPDATE / RESCHEDULE BOOKING
