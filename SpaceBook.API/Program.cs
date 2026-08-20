@@ -8,6 +8,7 @@ using SpaceBook.Infrastructure.Authentication;
 using SpaceBook.Infrastructure.Data;
 using SpaceBook.Infrastructure.Repositories;
 using System.Text;
+using SpaceBook.API.Middleware;
 
 // =====================================================
 // Render / Linux configuration
@@ -61,9 +62,9 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:5173",
-"https://spacebookss.netlify.app",
-"https://spacebook211-fcms-1bpe04jye-dvikash211-5241s-projects.vercel.app",
-"https://spacebook-frontend-v64o.onrender.com",
+                "https://spacebookss.netlify.app",
+                "https://spacebook211-fcms-1bpe04jye-dvikash211-5241s-projects.vercel.app",
+                "https://spacebook-frontend-v64o.onrender.com",
                 "https://spacebook211-98989-cs4tdldnv-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook211-98989-acn15v4y5-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook211-98989-g6itccmhu-dvikash211-5241s-projects.vercel.app"
@@ -89,6 +90,7 @@ builder.Services.AddScoped<IMissedCheckInRepository, MissedCheckInRepository>();
 builder.Services.AddScoped<IEmployeeCheckInRepository, EmployeeCheckInRepository>();
 builder.Services.AddScoped<IEmployeeCheckInService, EmployeeCheckInService>();
 builder.Services.AddScoped<IHotseatRepository, HotseatRepository>();
+
 // =====================================================
 // JWT Authentication
 // =====================================================
@@ -178,7 +180,6 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
-
 builder.Services.AddScoped<IFacilityRepository, FacilityRepository>();
 builder.Services.AddScoped<IFacilityService, FacilityService>();
 
@@ -199,6 +200,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 // =====================================================
 // Employee Dashboard
 // =====================================================
+
 builder.Services.AddScoped<ICopilotRepository, CopilotRepository>();
 builder.Services.AddScoped<ICopilotService, CopilotService>();
 
@@ -219,7 +221,10 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1"
     });
 
-    // JWT Bearer
+    // =================================================
+    // JWT Bearer Authentication
+    // =================================================
+
     c.AddSecurityDefinition("Bearer",
         new OpenApiSecurityScheme
         {
@@ -234,22 +239,28 @@ builder.Services.AddSwaggerGen(c =>
             BearerFormat = "JWT"
         });
 
-    c.AddSecurityRequirement(
-        new OpenApiSecurityRequirement
+    // =================================================
+    // Copilot API Key
+    // =================================================
+
+    c.AddSecurityDefinition("CopilotApiKey",
+        new OpenApiSecurityScheme
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference =
-                        new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
-                        }
-                },
-                Array.Empty<string>()
-            }
+            Description =
+                "Enter the Copilot API key.",
+
+            Name = "X-Copilot-Key",
+            In = ParameterLocation.Header,
+
+            Type = SecuritySchemeType.ApiKey
         });
+
+    // IMPORTANT:
+    // No global AddSecurityRequirement here.
+    //
+    // JWT and Copilot API key are defined separately.
+    // Copilot endpoints are protected by
+    // CopilotApiKeyMiddleware.
 });
 
 // =====================================================
@@ -282,6 +293,12 @@ if (app.Environment.IsDevelopment())
 // =====================================================
 
 app.UseCors("AllowReactApp");
+
+// =====================================================
+// Copilot API Key Authentication
+// =====================================================
+
+app.UseMiddleware<CopilotApiKeyMiddleware>();
 
 // =====================================================
 // Authentication & Authorization

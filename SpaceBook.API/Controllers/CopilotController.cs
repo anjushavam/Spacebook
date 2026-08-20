@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SpaceBook.Application.DTOs.Copilot;
 using SpaceBook.Application.Interfaces;
@@ -7,7 +6,6 @@ namespace SpaceBook.API.Controllers;
 
 [ApiController]
 [Route("api/copilot")]
-[Authorize(Roles = "Employee")]
 public class CopilotController : ControllerBase
 {
     private readonly ICopilotService _copilotService;

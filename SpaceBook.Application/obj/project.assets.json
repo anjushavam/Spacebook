@@ -389,19 +389,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\AnjushaVijayan\\.nuget\\packages\\": {}
+    "C:\\Users\\AmirthaGovindasamy\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\AnjushaVijayan\\Spacebook-backend\\Spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj",
+      "projectUniqueName": "C:\\Users\\AmirthaGovindasamy\\Spacebook\\Spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj",
       "projectName": "SpaceBook.Application",
-      "projectPath": "C:\\Users\\AnjushaVijayan\\Spacebook-backend\\Spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj",
-      "packagesPath": "C:\\Users\\AnjushaVijayan\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\AnjushaVijayan\\Spacebook-backend\\Spacebook\\SpaceBook.Application\\obj\\",
+      "projectPath": "C:\\Users\\AmirthaGovindasamy\\Spacebook\\Spacebook\\SpaceBook.Application\\SpaceBook.Application.csproj",
+      "packagesPath": "C:\\Users\\AmirthaGovindasamy\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\AmirthaGovindasamy\\Spacebook\\Spacebook\\SpaceBook.Application\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\AnjushaVijayan\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\AmirthaGovindasamy\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -413,8 +413,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\AnjushaVijayan\\Spacebook-backend\\Spacebook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {
-              "projectPath": "C:\\Users\\AnjushaVijayan\\Spacebook-backend\\Spacebook\\SpaceBook.Domain\\SpaceBook.Domain.csproj"
+            "C:\\Users\\AmirthaGovindasamy\\Spacebook\\Spacebook\\SpaceBook.Domain\\SpaceBook.Domain.csproj": {
+              "projectPath": "C:\\Users\\AmirthaGovindasamy\\Spacebook\\Spacebook\\SpaceBook.Domain\\SpaceBook.Domain.csproj"
             }
           }
         }
@@ -459,7 +459,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.424/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.423/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
