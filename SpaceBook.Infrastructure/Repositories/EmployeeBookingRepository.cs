@@ -123,7 +123,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         return !await _context.Bookings
             .AnyAsync(b =>
                 b.RoomId == roomId &&
-
                 b.BookingDate == bookingDate &&
 
                 b.Status != "Cancelled" &&
@@ -265,62 +264,95 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // CANCEL BOOKING
     // =========================================================
 
-    // =========================================================
-// CANCEL BOOKING
-// =========================================================
-
-public async Task<bool> CancelBookingAsync(
-    int bookingId,
-    int employeeId,
-    string reason)
-{
-    // -----------------------------------------------------
-    // VALIDATE CANCELLATION REASON
-    // -----------------------------------------------------
-
-    if (string.IsNullOrWhiteSpace(reason))
+    public async Task<bool> CancelBookingAsync(
+        int bookingId,
+        int employeeId,
+        string reason)
     {
-        throw new Exception(
-            "Cancellation reason is required.");
+        // -----------------------------------------------------
+        // VALIDATE BOOKING ID
+        // -----------------------------------------------------
+
+        if (bookingId <= 0)
+        {
+            throw new Exception(
+                "Invalid booking ID.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE EMPLOYEE ID
+        // -----------------------------------------------------
+
+        if (employeeId <= 0)
+        {
+            throw new Exception(
+                "Invalid employee.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE CANCELLATION REASON
+        // -----------------------------------------------------
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new Exception(
+                "Cancellation reason is required.");
+        }
+
+        // -----------------------------------------------------
+        // FIND BOOKING
+        // -----------------------------------------------------
+
+        var booking =
+            await _context.Bookings
+                .FirstOrDefaultAsync(b =>
+                    b.BookingId == bookingId &&
+                    b.EmployeeId == employeeId);
+
+        // -----------------------------------------------------
+        // BOOKING NOT FOUND
+        // -----------------------------------------------------
+
+        if (booking == null)
+        {
+            return false;
+        }
+
+        // -----------------------------------------------------
+        // ALREADY CANCELLED
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                booking.Status,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "This booking is already cancelled.");
+        }
+
+        // -----------------------------------------------------
+        // CANCEL BOOKING
+        // -----------------------------------------------------
+
+        booking.Status =
+            "Cancelled";
+
+        // -----------------------------------------------------
+        // SAVE CANCELLATION REASON
+        // -----------------------------------------------------
+
+        booking.CancellationReason =
+            reason.Trim();
+
+        // -----------------------------------------------------
+        // SAVE CHANGES
+        // -----------------------------------------------------
+
+        await _context.SaveChangesAsync();
+
+        return true;
     }
-
-    // -----------------------------------------------------
-    // FIND BOOKING
-    // -----------------------------------------------------
-
-    var booking = await _context.Bookings
-        .FirstOrDefaultAsync(b =>
-            b.BookingId == bookingId &&
-            b.EmployeeId == employeeId);
-
-    if (booking == null)
-    {
-        return false;
-    }
-
-    // -----------------------------------------------------
-    // ALREADY CANCELLED
-    // -----------------------------------------------------
-
-    if (string.Equals(
-            booking.Status,
-            "Cancelled",
-            StringComparison.OrdinalIgnoreCase))
-    {
-        throw new Exception(
-            "This booking is already cancelled.");
-    }
-
-    // -----------------------------------------------------
-    // CANCEL BOOKING
-    // -----------------------------------------------------
-
-    booking.Status = "Cancelled";
-
-    await _context.SaveChangesAsync();
-
-    return true;
-}
 
     // =========================================================
     // UPDATE / RESCHEDULE BOOKING
@@ -331,6 +363,16 @@ public async Task<bool> CancelBookingAsync(
         int employeeId,
         UpdateBookingRequestDto request)
     {
+        // -----------------------------------------------------
+        // VALIDATE REQUEST
+        // -----------------------------------------------------
+
+        if (request == null)
+        {
+            throw new Exception(
+                "Update booking request is required.");
+        }
+
         // -----------------------------------------------------
         // FIND EXISTING BOOKING
         // -----------------------------------------------------
@@ -572,6 +614,15 @@ public async Task<bool> CancelBookingAsync(
             request.ParticipantCount;
 
         // -----------------------------------------------------
+        // CLEAR OLD CANCELLATION REASON
+        // -----------------------------------------------------
+        // If a booking is being rescheduled, it is not cancelled.
+        // -----------------------------------------------------
+
+        booking.CancellationReason =
+            null;
+
+        // -----------------------------------------------------
         // RESCHEDULE REQUIRES ADMIN APPROVAL
         // -----------------------------------------------------
 
@@ -595,6 +646,16 @@ public async Task<bool> CancelBookingAsync(
         SearchAvailableRoomsAsync(
             SearchRoomsRequestDto request)
     {
+        // -----------------------------------------------------
+        // VALIDATE REQUEST
+        // -----------------------------------------------------
+
+        if (request == null)
+        {
+            throw new Exception(
+                "Search request is required.");
+        }
+
         // -----------------------------------------------------
         // VALIDATE TIME IF PROVIDED
         // -----------------------------------------------------
