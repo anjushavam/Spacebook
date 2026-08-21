@@ -133,7 +133,7 @@ public class EmployeeController : ControllerBase
     }
 
     // =========================================================
-    // EMPLOYEE AVAILABILITY CALENDAR
+    // EMPLOYEE AVAILABILITY
     // =========================================================
 
     [HttpGet("availability")]
@@ -143,10 +143,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // DATE REQUIRED
-            // -------------------------------------------------
-
             if (!date.HasValue)
             {
                 return BadRequest(new
@@ -154,10 +150,6 @@ public class EmployeeController : ControllerBase
                     Message = "Date is required."
                 });
             }
-
-            // -------------------------------------------------
-            // DATE VALIDATION
-            // -------------------------------------------------
 
             var dateValidation =
                 ValidateBookingDate(date.Value);
@@ -167,10 +159,6 @@ public class EmployeeController : ControllerBase
                 return dateValidation;
             }
 
-            // -------------------------------------------------
-            // ROOM TYPE VALIDATION
-            // -------------------------------------------------
-
             if (roomTypeId.HasValue &&
                 roomTypeId.Value <= 0)
             {
@@ -179,10 +167,6 @@ public class EmployeeController : ControllerBase
                     Message = "Invalid room type."
                 });
             }
-
-            // -------------------------------------------------
-            // GET AVAILABILITY
-            // -------------------------------------------------
 
             var result =
                 await _dashboardService
@@ -212,10 +196,6 @@ public class EmployeeController : ControllerBase
     {
         try
         {
-            // -------------------------------------------------
-            // EMPLOYEE ID
-            // -------------------------------------------------
-
             if (!TryGetEmployeeId(out int employeeId))
             {
                 return Unauthorized(new
@@ -225,10 +205,6 @@ public class EmployeeController : ControllerBase
                 });
             }
 
-            // -------------------------------------------------
-            // REQUEST VALIDATION
-            // -------------------------------------------------
-
             if (request == null)
             {
                 return BadRequest(new
@@ -237,10 +213,6 @@ public class EmployeeController : ControllerBase
                         "Booking request is required."
                 });
             }
-
-            // -------------------------------------------------
-            // CREATE BOOKING
-            // -------------------------------------------------
 
             var bookingId =
                 await _employeeBookingService
@@ -260,11 +232,34 @@ public class EmployeeController : ControllerBase
                     "Pending"
             });
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new
+            {
+                Message = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
         {
             return BadRequest(new
             {
+                Message = ex.Message
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
                 Message =
+                    "Unable to create booking.",
+                Error =
                     ex.Message
             });
         }
@@ -298,8 +293,7 @@ public class EmployeeController : ControllerBase
         {
             return StatusCode(500, new
             {
-                Message =
-                    ex.Message
+                Message = ex.Message
             });
         }
     }
@@ -332,8 +326,7 @@ public class EmployeeController : ControllerBase
         {
             return StatusCode(500, new
             {
-                Message =
-                    ex.Message
+                Message = ex.Message
             });
         }
     }
@@ -387,8 +380,7 @@ public class EmployeeController : ControllerBase
         {
             return StatusCode(500, new
             {
-                Message =
-                    ex.Message
+                Message = ex.Message
             });
         }
     }
@@ -398,88 +390,110 @@ public class EmployeeController : ControllerBase
     // =========================================================
 
     [HttpPut("bookings/{bookingId:int}/cancel")]
-public async Task<IActionResult> CancelBooking(
-    int bookingId,
-    [FromBody] CancelBookingRequestDto request)
-{
-    try
+    public async Task<IActionResult> CancelBooking(
+        int bookingId,
+        [FromBody] CancelBookingRequestDto request)
     {
-        if (!TryGetEmployeeId(out int employeeId))
+        try
         {
-            return Unauthorized(new
+            if (!TryGetEmployeeId(out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    Message =
+                        "Invalid token. Employee Id not found."
+                });
+            }
+
+            if (bookingId <= 0)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Invalid booking ID."
+                });
+            }
+
+            if (request == null)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Cancellation request is required."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Reason))
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Cancellation reason is required."
+                });
+            }
+
+            var reason =
+                request.Reason.Trim();
+
+            if (reason.Length > 500)
+            {
+                return BadRequest(new
+                {
+                    Message =
+                        "Cancellation reason cannot exceed 500 characters."
+                });
+            }
+
+            var result =
+                await _employeeBookingService
+                    .CancelBookingAsync(
+                        bookingId,
+                        employeeId,
+                        reason);
+
+            if (!result)
+            {
+                return NotFound(new
+                {
+                    Message =
+                        "Booking not found."
+                });
+            }
+
+            return Ok(new
             {
                 Message =
-                    "Invalid token. Employee Id not found."
-            });
-        }
+                    "Booking cancelled successfully.",
 
-        if (bookingId <= 0)
-        {
-            return BadRequest(new
-            {
-                Message =
-                    "Invalid booking ID."
-            });
-        }
-
-        if (request == null)
-        {
-            return BadRequest(new
-            {
-                Message =
-                    "Cancellation request is required."
-            });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Reason))
-        {
-            return BadRequest(new
-            {
-                Message =
-                    "Cancellation reason is required."
-            });
-        }
-
-        var result =
-            await _employeeBookingService
-                .CancelBookingAsync(
+                BookingId =
                     bookingId,
-                    employeeId,
-                    request.Reason);
 
-        if (!result)
-        {
-            return NotFound(new
-            {
-                Message =
-                    "Booking not found."
+                Status =
+                    "Cancelled",
+
+                CancellationReason =
+                    reason
             });
         }
-
-        return Ok(new
+        catch (InvalidOperationException ex)
         {
-            Message =
-                "Booking cancelled successfully.",
-
-            BookingId =
-                bookingId,
-
-            Status =
-                "Cancelled",
-
-            CancellationReason =
-                request.Reason.Trim()
-        });
-    }
-    catch (Exception ex)
-    {
-        return BadRequest(new
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+        catch (Exception ex)
         {
-            Message =
-                ex.Message
-        });
+            return StatusCode(500, new
+            {
+                Message =
+                    "Unable to cancel booking.",
+                Error =
+                    ex.Message
+            });
+        }
     }
-}
+
     // =========================================================
     // UPDATE / RESCHEDULE BOOKING
     // =========================================================
@@ -537,14 +551,43 @@ public async Task<IActionResult> CancelBooking(
             return Ok(new
             {
                 Message =
-                    "Booking updated successfully."
+                    "Booking updated successfully.",
+
+                BookingId =
+                    bookingId,
+
+                Status =
+                    "Pending"
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new
+            {
+                Message = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                Message = ex.Message
             });
         }
         catch (Exception ex)
         {
-            return BadRequest(new
+            return StatusCode(500, new
             {
                 Message =
+                    "Unable to update booking.",
+                Error =
                     ex.Message
             });
         }
@@ -576,11 +619,20 @@ public async Task<IActionResult> CancelBooking(
 
             return Ok(rooms);
         }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new
+            {
+                Message = ex.Message
+            });
+        }
         catch (Exception ex)
         {
-            return BadRequest(new
+            return StatusCode(500, new
             {
                 Message =
+                    "Unable to retrieve rooms.",
+                Error =
                     ex.Message
             });
         }
@@ -596,10 +648,6 @@ public async Task<IActionResult> CancelBooking(
     {
         try
         {
-            // -------------------------------------------------
-            // REQUEST REQUIRED
-            // -------------------------------------------------
-
             if (request == null)
             {
                 return BadRequest(new
@@ -610,7 +658,7 @@ public async Task<IActionResult> CancelBooking(
             }
 
             // -------------------------------------------------
-            // PARTICIPANT COUNT VALIDATION
+            // PARTICIPANT COUNT
             // -------------------------------------------------
 
             if (request.ParticipantCount.HasValue &&
@@ -624,7 +672,7 @@ public async Task<IActionResult> CancelBooking(
             }
 
             // -------------------------------------------------
-            // ROOM TYPE VALIDATION
+            // ROOM TYPE
             // -------------------------------------------------
 
             if (request.RoomTypeId.HasValue &&
@@ -638,7 +686,7 @@ public async Task<IActionResult> CancelBooking(
             }
 
             // -------------------------------------------------
-            // DATE VALIDATION
+            // DATE
             // -------------------------------------------------
 
             if (request.BookingDate.HasValue)
@@ -654,7 +702,7 @@ public async Task<IActionResult> CancelBooking(
             }
 
             // -------------------------------------------------
-            // START / END TIME MUST BE PROVIDED TOGETHER
+            // START / END TIME
             // -------------------------------------------------
 
             var hasStartTime =
@@ -673,7 +721,10 @@ public async Task<IActionResult> CancelBooking(
             }
 
             // -------------------------------------------------
-            // TIME RANGE VALIDATION
+            // TIME RANGE
+            //
+            // SpaceBook office hours:
+            // 09:00 AM - 07:30 PM
             // -------------------------------------------------
 
             if (hasStartTime && hasEndTime)
@@ -689,10 +740,10 @@ public async Task<IActionResult> CancelBooking(
                 }
 
                 var officeStart =
-                    new TimeOnly(10, 0);
+                    new TimeOnly(9, 0);
 
                 var officeEnd =
-                    new TimeOnly(19, 0);
+                    new TimeOnly(19, 30);
 
                 if (request.StartTime.Value <
                     officeStart ||
@@ -739,8 +790,8 @@ public async Task<IActionResult> CancelBooking(
                         request);
 
             var roomList =
-                rooms?.ToList() ??
-                new List<AvailableRoomDto>();
+                rooms?.ToList()
+                ?? new List<AvailableRoomDto>();
 
             // -------------------------------------------------
             // NO ROOMS
@@ -783,18 +834,27 @@ public async Task<IActionResult> CancelBooking(
                     roomList
             });
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
             return BadRequest(new
             {
+                Message = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
                 Message =
+                    "Unable to search available rooms.",
+                Error =
                     ex.Message
             });
         }
     }
 
     // =========================================================
-    // CHECK-IN BOOKING
+    // CHECK-IN
     // =========================================================
 
     [HttpPost("bookings/{bookingId:int}/checkin")]
@@ -829,11 +889,27 @@ public async Task<IActionResult> CancelBooking(
 
             return Ok(result);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new
+            {
+                Message = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
         {
             return BadRequest(new
             {
+                Message = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
                 Message =
+                    "Unable to check in.",
+                Error =
                     ex.Message
             });
         }

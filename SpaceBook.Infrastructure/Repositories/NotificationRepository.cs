@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using SpaceBook.Application.DTOs.Admin;
 using SpaceBook.Application.DTOs.Employee;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
@@ -7,7 +6,8 @@ using SpaceBook.Infrastructure.Data;
 
 namespace SpaceBook.Infrastructure.Repositories;
 
-public class NotificationRepository : INotificationRepository
+public class NotificationRepository
+    : INotificationRepository
 {
     private readonly ApplicationDbContext _context;
 
@@ -25,69 +25,32 @@ public class NotificationRepository : INotificationRepository
         GetEmployeeNotificationsAsync(
             int employeeId)
     {
-        var list = await _context.Notifications
-            .AsNoTracking()
+        var list =
+            await _context.Notifications
+                .AsNoTracking()
 
-            .Include(n => n.Employee)
+                .Include(n => n.Employee)
 
-            .Include(n => n.Booking)
-                .ThenInclude(b => b!.Room)
+                .Include(n => n.Booking)
+                    .ThenInclude(b => b!.Room)
 
-            .Include(n => n.Booking)
-                .ThenInclude(b => b!.Employee)
+                .Include(n => n.Booking)
+                    .ThenInclude(b => b!.Employee)
 
-            .Where(n =>
-                n.EmployeeId == employeeId)
+                .Where(n =>
+                    n.EmployeeId == employeeId)
 
-            .OrderByDescending(n => n.CreatedAt)
+                .OrderByDescending(
+                    n => n.CreatedAt)
 
-            .Take(50)
+                .Take(50)
 
-            .ToListAsync();
+                .ToListAsync();
 
         return list
-            .Select(n => new NotificationDto
-            {
-                NotificationId =
-                    n.NotificationId,
-
-                Title =
-                    DeriveTitle(n.Message),
-
-                Message =
-                    n.Message,
-
-                IsRead =
-                    n.IsRead,
-
-                CreatedOn =
-                    n.CreatedAt,
-
-                CreatedAt =
-                    n.CreatedAt,
-
-                TimeAgo =
-                    FormatTimeAgo(n.CreatedAt),
-
-                EmployeeName =
-                    n.Employee?.Name
-                    ?? n.Booking?.Employee?.Name,
-
-                RoomName =
-                    n.Booking?.Room?.RoomName,
-
-                BookingDate =
-                    n.Booking?.BookingDate,
-
-                StartTime =
-                    n.Booking?.StartTime,
-
-                EndTime =
-                    n.Booking?.EndTime
-            })
+            .Select(MapNotification)
             .ToList();
     }
-
 
     // =========================================================
     // ADMIN NOTIFICATIONS
@@ -96,199 +59,63 @@ public class NotificationRepository : INotificationRepository
     public async Task<List<NotificationDto>>
         GetAdminNotificationsAsync()
     {
-        var list = await _context.Notifications
-            .AsNoTracking()
+        var list =
+            await _context.Notifications
+                .AsNoTracking()
 
-            .Include(n => n.Employee)
+                .Include(n => n.Employee)
 
-            .Include(n => n.Booking)
-                .ThenInclude(b => b!.Room)
+                .Include(n => n.Booking)
+                    .ThenInclude(b => b!.Room)
 
-            .Include(n => n.Booking)
-                .ThenInclude(b => b!.Employee)
+                .Include(n => n.Booking)
+                    .ThenInclude(b => b!.Employee)
 
-            // -------------------------------------------------
-            // ONLY BOOKING ACTION NOTIFICATIONS
-            // -------------------------------------------------
+                .Where(n =>
+                    n.Message.Contains("request") ||
+                    n.Message.Contains("submitted") ||
+                    n.Message.Contains("pending") ||
+                    n.Message.Contains("rescheduled") ||
+                    n.Message.Contains("requires approval") ||
+                    n.Message.Contains("cancelled") ||
+                    n.Message.Contains("canceled"))
 
-            .Where(n =>
-                n.Message.ToLower().Contains("request") ||
-                n.Message.ToLower().Contains("submitted") ||
-                n.Message.ToLower().Contains("pending") ||
-                n.Message.ToLower().Contains("rescheduled") ||
-                n.Message.ToLower().Contains("requires approval") ||
-                n.Message.ToLower().Contains("cancelled"))
+                .OrderByDescending(
+                    n => n.CreatedAt)
 
-            .OrderByDescending(n => n.CreatedAt)
+                .Take(100)
 
-            .Take(100)
-
-            .ToListAsync();
+                .ToListAsync();
 
         // -----------------------------------------------------
         // REMOVE DUPLICATE ACTION NOTIFICATIONS
-        //
-        // Same BookingId + Same Notification Type
-        // Only the latest notification is returned.
         // -----------------------------------------------------
 
-        var distinctNotifications = list
-            .GroupBy(n => new
-            {
-                n.BookingId,
+        var distinctNotifications =
+            list
+                .GroupBy(n => new
+                {
+                    BookingId =
+                        n.BookingId ?? 0,
 
-                Action = GetNotificationAction(
-                    n.Message)
-            })
-            .Select(group =>
-                group
-                    .OrderByDescending(
-                        n => n.CreatedAt)
-                    .First())
-            .OrderByDescending(
-                n => n.CreatedAt)
-            .Take(50)
-            .ToList();
+                    Action =
+                        GetNotificationAction(
+                            n.Message)
+                })
+                .Select(group =>
+                    group
+                        .OrderByDescending(
+                            n => n.CreatedAt)
+                        .First())
+                .OrderByDescending(
+                    n => n.CreatedAt)
+                .Take(50)
+                .ToList();
 
         return distinctNotifications
-            .Select(n =>
-            {
-                var booking =
-                    n.Booking;
-
-                // -------------------------------------------------
-                // EMPLOYEE NAME
-                // -------------------------------------------------
-
-                var employeeName =
-                    n.Employee?.Name
-                    ?? booking?.Employee?.Name
-                    ?? "Employee";
-
-                // -------------------------------------------------
-                // ROOM NAME
-                // -------------------------------------------------
-
-                var roomName =
-                    booking?.Room?.RoomName
-                    ?? "Meeting Room";
-
-                // -------------------------------------------------
-                // NOTIFICATION TYPE
-                // -------------------------------------------------
-
-                var isRescheduled =
-                    n.Message.Contains(
-                        "rescheduled",
-                        StringComparison.OrdinalIgnoreCase);
-
-                var isCancelled =
-                    n.Message.Contains(
-                        "cancelled",
-                        StringComparison.OrdinalIgnoreCase)
-                    ||
-                    n.Message.Contains(
-                        "canceled",
-                        StringComparison.OrdinalIgnoreCase);
-
-                // -------------------------------------------------
-                // MESSAGE
-                // -------------------------------------------------
-
-                string message;
-
-                if (isRescheduled)
-                {
-                    message =
-                        $"{employeeName} rescheduled a booking for " +
-                        $"{roomName} and it requires approval.";
-                }
-                else if (isCancelled)
-                {
-                    message =
-                        $"{employeeName} cancelled a booking for " +
-                        $"{roomName}.";
-                }
-                else if (booking != null)
-                {
-                    message =
-                        $"{employeeName} submitted a booking request " +
-                        $"for {roomName}.";
-                }
-                else
-                {
-                    message =
-                        n.Message;
-                }
-
-                // -------------------------------------------------
-                // TITLE
-                // -------------------------------------------------
-
-                string title;
-
-                if (isRescheduled)
-                {
-                    title =
-                        "Booking Rescheduled";
-                }
-                else if (isCancelled)
-                {
-                    title =
-                        "Booking Cancelled";
-                }
-                else
-                {
-                    title =
-                        "Booking Request";
-                }
-
-                // -------------------------------------------------
-                // RETURN DTO
-                // -------------------------------------------------
-
-                return new NotificationDto
-                {
-                    NotificationId =
-                        n.NotificationId,
-
-                    Title =
-                        title,
-
-                    Message =
-                        message,
-
-                    IsRead =
-                        n.IsRead,
-
-                    CreatedOn =
-                        n.CreatedAt,
-
-                    CreatedAt =
-                        n.CreatedAt,
-
-                    TimeAgo =
-                        FormatTimeAgo(n.CreatedAt),
-
-                    EmployeeName =
-                        employeeName,
-
-                    RoomName =
-                        booking?.Room?.RoomName,
-
-                    BookingDate =
-                        booking?.BookingDate,
-
-                    StartTime =
-                        booking?.StartTime,
-
-                    EndTime =
-                        booking?.EndTime
-                };
-            })
+            .Select(MapAdminNotification)
             .ToList();
     }
-
 
     // =========================================================
     // GENERIC USER NOTIFICATIONS
@@ -302,7 +129,6 @@ public class NotificationRepository : INotificationRepository
             employeeId);
     }
 
-
     // =========================================================
     // GET ALL NOTIFICATIONS
     // =========================================================
@@ -310,96 +136,64 @@ public class NotificationRepository : INotificationRepository
     public async Task<List<NotificationDto>>
         GetAllAsync()
     {
-        var list = await _context.Notifications
-            .AsNoTracking()
+        var list =
+            await _context.Notifications
+                .AsNoTracking()
 
-            .Include(n => n.Employee)
+                .Include(n => n.Employee)
 
-            .Include(n => n.Booking)
-                .ThenInclude(b => b!.Room)
+                .Include(n => n.Booking)
+                    .ThenInclude(b => b!.Room)
 
-            .Include(n => n.Booking)
-                .ThenInclude(b => b!.Employee)
+                .Include(n => n.Booking)
+                    .ThenInclude(b => b!.Employee)
 
-            .OrderByDescending(
-                n => n.CreatedAt)
+                .OrderByDescending(
+                    n => n.CreatedAt)
 
-            .Take(50)
+                .Take(50)
 
-            .ToListAsync();
+                .ToListAsync();
 
         return list
-            .Select(n => new NotificationDto
-            {
-                NotificationId =
-                    n.NotificationId,
-
-                Title =
-                    DeriveTitle(n.Message),
-
-                Message =
-                    n.Message,
-
-                IsRead =
-                    n.IsRead,
-
-                CreatedOn =
-                    n.CreatedAt,
-
-                CreatedAt =
-                    n.CreatedAt,
-
-                TimeAgo =
-                    FormatTimeAgo(n.CreatedAt),
-
-                EmployeeName =
-                    n.Employee?.Name
-                    ?? n.Booking?.Employee?.Name,
-
-                RoomName =
-                    n.Booking?.Room?.RoomName,
-
-                BookingDate =
-                    n.Booking?.BookingDate,
-
-                StartTime =
-                    n.Booking?.StartTime,
-
-                EndTime =
-                    n.Booking?.EndTime
-            })
+            .Select(MapNotification)
             .ToList();
     }
 
-
     // =========================================================
-    // MARK NOTIFICATIONS AS READ
+    // MARK ALL AS READ
     // =========================================================
 
     public async Task MarkAllAsReadAsync(
         int employeeId)
     {
-        var unreadNotifications =
-            employeeId == 0
+        List<Notification> unreadNotifications;
 
+        if (employeeId == 0)
+        {
             // -------------------------------------------------
             // ADMIN
             // -------------------------------------------------
 
-            ? await _context.Notifications
-                .Where(n =>
-                    !n.IsRead)
-                .ToListAsync()
-
+            unreadNotifications =
+                await _context.Notifications
+                    .Where(n =>
+                        !n.IsRead)
+                    .ToListAsync();
+        }
+        else
+        {
             // -------------------------------------------------
             // EMPLOYEE
             // -------------------------------------------------
 
-            : await _context.Notifications
-                .Where(n =>
-                    n.EmployeeId == employeeId &&
-                    !n.IsRead)
-                .ToListAsync();
+            unreadNotifications =
+                await _context.Notifications
+                    .Where(n =>
+                        n.EmployeeId == employeeId &&
+                        !n.IsRead)
+                    .ToListAsync();
+        }
 
         foreach (var notification
                  in unreadNotifications)
@@ -410,21 +204,19 @@ public class NotificationRepository : INotificationRepository
         await _context.SaveChangesAsync();
     }
 
-
     // =========================================================
-    // ADD NOTIFICATION
+    // ADD
     // =========================================================
 
     public async Task AddAsync(
         Notification notification)
     {
-        await _context.Notifications.AddAsync(
-            notification);
+        await _context.Notifications
+            .AddAsync(notification);
     }
 
-
     // =========================================================
-    // SAVE CHANGES
+    // SAVE
     // =========================================================
 
     public async Task SaveChangesAsync()
@@ -432,15 +224,182 @@ public class NotificationRepository : INotificationRepository
         await _context.SaveChangesAsync();
     }
 
+    // =========================================================
+    // MAP EMPLOYEE / GENERAL NOTIFICATION
+    // =========================================================
+
+    private static NotificationDto
+        MapNotification(
+            Notification n)
+    {
+        return new NotificationDto
+        {
+            NotificationId =
+                n.NotificationId,
+
+            Title =
+                DeriveTitle(
+                    n.Message),
+
+            Message =
+                n.Message,
+
+            IsRead =
+                n.IsRead,
+
+            CreatedOn =
+                n.CreatedAt,
+
+            CreatedAt =
+                n.CreatedAt,
+
+            TimeAgo =
+                FormatTimeAgo(
+                    n.CreatedAt),
+
+            EmployeeName =
+                n.Employee?.Name
+                ?? n.Booking?.Employee?.Name,
+
+            RoomName =
+                n.Booking?.Room?.RoomName,
+
+            BookingDate =
+                n.Booking?.BookingDate,
+
+            StartTime =
+                n.Booking?.StartTime,
+
+            EndTime =
+                n.Booking?.EndTime
+        };
+    }
+
+    // =========================================================
+    // MAP ADMIN NOTIFICATION
+    // =========================================================
+
+    private static NotificationDto
+        MapAdminNotification(
+            Notification n)
+    {
+        var booking =
+            n.Booking;
+
+        var employeeName =
+            n.Employee?.Name
+            ?? booking?.Employee?.Name
+            ?? "Employee";
+
+        var roomName =
+            booking?.Room?.RoomName
+            ?? "Meeting Room";
+
+        var isRescheduled =
+            n.Message.Contains(
+                "rescheduled",
+                StringComparison.OrdinalIgnoreCase);
+
+        var isCancelled =
+            n.Message.Contains(
+                "cancelled",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            n.Message.Contains(
+                "canceled",
+                StringComparison.OrdinalIgnoreCase);
+
+        string title;
+
+        if (isRescheduled)
+        {
+            title =
+                "Booking Rescheduled";
+        }
+        else if (isCancelled)
+        {
+            title =
+                "Booking Cancelled";
+        }
+        else
+        {
+            title =
+                "Booking Request";
+        }
+
+        string message;
+
+        if (isRescheduled)
+        {
+            message =
+                $"{employeeName} rescheduled a booking for " +
+                $"{roomName} and it requires approval.";
+        }
+        else if (isCancelled)
+        {
+            message =
+                $"{employeeName} cancelled a booking for " +
+                $"{roomName}.";
+        }
+        else if (booking != null)
+        {
+            message =
+                $"{employeeName} submitted a booking request " +
+                $"for {roomName}.";
+        }
+        else
+        {
+            message =
+                n.Message;
+        }
+
+        return new NotificationDto
+        {
+            NotificationId =
+                n.NotificationId,
+
+            Title =
+                title,
+
+            Message =
+                message,
+
+            IsRead =
+                n.IsRead,
+
+            CreatedOn =
+                n.CreatedAt,
+
+            CreatedAt =
+                n.CreatedAt,
+
+            TimeAgo =
+                FormatTimeAgo(
+                    n.CreatedAt),
+
+            EmployeeName =
+                employeeName,
+
+            RoomName =
+                booking?.Room?.RoomName,
+
+            BookingDate =
+                booking?.BookingDate,
+
+            StartTime =
+                booking?.StartTime,
+
+            EndTime =
+                booking?.EndTime
+        };
+    }
 
     // =========================================================
     // GET NOTIFICATION ACTION
-    //
-    // Used to identify duplicate notifications.
     // =========================================================
 
     private static string GetNotificationAction(
-        string message)
+        string? message)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -501,13 +460,12 @@ public class NotificationRepository : INotificationRepository
         return "Notification";
     }
 
-
     // =========================================================
     // NOTIFICATION TITLE
     // =========================================================
 
     private static string DeriveTitle(
-        string message)
+        string? message)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -565,8 +523,7 @@ public class NotificationRepository : INotificationRepository
             return "Missed Check-in";
         }
 
-        if (
-            message.Contains(
+        if (message.Contains(
                 "request",
                 StringComparison.OrdinalIgnoreCase)
             ||
@@ -588,7 +545,6 @@ public class NotificationRepository : INotificationRepository
         return "Notification";
     }
 
-
     // =========================================================
     // TIME AGO
     // =========================================================
@@ -604,7 +560,8 @@ public class NotificationRepository : INotificationRepository
                 : created.ToUniversalTime();
 
         var span =
-            DateTime.UtcNow - utcCreated;
+            DateTime.UtcNow -
+            utcCreated;
 
         if (span.TotalSeconds < 60)
         {

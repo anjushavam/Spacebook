@@ -1,4 +1,3 @@
-using SpaceBook.Application.DTOs.Admin;
 using SpaceBook.Application.DTOs.Employee;
 using SpaceBook.Domain.Entities;
 
@@ -37,7 +36,7 @@ public interface INotificationRepository
 
 
     // =========================================================
-    // MARK AS READ
+    // MARK ALL NOTIFICATIONS AS READ
     // =========================================================
 
     Task MarkAllAsReadAsync(

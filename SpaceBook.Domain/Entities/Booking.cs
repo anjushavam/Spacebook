@@ -1,5 +1,3 @@
-using System;
-
 namespace SpaceBook.Domain.Entities;
 
 public class Booking
@@ -7,13 +5,14 @@ public class Booking
     public int BookingId { get; set; }
 
     public int RoomId { get; set; }
-    public string? CancellationReason { get; set; }
 
     public int EmployeeId { get; set; }
 
-    public string MeetingTitle { get; set; } = string.Empty;
+    public string MeetingTitle { get; set; } =
+        string.Empty;
 
-    public string Purpose { get; set; } = string.Empty;
+    public string Purpose { get; set; } =
+        string.Empty;
 
     public int ParticipantCount { get; set; }
 
@@ -25,7 +24,10 @@ public class Booking
 
     public DateTime BookedOn { get; set; }
 
-    public string Status { get; set; } = string.Empty;
+    public string Status { get; set; } =
+        string.Empty;
+
+    public string? CancellationReason { get; set; }
 
     public Room? Room { get; set; }
 

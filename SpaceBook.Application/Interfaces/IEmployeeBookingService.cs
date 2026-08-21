@@ -12,7 +12,6 @@ public interface IEmployeeBookingService
         int employeeId,
         CreateBookingRequestDto request);
 
-
     // =========================================================
     // GET BOOKING DETAILS
     // =========================================================
@@ -21,16 +20,14 @@ public interface IEmployeeBookingService
         int bookingId,
         int employeeId);
 
-
     // =========================================================
     // CANCEL BOOKING
     // =========================================================
 
     Task<bool> CancelBookingAsync(
-    int bookingId,
-    int employeeId,
-    string cancellationReason);
-
+        int bookingId,
+        int employeeId,
+        string cancellationReason);
 
     // =========================================================
     // UPDATE / RESCHEDULE BOOKING
@@ -41,21 +38,17 @@ public interface IEmployeeBookingService
         int employeeId,
         UpdateBookingRequestDto request);
 
-
     // =========================================================
     // SEARCH AVAILABLE ROOMS
     // =========================================================
 
-    Task<List<AvailableRoomDto>>
-        SearchAvailableRoomsAsync(
-            SearchRoomsRequestDto request);
-
+    Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
+        SearchRoomsRequestDto request);
 
     // =========================================================
     // GET ROOMS BY MODULE
     // =========================================================
 
-    Task<List<AvailableRoomDto>>
-        GetRoomsByModuleAsync(
-            string module);
+    Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
+        string module);
 }

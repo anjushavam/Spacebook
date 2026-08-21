@@ -1,7 +1,6 @@
-using SpaceBook.Application.DTOs.Admin; // Adjust if NotificationDto is under SpaceBook.Application.DTOs.Employee
+using SpaceBook.Application.DTOs.Employee;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
-using SpaceBook.Application.DTOs.Employee;
 
 namespace SpaceBook.Application.Services;
 
@@ -9,32 +8,86 @@ public class NotificationService : INotificationService
 {
     private readonly INotificationRepository _notificationRepository;
 
-    public NotificationService(INotificationRepository notificationRepository)
+    public NotificationService(
+        INotificationRepository notificationRepository)
     {
-        _notificationRepository = notificationRepository;
+        _notificationRepository =
+            notificationRepository;
     }
 
-    public async Task<List<NotificationDto>> GetNotificationsForUserAsync(int employeeId)
+    // =========================================================
+    // GET USER NOTIFICATIONS
+    // =========================================================
+
+    public async Task<List<NotificationDto>>
+        GetNotificationsForUserAsync(
+            int employeeId)
     {
-        return await _notificationRepository.GetNotificationsForUserAsync(employeeId);
+        return await _notificationRepository
+            .GetNotificationsForUserAsync(
+                employeeId);
     }
 
-    public async Task MarkAllAsReadAsync(int employeeId)
+    // =========================================================
+    // MARK ALL AS READ
+    // =========================================================
+
+    public async Task MarkAllAsReadAsync(
+        int employeeId)
     {
-        await _notificationRepository.MarkAllAsReadAsync(employeeId);
+        await _notificationRepository
+            .MarkAllAsReadAsync(
+                employeeId);
     }
 
-    public async Task CreateNotificationAsync(int employeeId, int? bookingId, string message)
+    // =========================================================
+    // CREATE NOTIFICATION
+    // =========================================================
+
+    public async Task CreateNotificationAsync(
+        int employeeId,
+        int? bookingId,
+        string message)
     {
-        var notification = new Notification
+        if (employeeId <= 0)
         {
-            EmployeeId = employeeId, // FIXED: Changed EmployeeId to UserId to match DB Entity
-            Message = message,
-            IsRead = false,
-            CreatedAt = DateTime.UtcNow
-        };
+            throw new ArgumentException(
+                "Invalid employee ID.");
+        }
 
-        await _notificationRepository.AddAsync(notification);
-        await _notificationRepository.SaveChangesAsync();
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            throw new ArgumentException(
+                "Notification message is required.");
+        }
+
+        var notification =
+            new Notification
+            {
+                EmployeeId =
+                    employeeId,
+
+                // IMPORTANT:
+                // Preserve booking relationship.
+                BookingId =
+                    bookingId,
+
+                Message =
+                    message.Length > 500
+                        ? message[..500]
+                        : message,
+
+                IsRead =
+                    false,
+
+                CreatedAt =
+                    DateTime.UtcNow
+            };
+
+        await _notificationRepository
+            .AddAsync(notification);
+
+        await _notificationRepository
+            .SaveChangesAsync();
     }
 }

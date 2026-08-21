@@ -48,43 +48,33 @@ public class BookingRepository : IBookingRepository
         BookingFilterDto filter)
     {
         var query = _context.Bookings
+            .AsNoTracking()
             .Include(x => x.Room)
                 .ThenInclude(r => r!.Module)
             .Include(x => x.Employee)
             .AsQueryable();
 
-        // -----------------------------------------------------
-        // SEARCH
-        // -----------------------------------------------------
-
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            var search = filter.Search.Trim();
+            var search =
+                filter.Search.Trim();
 
             query = query.Where(x =>
                 x.Purpose.Contains(search) ||
+
                 (x.Room != null &&
                  x.Room.RoomName.Contains(search)) ||
-                (
-                    x.Room != null &&
-                    x.Room.Module != null &&
-                    x.Room.Module.ModuleName.Contains(search)
-                ));
-        }
 
-        // -----------------------------------------------------
-        // STATUS FILTER
-        // -----------------------------------------------------
+                (x.Room != null &&
+                 x.Room.Module != null &&
+                 x.Room.Module.ModuleName.Contains(search)));
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.Status))
         {
             query = query.Where(x =>
                 x.Status == filter.Status);
         }
-
-        // -----------------------------------------------------
-        // RETURN BOOKINGS
-        // -----------------------------------------------------
 
         return await query
             .OrderByDescending(x => x.BookedOn)
@@ -214,10 +204,6 @@ public class BookingRepository : IBookingRepository
                 "Booking not found.");
         }
 
-        // -----------------------------------------------------
-        // Already approved
-        // -----------------------------------------------------
-
         if (string.Equals(
                 booking.Status,
                 "Approved",
@@ -226,11 +212,26 @@ public class BookingRepository : IBookingRepository
             return;
         }
 
-        // -----------------------------------------------------
-        // Approve booking
-        // -----------------------------------------------------
+        if (string.Equals(
+                booking.Status,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "A cancelled booking cannot be approved.");
+        }
 
-        booking.Status = "Approved";
+        if (string.Equals(
+                booking.Status,
+                "Rejected",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "A rejected booking cannot be approved.");
+        }
+
+        booking.Status =
+            "Approved";
 
         await _context.SaveChangesAsync();
     }
@@ -253,10 +254,6 @@ public class BookingRepository : IBookingRepository
                 "Booking not found.");
         }
 
-        // -----------------------------------------------------
-        // Already rejected
-        // -----------------------------------------------------
-
         if (string.Equals(
                 booking.Status,
                 "Rejected",
@@ -265,11 +262,17 @@ public class BookingRepository : IBookingRepository
             return;
         }
 
-        // -----------------------------------------------------
-        // Reject booking
-        // -----------------------------------------------------
+        if (string.Equals(
+                booking.Status,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "A cancelled booking cannot be rejected.");
+        }
 
-        booking.Status = "Rejected";
+        booking.Status =
+            "Rejected";
 
         await _context.SaveChangesAsync();
     }
@@ -292,7 +295,8 @@ public class BookingRepository : IBookingRepository
                 "Booking not found.");
         }
 
-        _context.Bookings.Remove(booking);
+        _context.Bookings.Remove(
+            booking);
 
         await _context.SaveChangesAsync();
     }
@@ -323,8 +327,10 @@ public class BookingRepository : IBookingRepository
             .AnyAsync(b =>
                 b.RoomId == roomId &&
                 b.BookingDate == bookingDate &&
+
                 b.Status != "Cancelled" &&
                 b.Status != "Rejected" &&
+
                 startTime < b.EndTime &&
                 endTime > b.StartTime);
     }
