@@ -31,11 +31,16 @@ public class NotificationRepository
 
                 .Include(n => n.Employee)
 
+                // Room booking
                 .Include(n => n.Booking)
                     .ThenInclude(b => b!.Room)
 
                 .Include(n => n.Booking)
                     .ThenInclude(b => b!.Employee)
+
+                // Hotseat booking
+                .Include(n => n.HotseatBooking)
+                    .ThenInclude(h => h!.Seat)
 
                 .Where(n =>
                     n.EmployeeId == employeeId)
@@ -71,14 +76,40 @@ public class NotificationRepository
                 .Include(n => n.Booking)
                     .ThenInclude(b => b!.Employee)
 
+                // Admin notifications should relate to
+                // normal room bookings.
                 .Where(n =>
-                    n.Message.Contains("request") ||
-                    n.Message.Contains("submitted") ||
-                    n.Message.Contains("pending") ||
-                    n.Message.Contains("rescheduled") ||
-                    n.Message.Contains("requires approval") ||
-                    n.Message.Contains("cancelled") ||
-                    n.Message.Contains("canceled"))
+                    n.BookingId != null &&
+
+                    (
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%request%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%submitted%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%pending%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%rescheduled%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%requires approval%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%cancelled%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%canceled%")
+                    ))
 
                 .OrderByDescending(
                     n => n.CreatedAt)
@@ -102,14 +133,18 @@ public class NotificationRepository
                         GetNotificationAction(
                             n.Message)
                 })
+
                 .Select(group =>
                     group
                         .OrderByDescending(
                             n => n.CreatedAt)
                         .First())
+
                 .OrderByDescending(
                     n => n.CreatedAt)
+
                 .Take(50)
+
                 .ToList();
 
         return distinctNotifications
@@ -148,6 +183,9 @@ public class NotificationRepository
                 .Include(n => n.Booking)
                     .ThenInclude(b => b!.Employee)
 
+                .Include(n => n.HotseatBooking)
+                    .ThenInclude(h => h!.Seat)
+
                 .OrderByDescending(
                     n => n.CreatedAt)
 
@@ -161,39 +199,66 @@ public class NotificationRepository
     }
 
     // =========================================================
+    // MARK SINGLE NOTIFICATION AS READ
+    // =========================================================
+
+    public async Task MarkAsReadAsync(
+        int notificationId,
+        int employeeId)
+    {
+        var notification =
+            await _context.Notifications
+                .FirstOrDefaultAsync(n =>
+                    n.NotificationId ==
+                        notificationId &&
+
+                    n.EmployeeId ==
+                        employeeId);
+
+        if (notification == null)
+        {
+            throw new KeyNotFoundException(
+                "Notification not found.");
+        }
+
+        if (notification.IsRead)
+        {
+            return;
+        }
+
+        notification.IsRead = true;
+
+        await _context.SaveChangesAsync();
+    }
+
+    // =========================================================
     // MARK ALL AS READ
     // =========================================================
 
     public async Task MarkAllAsReadAsync(
         int employeeId)
     {
-        List<Notification> unreadNotifications;
+        // -----------------------------------------------------
+        // IMPORTANT
+        //
+        // EmployeeId must represent an actual employee.
+        //
+        // Do not use employeeId = 0 here for admin because that
+        // would mark other users' notifications as read.
+        // -----------------------------------------------------
 
-        if (employeeId == 0)
+        if (employeeId <= 0)
         {
-            // -------------------------------------------------
-            // ADMIN
-            // -------------------------------------------------
-
-            unreadNotifications =
-                await _context.Notifications
-                    .Where(n =>
-                        !n.IsRead)
-                    .ToListAsync();
+            return;
         }
-        else
-        {
-            // -------------------------------------------------
-            // EMPLOYEE
-            // -------------------------------------------------
 
-            unreadNotifications =
-                await _context.Notifications
-                    .Where(n =>
-                        n.EmployeeId == employeeId &&
-                        !n.IsRead)
-                    .ToListAsync();
-        }
+        var unreadNotifications =
+            await _context.Notifications
+                .Where(n =>
+                    n.EmployeeId == employeeId &&
+                    !n.IsRead)
+
+                .ToListAsync();
 
         foreach (var notification
                  in unreadNotifications)
@@ -211,6 +276,43 @@ public class NotificationRepository
     public async Task AddAsync(
         Notification notification)
     {
+        // -----------------------------------------------------
+        // VALIDATE NOTIFICATION TARGET
+        // -----------------------------------------------------
+
+        if (!notification.BookingId.HasValue &&
+            !notification.HotseatBookingId.HasValue)
+        {
+            // General notification is still allowed.
+        }
+
+        // A single notification should not point to both types.
+        if (notification.BookingId.HasValue &&
+            notification.HotseatBookingId.HasValue)
+        {
+            throw new InvalidOperationException(
+                "A notification cannot reference both a room booking and a hotseat booking.");
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                notification.Message))
+        {
+            throw new InvalidOperationException(
+                "Notification message is required.");
+        }
+
+        if (notification.Message.Length > 500)
+        {
+            notification.Message =
+                notification.Message[..500];
+        }
+
+        if (notification.CreatedAt == default)
+        {
+            notification.CreatedAt =
+                DateTime.UtcNow;
+        }
+
         await _context.Notifications
             .AddAsync(notification);
     }
@@ -232,6 +334,12 @@ public class NotificationRepository
         MapNotification(
             Notification n)
     {
+        var isRoomBooking =
+            n.BookingId.HasValue;
+
+        var isHotseat =
+            n.HotseatBookingId.HasValue;
+
         return new NotificationDto
         {
             NotificationId =
@@ -239,7 +347,8 @@ public class NotificationRepository
 
             Title =
                 DeriveTitle(
-                    n.Message),
+                    n.Message,
+                    isHotseat),
 
             Message =
                 n.Message,
@@ -261,17 +370,30 @@ public class NotificationRepository
                 n.Employee?.Name
                 ?? n.Booking?.Employee?.Name,
 
+            // Only room bookings have RoomName
             RoomName =
-                n.Booking?.Room?.RoomName,
+                isRoomBooking
+                    ? n.Booking?.Room?.RoomName
+                    : null,
 
+            // Booking date can come from either type
             BookingDate =
-                n.Booking?.BookingDate,
+                isRoomBooking
+                    ? n.Booking?.BookingDate
+                    : isHotseat
+                        ? n.HotseatBooking?.BookingDate
+                        : null,
 
+            // Hotseat bookings do not have room times
             StartTime =
-                n.Booking?.StartTime,
+                isRoomBooking
+                    ? n.Booking?.StartTime
+                    : null,
 
             EndTime =
-                n.Booking?.EndTime
+                isRoomBooking
+                    ? n.Booking?.EndTime
+                    : null
         };
     }
 
@@ -439,6 +561,27 @@ public class NotificationRepository
         }
 
         if (message.Contains(
+                "confirmed",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Confirmed";
+        }
+
+        if (message.Contains(
+                "checked in",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "CheckedIn";
+        }
+
+        if (message.Contains(
+                "expired",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Expired";
+        }
+
+        if (message.Contains(
                 "request",
                 StringComparison.OrdinalIgnoreCase)
             ||
@@ -465,11 +608,37 @@ public class NotificationRepository
     // =========================================================
 
     private static string DeriveTitle(
-        string? message)
+        string? message,
+        bool isHotseat)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
-            return "Notification";
+            return isHotseat
+                ? "Hotseat Notification"
+                : "Notification";
+        }
+
+        if (message.Contains(
+                "checked in",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Hotseat Check-in";
+        }
+
+        if (message.Contains(
+                "expired",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Hotseat Booking Expired";
+        }
+
+        if (message.Contains(
+                "confirmed",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return isHotseat
+                ? "Hotseat Booking Confirmed"
+                : "Booking Confirmed";
         }
 
         if (message.Contains(
@@ -513,7 +682,9 @@ public class NotificationRepository
                 "cancel",
                 StringComparison.OrdinalIgnoreCase))
         {
-            return "Booking Cancelled";
+            return isHotseat
+                ? "Hotseat Booking Cancelled"
+                : "Booking Cancelled";
         }
 
         if (message.Contains(
@@ -542,7 +713,9 @@ public class NotificationRepository
             return "Booking Request";
         }
 
-        return "Notification";
+        return isHotseat
+            ? "Hotseat Notification"
+            : "Notification";
     }
 
     // =========================================================
@@ -553,34 +726,36 @@ public class NotificationRepository
         DateTime created)
     {
         var utcCreated =
-            created.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(
-                    created,
-                    DateTimeKind.Utc)
+            created.Kind == DateTimeKind.Utc
+                ? created
                 : created.ToUniversalTime();
 
         var span =
             DateTime.UtcNow -
             utcCreated;
 
-        if (span.TotalSeconds < 60)
+        if (span.TotalSeconds < 0 ||
+            span.TotalSeconds < 60)
         {
             return "Just now";
         }
 
         if (span.TotalMinutes < 60)
         {
-            return $"{(int)span.TotalMinutes}m ago";
+            return
+                $"{(int)span.TotalMinutes}m ago";
         }
 
         if (span.TotalHours < 24)
         {
-            return $"{(int)span.TotalHours}h ago";
+            return
+                $"{(int)span.TotalHours}h ago";
         }
 
         if (span.TotalDays < 7)
         {
-            return $"{(int)span.TotalDays}d ago";
+            return
+                $"{(int)span.TotalDays}d ago";
         }
 
         return utcCreated.ToString(

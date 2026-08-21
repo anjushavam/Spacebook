@@ -16,27 +16,50 @@ public class ApplicationDbContext : DbContext
     // =========================================================
 
     public DbSet<Role> Roles => Set<Role>();
+
     public DbSet<Employee> Employees => Set<Employee>();
+
     public DbSet<RoomType> RoomTypes => Set<RoomType>();
+
     public DbSet<Room> Rooms => Set<Room>();
+
     public DbSet<Module> Modules => Set<Module>();
+
     public DbSet<Facility> Facilities => Set<Facility>();
-    public DbSet<RoomFacility> RoomFacilities => Set<RoomFacility>();
+
+    public DbSet<RoomFacility> RoomFacilities =>
+        Set<RoomFacility>();
+
     public DbSet<Booking> Bookings => Set<Booking>();
+
     public DbSet<CheckIn> CheckIns => Set<CheckIn>();
-    public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<HotseatBooking> HotseatBookings => Set<HotseatBooking>();
+
+    public DbSet<Notification> Notifications =>
+        Set<Notification>();
+
+    public DbSet<HotseatBooking> HotseatBookings =>
+        Set<HotseatBooking>();
+
     public DbSet<Seat> Seats => Set<Seat>();
+
     public DbSet<Office> Offices => Set<Office>();
+
     public DbSet<Location> Locations => Set<Location>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+
+    // =========================================================
+    // MODEL CONFIGURATION
+    // =========================================================
+
+    protected override void OnModelCreating(
+        ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // =========================================================
+
+        // =====================================================
         // ROLE
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Role>(entity =>
         {
@@ -58,9 +81,10 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // =========================================================
+
+        // =====================================================
         // EMPLOYEE
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Employee>(entity =>
         {
@@ -91,7 +115,8 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(x => x.CreatedOn)
                 .HasColumnName("createdon")
-                .HasColumnType("timestamp with time zone");
+                .HasColumnType(
+                    "timestamp with time zone");
 
             entity.HasOne(x => x.Role)
                 .WithMany(x => x.Employees)
@@ -104,9 +129,10 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // =========================================================
+
+        // =====================================================
         // ROOM TYPE
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<RoomType>(entity =>
         {
@@ -128,9 +154,10 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // =========================================================
+
+        // =====================================================
         // LOCATION
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Location>(entity =>
         {
@@ -150,9 +177,10 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // =========================================================
+
+        // =====================================================
         // OFFICE
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Office>(entity =>
         {
@@ -180,9 +208,10 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // =========================================================
+
+        // =====================================================
         // MODULE
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Module>(entity =>
         {
@@ -206,14 +235,16 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(x => x.RecordIngestedOn)
                 .HasColumnName("recordingestedon")
-                .HasColumnType("timestamp with time zone");
+                .HasColumnType(
+                    "timestamp with time zone");
 
             entity.Property(x => x.RecordModifiedBy)
                 .HasColumnName("recordmodifiedby");
 
             entity.Property(x => x.RecordModifiedOn)
                 .HasColumnName("recordmodifiedon")
-                .HasColumnType("timestamp with time zone");
+                .HasColumnType(
+                    "timestamp with time zone");
 
             entity.HasOne(x => x.Office)
                 .WithMany(x => x.Modules)
@@ -231,9 +262,10 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // =========================================================
+
+        // =====================================================
         // SEAT
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Seat>(entity =>
         {
@@ -273,66 +305,68 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // =========================================================
-// ROOM
-// =========================================================
 
-modelBuilder.Entity<Room>(entity =>
-{
-    entity.ToTable("rooms");
+        // =====================================================
+        // ROOM
+        // =====================================================
 
-    entity.HasKey(x => x.RoomId);
+        modelBuilder.Entity<Room>(entity =>
+        {
+            entity.ToTable("rooms");
 
-    entity.Property(x => x.RoomId)
-        .HasColumnName("roomid");
+            entity.HasKey(x => x.RoomId);
 
-    entity.Property(x => x.RoomNumber)
-        .HasColumnName("roomnumber")
-        .HasMaxLength(50)
-        .IsRequired();
+            entity.Property(x => x.RoomId)
+                .HasColumnName("roomid");
 
-    entity.Property(x => x.RoomTypeId)
-        .HasColumnName("roomtypeid");
+            entity.Property(x => x.RoomNumber)
+                .HasColumnName("roomnumber")
+                .HasMaxLength(50)
+                .IsRequired();
 
-    entity.Property(x => x.ModuleId)
-        .HasColumnName("moduleid");
+            entity.Property(x => x.RoomTypeId)
+                .HasColumnName("roomtypeid");
 
-    entity.Property(x => x.RoomName)
-        .HasColumnName("roomname");
+            entity.Property(x => x.ModuleId)
+                .HasColumnName("moduleid");
 
-    entity.Property(x => x.Capacity)
-        .HasColumnName("capacity");
+            entity.Property(x => x.RoomName)
+                .HasColumnName("roomname");
 
-    entity.Property(x => x.Status)
-        .HasColumnName("status");
+            entity.Property(x => x.Capacity)
+                .HasColumnName("capacity");
 
-    entity.Property(x => x.IsBlocked)
-        .HasColumnName("isblocked");
+            entity.Property(x => x.Status)
+                .HasColumnName("status");
 
-    entity.HasOne(x => x.RoomType)
-        .WithMany(x => x.Rooms)
-        .HasForeignKey(x => x.RoomTypeId)
-        .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.IsBlocked)
+                .HasColumnName("isblocked");
 
-    entity.HasOne(x => x.Module)
-        .WithMany(x => x.Rooms)
-        .HasForeignKey(x => x.ModuleId)
-        .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.RoomType)
+                .WithMany(x => x.Rooms)
+                .HasForeignKey(x => x.RoomTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-    entity.HasMany(x => x.RoomFacilities)
-        .WithOne(x => x.Room)
-        .HasForeignKey(x => x.RoomId)
-        .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Module)
+                .WithMany(x => x.Rooms)
+                .HasForeignKey(x => x.ModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-    entity.HasMany(x => x.Bookings)
-        .WithOne(x => x.Room)
-        .HasForeignKey(x => x.RoomId)
-        .OnDelete(DeleteBehavior.Restrict);
-});
+            entity.HasMany(x => x.RoomFacilities)
+                .WithOne(x => x.Room)
+                .HasForeignKey(x => x.RoomId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        // =========================================================
+            entity.HasMany(x => x.Bookings)
+                .WithOne(x => x.Room)
+                .HasForeignKey(x => x.RoomId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+
+        // =====================================================
         // FACILITY
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Facility>(entity =>
         {
@@ -354,9 +388,10 @@ modelBuilder.Entity<Room>(entity =>
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // =========================================================
+
+        // =====================================================
         // ROOM FACILITY
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<RoomFacility>(entity =>
         {
@@ -384,9 +419,10 @@ modelBuilder.Entity<Room>(entity =>
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // =========================================================
+
+        // =====================================================
         // BOOKING
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Booking>(entity =>
         {
@@ -432,15 +468,10 @@ modelBuilder.Entity<Room>(entity =>
                 .HasColumnName("endtime")
                 .IsRequired();
 
-            // -----------------------------------------------------
-            // BOOKED ON
-            // PostgreSQL: timestamp with time zone
-            // Always assign DateTime.UtcNow in application code.
-            // -----------------------------------------------------
-
             entity.Property(x => x.BookedOn)
                 .HasColumnName("bookedon")
-                .HasColumnType("timestamp with time zone")
+                .HasColumnType(
+                    "timestamp with time zone")
                 .IsRequired();
 
             entity.Property(x => x.Status)
@@ -448,45 +479,43 @@ modelBuilder.Entity<Room>(entity =>
                 .HasMaxLength(50)
                 .IsRequired();
 
-            // -----------------------------------------------------
-            // CANCELLATION REASON
-            // -----------------------------------------------------
-
             entity.Property(x => x.CancellationReason)
                 .HasColumnName("cancellationreason")
                 .HasMaxLength(500);
 
-            // -----------------------------------------------------
-            // EMPLOYEE RELATIONSHIP
-            // -----------------------------------------------------
+            // -------------------------------------------------
+            // EMPLOYEE
+            // -------------------------------------------------
 
             entity.HasOne(x => x.Employee)
                 .WithMany(x => x.Bookings)
                 .HasForeignKey(x => x.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // -----------------------------------------------------
-            // ROOM RELATIONSHIP
-            // -----------------------------------------------------
+            // -------------------------------------------------
+            // ROOM
+            // -------------------------------------------------
 
             entity.HasOne(x => x.Room)
                 .WithMany(x => x.Bookings)
                 .HasForeignKey(x => x.RoomId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // -----------------------------------------------------
-            // CHECK-IN RELATIONSHIP
-            // -----------------------------------------------------
+            // -------------------------------------------------
+            // CHECK-IN
+            // -------------------------------------------------
 
             entity.HasOne(x => x.CheckIn)
                 .WithOne(x => x.Booking)
-                .HasForeignKey<CheckIn>(x => x.BookingId)
+                .HasForeignKey<CheckIn>(
+                    x => x.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // =========================================================
+
+        // =====================================================
         // CHECK-IN
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<CheckIn>(entity =>
         {
@@ -504,7 +533,8 @@ modelBuilder.Entity<Room>(entity =>
 
             entity.Property(x => x.CheckedInAt)
                 .HasColumnName("checkedinat")
-                .HasColumnType("timestamp with time zone")
+                .HasColumnType(
+                    "timestamp with time zone")
                 .IsRequired();
 
             entity.Property(x => x.Status)
@@ -514,183 +544,316 @@ modelBuilder.Entity<Room>(entity =>
 
             entity.HasOne(x => x.Booking)
                 .WithOne(x => x.CheckIn)
-                .HasForeignKey<CheckIn>(x => x.BookingId)
+                .HasForeignKey<CheckIn>(
+                    x => x.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Prevent multiple check-in records
-            // for the same booking.
             entity.HasIndex(x => x.BookingId)
                 .IsUnique();
         });
 
-        // =========================================================
+
+        // =====================================================
         // NOTIFICATION
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.ToTable("notifications");
 
-            entity.HasKey(x => x.NotificationId);
+            // -------------------------------------------------
+            // PRIMARY KEY
+            // -------------------------------------------------
 
-            entity.Property(x => x.NotificationId)
-                .HasColumnName("notificationid")
+            entity.HasKey(x =>
+                x.NotificationId);
+
+            entity.Property(x =>
+                    x.NotificationId)
+                .HasColumnName(
+                    "notificationid")
                 .ValueGeneratedOnAdd();
 
-            entity.Property(x => x.EmployeeId)
-                .HasColumnName("employeeid")
+
+            // -------------------------------------------------
+            // EMPLOYEE
+            // -------------------------------------------------
+
+            entity.Property(x =>
+                    x.EmployeeId)
+                .HasColumnName(
+                    "employeeid")
                 .IsRequired();
 
-            entity.Property(x => x.BookingId)
-                .HasColumnName("bookingid");
 
-            entity.Property(x => x.HotseatBookingId)
-                .HasColumnName("hotseatbookingid");
+            // -------------------------------------------------
+            // NORMAL ROOM BOOKING
+            // Nullable because hotseat notifications will not
+            // have a normal BookingId.
+            // -------------------------------------------------
 
-            entity.Property(x => x.Message)
-                .HasColumnName("message")
+            entity.Property(x =>
+                    x.BookingId)
+                .HasColumnName(
+                    "bookingid")
+                .IsRequired(false);
+
+
+            // -------------------------------------------------
+            // HOTSEAT BOOKING
+            // Nullable because room notifications will not
+            // have a HotseatBookingId.
+            // -------------------------------------------------
+
+            entity.Property(x =>
+                    x.HotseatBookingId)
+                .HasColumnName(
+                    "hotseatbookingid")
+                .IsRequired(false);
+
+
+            // -------------------------------------------------
+            // MESSAGE
+            // -------------------------------------------------
+
+            entity.Property(x =>
+                    x.Message)
+                .HasColumnName(
+                    "message")
                 .HasMaxLength(500)
                 .IsRequired();
 
-            entity.Property(x => x.IsRead)
-                .HasColumnName("isread")
+
+            // -------------------------------------------------
+            // READ STATUS
+            // -------------------------------------------------
+
+            entity.Property(x =>
+                    x.IsRead)
+                .HasColumnName(
+                    "isread")
                 .HasDefaultValue(false)
                 .IsRequired();
 
-            entity.Property(x => x.CreatedAt)
-                .HasColumnName("createdat")
-                .HasColumnType("timestamp with time zone")
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+
+            // -------------------------------------------------
+            // CREATED DATE
+            //
+            // PostgreSQL:
+            // timestamp with time zone
+            //
+            // Application code should use:
+            // DateTime.UtcNow
+            // -------------------------------------------------
+
+            entity.Property(x =>
+                    x.CreatedAt)
+                .HasColumnName(
+                    "createdat")
+                .HasColumnType(
+                    "timestamp with time zone")
+                .HasDefaultValueSql(
+                    "CURRENT_TIMESTAMP")
                 .IsRequired();
 
-            // -----------------------------------------------------
+
+            // -------------------------------------------------
             // EMPLOYEE RELATIONSHIP
-            // -----------------------------------------------------
+            // -------------------------------------------------
 
-            entity.HasOne(x => x.Employee)
+            entity.HasOne(x =>
+                    x.Employee)
                 .WithMany()
-                .HasForeignKey(x => x.EmployeeId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .HasForeignKey(x =>
+                    x.EmployeeId)
+                .OnDelete(
+                    DeleteBehavior.Restrict);
 
-            // -----------------------------------------------------
-            // BOOKING RELATIONSHIP
-            // -----------------------------------------------------
 
-            entity.HasOne(x => x.Booking)
+            // -------------------------------------------------
+            // NORMAL ROOM BOOKING RELATIONSHIP
+            //
+            // SetNull keeps notification history even when a
+            // normal booking is deleted.
+            // -------------------------------------------------
+
+            entity.HasOne(x =>
+                    x.Booking)
                 .WithMany()
-                .HasForeignKey(x => x.BookingId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .HasForeignKey(x =>
+                    x.BookingId)
+                .OnDelete(
+                    DeleteBehavior.SetNull);
 
-            // -----------------------------------------------------
+
+            // -------------------------------------------------
             // HOTSEAT BOOKING RELATIONSHIP
-            // -----------------------------------------------------
+            //
+            // SetNull keeps notification history even when a
+            // hotseat booking is deleted.
+            // -------------------------------------------------
 
-            entity.HasOne(x => x.HotseatBooking)
+            entity.HasOne(x =>
+                    x.HotseatBooking)
                 .WithMany()
-                .HasForeignKey(x => x.HotseatBookingId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .HasForeignKey(x =>
+                    x.HotseatBookingId)
+                .OnDelete(
+                    DeleteBehavior.SetNull);
 
-            // -----------------------------------------------------
+
+            // -------------------------------------------------
             // INDEXES
-            // -----------------------------------------------------
+            // -------------------------------------------------
 
-            entity.HasIndex(x => x.EmployeeId);
+            entity.HasIndex(x =>
+                x.EmployeeId);
 
-            entity.HasIndex(x => x.BookingId);
+            entity.HasIndex(x =>
+                x.BookingId);
 
-            entity.HasIndex(x => x.CreatedAt);
+            entity.HasIndex(x =>
+                x.HotseatBookingId);
 
-            entity.HasIndex(x => x.IsRead);
+            entity.HasIndex(x =>
+                x.CreatedAt);
+
+            entity.HasIndex(x =>
+                x.IsRead);
         });
 
-        // =========================================================
+
+        // =====================================================
         // HOTSEAT BOOKING
-        // =========================================================
+        // =====================================================
 
         modelBuilder.Entity<HotseatBooking>(entity =>
         {
-            entity.ToTable("hotseatbookings");
+            entity.ToTable(
+                "hotseatbookings");
 
-            entity.HasKey(x => x.HotseatBookingId);
+            entity.HasKey(x =>
+                x.HotseatBookingId);
 
-            entity.Property(x => x.HotseatBookingId)
-                .HasColumnName("hotseatbookingid")
+            entity.Property(x =>
+                    x.HotseatBookingId)
+                .HasColumnName(
+                    "hotseatbookingid")
                 .ValueGeneratedOnAdd();
 
-            entity.Property(x => x.SeatId)
-                .HasColumnName("seatid")
+            entity.Property(x =>
+                    x.SeatId)
+                .HasColumnName(
+                    "seatid")
                 .IsRequired();
 
-            entity.Property(x => x.EmployeeId)
-                .HasColumnName("employeeid")
+            entity.Property(x =>
+                    x.EmployeeId)
+                .HasColumnName(
+                    "employeeid")
                 .IsRequired();
 
-            entity.Property(x => x.BookingDate)
-                .HasColumnName("bookingdate")
+            entity.Property(x =>
+                    x.BookingDate)
+                .HasColumnName(
+                    "bookingdate")
                 .IsRequired();
 
-            entity.Property(x => x.BookingStatus)
-                .HasColumnName("bookingstatus")
+            entity.Property(x =>
+                    x.BookingStatus)
+                .HasColumnName(
+                    "bookingstatus")
                 .HasMaxLength(50)
                 .IsRequired();
 
-            // -----------------------------------------------------
+
+            // -------------------------------------------------
             // TIMESTAMPS
-            // PostgreSQL timestamp with time zone.
-            // Always use UTC values.
-            // -----------------------------------------------------
+            // PostgreSQL timestamp with time zone
+            // -------------------------------------------------
 
-            entity.Property(x => x.BookedOn)
-                .HasColumnName("bookedon")
-                .HasColumnType("timestamp with time zone");
+            entity.Property(x =>
+                    x.BookedOn)
+                .HasColumnName(
+                    "bookedon")
+                .HasColumnType(
+                    "timestamp with time zone");
 
-            entity.Property(x => x.CheckInDeadline)
-                .HasColumnName("checkindeadline")
-                .HasColumnType("timestamp with time zone");
+            entity.Property(x =>
+                    x.CheckInDeadline)
+                .HasColumnName(
+                    "checkindeadline")
+                .HasColumnType(
+                    "timestamp with time zone");
 
-            entity.Property(x => x.CheckInTime)
-                .HasColumnName("checkintime")
-                .HasColumnType("timestamp with time zone");
+            entity.Property(x =>
+                    x.CheckInTime)
+                .HasColumnName(
+                    "checkintime")
+                .HasColumnType(
+                    "timestamp with time zone");
 
-            entity.Property(x => x.ReleasedOn)
-                .HasColumnName("releasedon")
-                .HasColumnType("timestamp with time zone");
+            entity.Property(x =>
+                    x.ReleasedOn)
+                .HasColumnName(
+                    "releasedon")
+                .HasColumnType(
+                    "timestamp with time zone");
 
-            entity.Property(x => x.RecordIngestedBy)
-                .HasColumnName("recordingestedby");
+            entity.Property(x =>
+                    x.RecordIngestedBy)
+                .HasColumnName(
+                    "recordingestedby");
 
-            entity.Property(x => x.RecordIngestedOn)
-                .HasColumnName("recordingestedon")
-                .HasColumnType("timestamp with time zone");
+            entity.Property(x =>
+                    x.RecordIngestedOn)
+                .HasColumnName(
+                    "recordingestedon")
+                .HasColumnType(
+                    "timestamp with time zone");
 
-            entity.Property(x => x.RecordModifiedBy)
-                .HasColumnName("recordmodifiedby");
+            entity.Property(x =>
+                    x.RecordModifiedBy)
+                .HasColumnName(
+                    "recordmodifiedby");
 
-            entity.Property(x => x.RecordModifiedOn)
-                .HasColumnName("recordmodifiedon")
-                .HasColumnType("timestamp with time zone");
+            entity.Property(x =>
+                    x.RecordModifiedOn)
+                .HasColumnName(
+                    "recordmodifiedon")
+                .HasColumnType(
+                    "timestamp with time zone");
 
-            // -----------------------------------------------------
+
+            // -------------------------------------------------
             // SEAT RELATIONSHIP
-            // -----------------------------------------------------
+            // -------------------------------------------------
 
-            entity.HasOne(x => x.Seat)
-                .WithMany(x => x.HotseatBookings)
-                .HasForeignKey(x => x.SeatId)
-                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x =>
+                    x.Seat)
+                .WithMany(x =>
+                    x.HotseatBookings)
+                .HasForeignKey(x =>
+                    x.SeatId)
+                .OnDelete(
+                    DeleteBehavior.Restrict);
 
-            // -----------------------------------------------------
+
+            // -------------------------------------------------
             // EMPLOYEE RELATIONSHIP
-            // -----------------------------------------------------
+            // -------------------------------------------------
 
             entity.HasOne<Employee>()
                 .WithMany()
-                .HasForeignKey(x => x.EmployeeId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .HasForeignKey(x =>
+                    x.EmployeeId)
+                .OnDelete(
+                    DeleteBehavior.Restrict);
 
-            // -----------------------------------------------------
+
+            // -------------------------------------------------
             // INDEXES
-            // -----------------------------------------------------
+            // -------------------------------------------------
 
             entity.HasIndex(x => new
             {

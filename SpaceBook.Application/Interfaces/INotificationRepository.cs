@@ -36,6 +36,15 @@ public interface INotificationRepository
 
 
     // =========================================================
+    // MARK SINGLE NOTIFICATION AS READ
+    // =========================================================
+
+    Task MarkAsReadAsync(
+        int notificationId,
+        int employeeId);
+
+
+    // =========================================================
     // MARK ALL NOTIFICATIONS AS READ
     // =========================================================
 

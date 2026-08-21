@@ -12,14 +12,21 @@ public class Notification
     // =========================================================
     // EMPLOYEE
     // =========================================================
+    // Every notification belongs to an employee.
 
-    public int? EmployeeId { get; set; }
+    public int EmployeeId { get; set; }
 
     public Employee? Employee { get; set; }
 
 
     // =========================================================
     // NORMAL ROOM BOOKING
+    // =========================================================
+    // Used for room-booking notifications.
+    //
+    // Example:
+    // BookingId = 115
+    // HotseatBookingId = null
     // =========================================================
 
     public int? BookingId { get; set; }
@@ -30,6 +37,12 @@ public class Notification
     // =========================================================
     // HOTSEAT BOOKING
     // =========================================================
+    // Used for hotseat-booking notifications.
+    //
+    // Example:
+    // BookingId = null
+    // HotseatBookingId = 10
+    // =========================================================
 
     public int? HotseatBookingId { get; set; }
 
@@ -37,12 +50,27 @@ public class Notification
 
 
     // =========================================================
-    // NOTIFICATION DETAILS
+    // NOTIFICATION MESSAGE
     // =========================================================
 
     public string Message { get; set; } = string.Empty;
 
+
+    // =========================================================
+    // READ STATUS
+    // =========================================================
+
     public bool IsRead { get; set; } = false;
 
-    public DateTime CreatedAt { get; set; }
+
+    // =========================================================
+    // CREATED DATE
+    // =========================================================
+    // PostgreSQL column:
+    // timestamp with time zone
+    //
+    // Always use UTC.
+    // =========================================================
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

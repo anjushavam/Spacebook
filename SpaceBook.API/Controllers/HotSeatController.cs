@@ -1,1713 +1,1263 @@
 using Microsoft.AspNetCore.Mvc;
-
 using Microsoft.EntityFrameworkCore;
-
 using SpaceBook.Application.DTOs.Hotseat;
-
+using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
-
 using SpaceBook.Infrastructure.Data;
-
 using System.Security.Claims;
- 
-namespace SpaceBook.API.Controllers
 
+namespace SpaceBook.API.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+public class HotseatController : ControllerBase
 {
+    private readonly ApplicationDbContext _context;
+    private readonly INotificationRepository _notificationRepository;
 
-    [Route("api/[controller]")]
-
-    [ApiController]
-
-    public class HotseatController : ControllerBase
-
+    public HotseatController(
+        ApplicationDbContext context,
+        INotificationRepository notificationRepository)
     {
+        _context = context;
+        _notificationRepository = notificationRepository;
+    }
 
-        private readonly ApplicationDbContext _context;
- 
-        public HotseatController(ApplicationDbContext context)
+    // ============================================================
+    // CREATE NOTIFICATION HELPER
+    // ============================================================
 
+    private async Task CreateHotseatNotificationAsync(
+        int employeeId,
+        int hotseatBookingId,
+        string message)
+    {
+        try
         {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
 
-            _context = context;
+            if (message.Length > 500)
+            {
+                message = message[..500];
+            }
 
+            var notification = new Notification
+            {
+                EmployeeId = employeeId,
+
+                // Normal room booking does not apply
+                BookingId = null,
+
+                // Hotseat booking reference
+                HotseatBookingId = hotseatBookingId,
+
+                Message = message,
+
+                IsRead = false,
+
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _notificationRepository
+                .AddAsync(notification);
+
+            await _notificationRepository
+                .SaveChangesAsync();
         }
- 
-        // ============================================================
-
-        // GET: api/Hotseat
-
-        // Get active hotseat seats and their status for a date
-
-        // ============================================================
- 
-        [HttpGet]
-
-        public async Task<ActionResult<IEnumerable<HotseatSeatDto>>> GetOfficeMap(
-
-            [FromQuery] string? date,
-
-            [FromQuery] string? city,
-
-            [FromQuery] string? building,
-
-            [FromQuery] string? module)
-
+        catch (Exception ex)
         {
+            // Notification failure should not fail
+            // the hotseat operation itself.
+            Console.WriteLine(
+                $"[HotseatController] Notification creation failed " +
+                $"for hotseat booking {hotseatBookingId}.");
 
-            // --------------------------------------------------------
+            Console.WriteLine(
+                $"[HotseatController] Exception: {ex}");
+        }
+    }
 
-            // 1. Parse requested date
+    // ============================================================
+    // GET: api/Hotseat
+    // ============================================================
 
-            // --------------------------------------------------------
- 
-            DateOnly? bookingDate = null;
- 
-            if (!string.IsNullOrWhiteSpace(date))
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<HotseatSeatDto>>>
+        GetOfficeMap(
+            [FromQuery] string? date,
+            [FromQuery] string? city,
+            [FromQuery] string? building,
+            [FromQuery] string? module)
+    {
+        // --------------------------------------------------------
+        // 1. PARSE DATE
+        // --------------------------------------------------------
 
+        DateOnly? bookingDate = null;
+
+        if (!string.IsNullOrWhiteSpace(date))
+        {
+            if (DateOnly.TryParse(
+                    date,
+                    out var parsedDate))
             {
-
-                if (DateOnly.TryParse(date, out var parsedDate))
-
-                {
-
-                    bookingDate = parsedDate;
-
-                }
-
-                else
-
-                {
-
-                    return BadRequest(new
-
-                    {
-
-                        message = "Invalid date format."
-
-                    });
-
-                }
-
+                bookingDate = parsedDate;
             }
- 
-            // --------------------------------------------------------
+            else
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "Invalid date format."
+                });
+            }
+        }
 
-            // 2. Get active seats
+        // --------------------------------------------------------
+        // 2. GET ACTIVE SEATS
+        // --------------------------------------------------------
 
-            // --------------------------------------------------------
- 
-            var seatsQuery = _context.Seats
-
+        var seatsQuery =
+            _context.Seats
                 .AsNoTracking()
+                .Include(s => s.Module)
+                    .ThenInclude(m => m!.Office)
+                    .ThenInclude(o => o!.Location)
+                .Where(s => s.IsActive)
+                .AsQueryable();
 
-                .Where(s => s.IsActive);
- 
-            // --------------------------------------------------------
+        // --------------------------------------------------------
+        // 3. MODULE FILTER
+        // --------------------------------------------------------
 
-            // 3. Optional module filter
-
-            // --------------------------------------------------------
- 
-            if (!string.IsNullOrWhiteSpace(module))
-
-            {
-
-                seatsQuery = seatsQuery.Where(s =>
-
+        if (!string.IsNullOrWhiteSpace(module))
+        {
+            seatsQuery =
+                seatsQuery.Where(s =>
                     s.Module != null &&
-
                     s.Module.ModuleName == module);
+        }
 
-            }
- 
-            // --------------------------------------------------------
+        // --------------------------------------------------------
+        // 4. BUILDING FILTER
+        // --------------------------------------------------------
 
-            // 4. Get seats and booking status
+        if (!string.IsNullOrWhiteSpace(building))
+        {
+            seatsQuery =
+                seatsQuery.Where(s =>
+                    s.Module != null &&
+                    s.Module.Office != null &&
+                    s.Module.Office.OfficeName ==
+                        building);
+        }
 
-            // --------------------------------------------------------
- 
-            var seats = await seatsQuery
+        // --------------------------------------------------------
+        // 5. CITY FILTER
+        // --------------------------------------------------------
 
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            seatsQuery =
+                seatsQuery.Where(s =>
+                    s.Module != null &&
+                    s.Module.Office != null &&
+                    s.Module.Office.Location != null &&
+                    s.Module.Office.Location.LocationName ==
+                        city);
+        }
+
+        // --------------------------------------------------------
+        // 6. GET SEAT STATUS
+        // --------------------------------------------------------
+
+        var seats =
+            await seatsQuery
                 .OrderBy(s => s.ModuleId)
-
                 .ThenBy(s => s.Section)
-
                 .ThenBy(s => s.RowNumber)
-
                 .ThenBy(s => s.ColumnNumber)
-
                 .Select(s => new
-
                 {
-
                     s.SeatId,
 
                     s.SeatNumber,
 
-                    Section = s.Section ?? "",
+                    Section =
+                        s.Section ?? "",
 
-                    Row = s.RowNumber,
- 
-                    IsBooked = bookingDate.HasValue &&
+                    Row =
+                        s.RowNumber,
 
+                    IsBooked =
+                        bookingDate.HasValue &&
                         s.HotseatBookings.Any(b =>
-
-                            b.BookingDate == bookingDate.Value &&
-
+                            b.BookingDate ==
+                                bookingDate.Value &&
                             (
+                                b.BookingStatus ==
+                                    "Confirmed" ||
 
-                                b.BookingStatus == "Confirmed" ||
-
-                                b.BookingStatus == "CheckedIn"
-
+                                b.BookingStatus ==
+                                    "CheckedIn"
                             ))
-
                 })
-
                 .ToListAsync();
- 
-            // --------------------------------------------------------
 
-            // 5. Convert to DTO
+        // --------------------------------------------------------
+        // 7. MAP
+        // --------------------------------------------------------
 
-            // --------------------------------------------------------
- 
-            var result = seats.Select(s => new HotseatSeatDto
-
-            {
-
-                SeatNumber = s.SeatNumber,
-
-                Section = s.Section,
-
-                Row = s.Row,
-
-                Status = s.IsBooked ? "Booked" : "Vacant"
-
-            }).ToList();
- 
-            return Ok(result);
-
-        }
- 
- 
-        // ============================================================
-
-        // GET: api/Hotseat/my-bookings
-
-        // Get logged-in employee's hotseat bookings
-
-        // ============================================================
- 
-        [HttpGet("my-bookings")]
-
-        public async Task<IActionResult> GetMyBookings()
-
-        {
-
-            // --------------------------------------------------------
-
-            // 1. Get employee ID from JWT
-
-            // --------------------------------------------------------
- 
-            var employeeIdClaim =
-
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
- 
-            if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
-
-                !int.TryParse(employeeIdClaim, out int employeeId))
-
-            {
-
-                return Unauthorized(new
-
+        var result =
+            seats.Select(s =>
+                new HotseatSeatDto
                 {
+                    SeatNumber =
+                        s.SeatNumber,
 
-                    message = "Employee information could not be determined."
+                    Section =
+                        s.Section,
 
-                });
+                    Row =
+                        s.Row,
 
-            }
- 
-            // --------------------------------------------------------
+                    Status =
+                        s.IsBooked
+                            ? "Booked"
+                            : "Vacant"
+                })
+                .ToList();
 
-            // 2. Get employee bookings
+        return Ok(result);
+    }
 
-            // --------------------------------------------------------
- 
-            var bookings = await _context.HotseatBookings
+    // ============================================================
+    // GET: api/Hotseat/my-bookings
+    // ============================================================
 
+    [HttpGet("my-bookings")]
+    public async Task<IActionResult> GetMyBookings()
+    {
+        var employeeIdClaim =
+            User.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
+            !int.TryParse(
+                employeeIdClaim,
+                out int employeeId))
+        {
+            return Unauthorized(new
+            {
+                message =
+                    "Employee information could not be determined."
+            });
+        }
+
+        var bookings =
+            await _context.HotseatBookings
                 .AsNoTracking()
 
-                .Where(b => b.EmployeeId == employeeId)
+                .Where(b =>
+                    b.EmployeeId == employeeId)
 
                 .Include(b => b.Seat)
-
                     .ThenInclude(s => s.Module)
 
-                .OrderByDescending(b => b.BookingDate)
+                .OrderByDescending(
+                    b => b.BookingDate)
 
-                .ThenByDescending(b => b.BookedOn)
+                .ThenByDescending(
+                    b => b.BookedOn)
 
                 .Select(b => new
-
                 {
+                    bookingId =
+                        b.HotseatBookingId,
 
-                    bookingId = b.HotseatBookingId,
- 
-                    seatId = b.SeatId,
- 
-                    seatNumber = b.Seat != null
+                    seatId =
+                        b.SeatId,
 
-                        ? b.Seat.SeatNumber
+                    seatNumber =
+                        b.Seat != null
+                            ? b.Seat.SeatNumber
+                            : "",
 
-                        : "",
- 
-                    module = b.Seat != null &&
+                    module =
+                        b.Seat != null &&
+                        b.Seat.Module != null
+                            ? b.Seat.Module.ModuleName
+                            : "",
 
-                             b.Seat.Module != null
+                    type =
+                        "Hot Seat",
 
-                        ? b.Seat.Module.ModuleName
+                    date =
+                        b.BookingDate,
 
-                        : "",
- 
-                    type = "Hot Seat",
- 
-                    date = b.BookingDate,
- 
-                    expectedCheckIn = b.CheckInDeadline,
- 
-                    status = b.BookingStatus,
- 
-                    bookedOn = b.BookedOn,
- 
-                    checkInTime = b.CheckInTime,
- 
-                    releasedOn = b.ReleasedOn
+                    expectedCheckIn =
+                        b.CheckInDeadline,
 
+                    status =
+                        b.BookingStatus,
+
+                    bookedOn =
+                        b.BookedOn,
+
+                    checkInTime =
+                        b.CheckInTime,
+
+                    releasedOn =
+                        b.ReleasedOn
                 })
 
                 .ToListAsync();
- 
-            return Ok(bookings);
 
-        }
- 
- 
-        // ============================================================
+        return Ok(bookings);
+    }
 
-        // POST: api/Hotseat
+    // ============================================================
+    // POST: api/Hotseat
+    // CREATE HOTSEAT BOOKING
+    // ============================================================
 
-        // Create a hotseat booking
-
-        // ============================================================
- 
-        [HttpPost]
-
-        public async Task<IActionResult> CreateBooking(
-
-            [FromBody] CreateHotseatBookingDto request)
-
+    [HttpPost]
+    public async Task<IActionResult> CreateBooking(
+        [FromBody] CreateHotseatBookingDto request)
+    {
+        if (request == null)
         {
-
-            // --------------------------------------------------------
-
-            // 1. Validate request
-
-            // --------------------------------------------------------
- 
-            if (request == null)
-
+            return BadRequest(new
             {
+                message =
+                    "Booking request is required."
+            });
+        }
 
-                return BadRequest(new
+        // --------------------------------------------------------
+        // DATE VALIDATION
+        // --------------------------------------------------------
 
-                {
+        var todayUtc =
+            DateOnly.FromDateTime(
+                DateTime.UtcNow);
 
-                    message = "Booking request is required."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 2. Validate booking date
-
-            // --------------------------------------------------------
- 
-            var todayUtc =
-
-                DateOnly.FromDateTime(DateTime.UtcNow);
- 
-            if (request.BookingDate < todayUtc)
-
+        if (request.BookingDate < todayUtc)
+        {
+            return BadRequest(new
             {
+                message =
+                    "Booking date cannot be in the past."
+            });
+        }
 
-                return BadRequest(new
+        // --------------------------------------------------------
+        // GET SEAT
+        // --------------------------------------------------------
 
-                {
-
-                    message = "Booking date cannot be in the past."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 3. Validate seat
-
-            // --------------------------------------------------------
- 
-            var seat = await _context.Seats
-
+        var seat =
+            await _context.Seats
                 .Include(s => s.Module)
 
                 .FirstOrDefaultAsync(s =>
-
                     s.SeatId == request.SeatId &&
-
                     s.IsActive);
- 
-            if (seat == null)
 
+        if (seat == null)
+        {
+            return NotFound(new
             {
+                message =
+                    "Seat not found or inactive."
+            });
+        }
 
-                return NotFound(new
+        // --------------------------------------------------------
+        // GET EMPLOYEE
+        // --------------------------------------------------------
 
-                {
+        var employeeIdClaim =
+            User.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
 
-                    message = "Seat not found or inactive."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 4. Get employee ID from JWT
-
-            // --------------------------------------------------------
- 
-            var employeeIdClaim =
-
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
- 
-            if (string.IsNullOrWhiteSpace(employeeIdClaim))
-
+        if (string.IsNullOrWhiteSpace(employeeIdClaim))
+        {
+            return Unauthorized(new
             {
+                message =
+                    "Employee information could not be determined."
+            });
+        }
 
-                return Unauthorized(new
-
-                {
-
-                    message =
-
-                        "Employee information could not be determined."
-
-                });
-
-            }
- 
-            if (!int.TryParse(
-
-                    employeeIdClaim,
-
-                    out int employeeId))
-
+        if (!int.TryParse(
+                employeeIdClaim,
+                out int employeeId))
+        {
+            return Unauthorized(new
             {
+                message =
+                    "Invalid employee ID."
+            });
+        }
 
-                return Unauthorized(new
-
-                {
-
-                    message = "Invalid employee ID."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 5. Check employee exists
-
-            // --------------------------------------------------------
- 
-            var employeeExists = await _context.Employees
-
+        var employeeExists =
+            await _context.Employees
                 .AnyAsync(e =>
-
                     e.EmployeeId == employeeId &&
-
                     e.IsActive);
- 
-            if (!employeeExists)
 
+        if (!employeeExists)
+        {
+            return Unauthorized(new
             {
+                message =
+                    "Employee not found or inactive."
+            });
+        }
 
-                return Unauthorized(new
+        // --------------------------------------------------------
+        // CHECK SEAT ALREADY BOOKED
+        // --------------------------------------------------------
 
-                {
+        var existingBooking =
+            await _context.HotseatBookings
+                .AsNoTracking()
 
-                    message = "Employee not found or inactive."
+                .FirstOrDefaultAsync(b =>
+                    b.SeatId == request.SeatId &&
+                    b.BookingDate ==
+                        request.BookingDate &&
+                    (
+                        b.BookingStatus ==
+                            "Confirmed" ||
 
-                });
+                        b.BookingStatus ==
+                            "CheckedIn"
+                    ));
 
-            }
- 
-            // --------------------------------------------------------
-
-            // 6. Check seat already booked
-
-            // --------------------------------------------------------
- 
-            var existingBooking =
-
-                await _context.HotseatBookings
-
-                    .AsNoTracking()
-
-                    .FirstOrDefaultAsync(b =>
-
-                        b.SeatId == request.SeatId &&
-
-                        b.BookingDate == request.BookingDate &&
-
-                        (
-
-                            b.BookingStatus == "Confirmed" ||
-
-                            b.BookingStatus == "CheckedIn"
-
-                        ));
- 
-            if (existingBooking != null)
-
+        if (existingBooking != null)
+        {
+            return Conflict(new
             {
+                message =
+                    "This seat is already booked for the selected date.",
 
-                return Conflict(new
+                existingBookingId =
+                    existingBooking
+                        .HotseatBookingId,
 
-                {
+                bookingStatus =
+                    existingBooking
+                        .BookingStatus
+            });
+        }
 
-                    message =
+        // --------------------------------------------------------
+        // PREVENT EMPLOYEE DUPLICATE BOOKING
+        // --------------------------------------------------------
 
-                        "This seat is already booked for the selected date.",
- 
-                    existingBookingId =
+        var employeeExistingBooking =
+            await _context.HotseatBookings
+                .AsNoTracking()
 
-                        existingBooking.HotseatBookingId,
- 
-                    bookingStatus =
+                .FirstOrDefaultAsync(b =>
+                    b.EmployeeId == employeeId &&
+                    b.BookingDate ==
+                        request.BookingDate &&
+                    (
+                        b.BookingStatus ==
+                            "Confirmed" ||
 
-                        existingBooking.BookingStatus
+                        b.BookingStatus ==
+                            "CheckedIn"
+                    ));
 
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 7. Prevent employee duplicate booking
-
-            // --------------------------------------------------------
- 
-            var employeeExistingBooking =
-
-                await _context.HotseatBookings
-
-                    .AsNoTracking()
-
-                    .FirstOrDefaultAsync(b =>
-
-                        b.EmployeeId == employeeId &&
-
-                        b.BookingDate == request.BookingDate &&
-
-                        (
-
-                            b.BookingStatus == "Confirmed" ||
-
-                            b.BookingStatus == "CheckedIn"
-
-                        ));
- 
-            if (employeeExistingBooking != null)
-
+        if (employeeExistingBooking != null)
+        {
+            return Conflict(new
             {
+                message =
+                    "You already have a hotseat booking for this date.",
 
-                return Conflict(new
+                existingBookingId =
+                    employeeExistingBooking
+                        .HotseatBookingId,
 
-                {
+                seatId =
+                    employeeExistingBooking.SeatId,
 
-                    message =
+                bookingStatus =
+                    employeeExistingBooking
+                        .BookingStatus
+            });
+        }
 
-                        "You already have a hotseat booking for this date.",
- 
-                    existingBookingId =
+        // --------------------------------------------------------
+        // CHECK-IN DEADLINE
+        // --------------------------------------------------------
 
-                        employeeExistingBooking.HotseatBookingId,
- 
-                    seatId =
+        var checkInTime =
+            request.ExpectedCheckInTime ??
+            new TimeOnly(9, 0, 0);
 
-                        employeeExistingBooking.SeatId,
- 
-                    bookingStatus =
+        var checkInDeadlineUtc =
+            DateTime.SpecifyKind(
+                request.BookingDate
+                    .ToDateTime(checkInTime),
+                DateTimeKind.Utc);
 
-                        employeeExistingBooking.BookingStatus
+        // --------------------------------------------------------
+        // CREATE BOOKING
+        // --------------------------------------------------------
 
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 8. Create UTC booked time
-
-            // --------------------------------------------------------
- 
-            var bookedOnUtc = DateTime.UtcNow;
- 
-            // --------------------------------------------------------
-
-            // 9. Create check-in deadline
-
-            // --------------------------------------------------------
- 
-            var checkInTime =
-
-                request.ExpectedCheckInTime ??
-
-                new TimeOnly(9, 0, 0);
- 
-            var checkInDeadlineUtc =
-
-                DateTime.SpecifyKind(
-
-                    request.BookingDate.ToDateTime(checkInTime),
-
-                    DateTimeKind.Utc);
- 
-            // --------------------------------------------------------
-
-            // 10. Create booking
-
-            // --------------------------------------------------------
- 
-            var booking = new HotseatBooking
-
+        var booking =
+            new HotseatBooking
             {
+                SeatId =
+                    request.SeatId,
 
-                SeatId = request.SeatId,
- 
-                EmployeeId = employeeId,
- 
-                BookingDate = request.BookingDate,
- 
-                BookingStatus = "Confirmed",
- 
-                BookedOn = bookedOnUtc,
- 
-                CheckInDeadline = checkInDeadlineUtc,
- 
-                CheckInTime = null,
- 
-                ReleasedOn = null,
- 
-                RecordIngestedBy =
+                EmployeeId =
+                    employeeId,
 
-                    employeeId.ToString(),
- 
-                RecordIngestedOn =
+                BookingDate =
+                    request.BookingDate,
 
+                BookingStatus =
+                    "Confirmed",
+
+                BookedOn =
                     DateTime.UtcNow,
- 
-                RecordModifiedBy = null,
- 
-                RecordModifiedOn = null
 
+                CheckInDeadline =
+                    checkInDeadlineUtc,
+
+                CheckInTime =
+                    null,
+
+                ReleasedOn =
+                    null,
+
+                RecordIngestedBy =
+                    employeeId.ToString(),
+
+                RecordIngestedOn =
+                    DateTime.UtcNow,
+
+                RecordModifiedBy =
+                    null,
+
+                RecordModifiedOn =
+                    null
             };
- 
-            // --------------------------------------------------------
 
-            // 11. Save
+        // --------------------------------------------------------
+        // SAVE BOOKING
+        // --------------------------------------------------------
 
-            // --------------------------------------------------------
- 
-            try
+        try
+        {
+            _context.HotseatBookings
+                .Add(booking);
 
-            {
+            await _context
+                .SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            Console.WriteLine(
+                "HOTSEAT BOOKING DATABASE ERROR:");
 
-                _context.HotseatBookings.Add(booking);
- 
-                await _context.SaveChangesAsync();
+            Console.WriteLine(
+                ex.ToString());
 
-            }
-
-            catch (DbUpdateException ex)
-
-            {
-
-                Console.WriteLine(
-
-                    "HOTSEAT BOOKING DATABASE ERROR:");
- 
-                Console.WriteLine(ex.ToString());
- 
-                return StatusCode(500, new
-
+            return StatusCode(
+                500,
+                new
                 {
-
                     message =
-
                         "An error occurred while saving the hotseat booking.",
- 
+
                     detail =
-
                         ex.InnerException?.Message ??
-
                         ex.Message
-
                 });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 12. Return response
-
-            // --------------------------------------------------------
- 
-            return Ok(new
-
-            {
-
-                message =
-
-                    "Hotseat booked successfully.",
- 
-                bookingId =
-
-                    booking.HotseatBookingId,
- 
-                seatId =
-
-                    booking.SeatId,
- 
-                seatNumber =
-
-                    seat.SeatNumber,
- 
-                employeeId =
-
-                    booking.EmployeeId,
- 
-                bookingDate =
-
-                    booking.BookingDate,
- 
-                bookingStatus =
-
-                    booking.BookingStatus,
- 
-                bookedOn =
-
-                    booking.BookedOn,
- 
-                checkInDeadline =
-
-                    booking.CheckInDeadline
-
-            });
-
         }
- 
- 
-        // ============================================================
 
-        // PUT: api/Hotseat/{id}
+        // --------------------------------------------------------
+        // CREATE CONFIRMATION NOTIFICATION
+        // --------------------------------------------------------
 
-        // Edit a hotseat booking
+        await CreateHotseatNotificationAsync(
+            employeeId,
+            booking.HotseatBookingId,
+            $"Your hotseat booking for {seat.SeatNumber} " +
+            $"on {booking.BookingDate:dd-MMM-yyyy} has been confirmed.");
 
-        // ============================================================
- 
-        [HttpPut("{id:int}")]
+        // --------------------------------------------------------
+        // RETURN
+        // --------------------------------------------------------
 
-        public async Task<IActionResult> UpdateBooking(
-
-            int id,
-
-            [FromBody] CreateHotseatBookingDto request)
-
+        return Ok(new
         {
+            message =
+                "Hotseat booked successfully.",
 
-            // --------------------------------------------------------
+            bookingId =
+                booking.HotseatBookingId,
 
-            // 1. Validate request
+            seatId =
+                booking.SeatId,
 
-            // --------------------------------------------------------
- 
-            if (request == null)
+            seatNumber =
+                seat.SeatNumber,
 
-            {
+            employeeId =
+                booking.EmployeeId,
 
-                return BadRequest(new
+            bookingDate =
+                booking.BookingDate,
 
-                {
+            bookingStatus =
+                booking.BookingStatus,
 
-                    message = "Booking request is required."
+            bookedOn =
+                booking.BookedOn,
 
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 2. Get employee ID
-
-            // --------------------------------------------------------
- 
-            var employeeIdClaim =
-
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
- 
-            if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
-
-                !int.TryParse(
-
-                    employeeIdClaim,
-
-                    out int employeeId))
-
-            {
-
-                return Unauthorized(new
-
-                {
-
-                    message =
-
-                        "Employee information could not be determined."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 3. Find booking
-
-            // --------------------------------------------------------
- 
-            var booking =
-
-                await _context.HotseatBookings
-
-                    .FirstOrDefaultAsync(b =>
-
-                        b.HotseatBookingId == id);
- 
-            if (booking == null)
-
-            {
-
-                return NotFound(new
-
-                {
-
-                    message =
-
-                        "Hotseat booking not found."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 4. Verify ownership
-
-            // --------------------------------------------------------
- 
-            if (booking.EmployeeId != employeeId)
-
-            {
-
-                return Forbid();
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 5. Check booking status
-
-            // --------------------------------------------------------
- 
-            if (booking.BookingStatus != "Confirmed")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "Only confirmed bookings can be edited."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 6. Validate booking date
-
-            // --------------------------------------------------------
- 
-            var todayUtc =
-
-                DateOnly.FromDateTime(DateTime.UtcNow);
- 
-            if (request.BookingDate < todayUtc)
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "Booking date cannot be in the past."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 7. Validate new seat
-
-            // --------------------------------------------------------
- 
-            var seat =
-
-                await _context.Seats
-
-                    .Include(s => s.Module)
-
-                    .FirstOrDefaultAsync(s =>
-
-                        s.SeatId == request.SeatId &&
-
-                        s.IsActive);
- 
-            if (seat == null)
-
-            {
-
-                return NotFound(new
-
-                {
-
-                    message =
-
-                        "Seat not found or inactive."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 8. Check seat availability
-
-            // Exclude current booking
-
-            // --------------------------------------------------------
- 
-            var seatAlreadyBooked =
-
-                await _context.HotseatBookings
-
-                    .AsNoTracking()
-
-                    .AnyAsync(b =>
-
-                        b.HotseatBookingId != id &&
-
-                        b.SeatId == request.SeatId &&
-
-                        b.BookingDate == request.BookingDate &&
-
-                        (
-
-                            b.BookingStatus == "Confirmed" ||
-
-                            b.BookingStatus == "CheckedIn"
-
-                        ));
- 
-            if (seatAlreadyBooked)
-
-            {
-
-                return Conflict(new
-
-                {
-
-                    message =
-
-                        "This seat is already booked for the selected date."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 9. Check employee already has another booking
-
-            // --------------------------------------------------------
- 
-            var employeeAlreadyBooked =
-
-                await _context.HotseatBookings
-
-                    .AsNoTracking()
-
-                    .AnyAsync(b =>
-
-                        b.HotseatBookingId != id &&
-
-                        b.EmployeeId == employeeId &&
-
-                        b.BookingDate == request.BookingDate &&
-
-                        (
-
-                            b.BookingStatus == "Confirmed" ||
-
-                            b.BookingStatus == "CheckedIn"
-
-                        ));
- 
-            if (employeeAlreadyBooked)
-
-            {
-
-                return Conflict(new
-
-                {
-
-                    message =
-
-                        "You already have another hotseat booking for this date."
-
-                });
-
-            }
-            // --------------------------------------------------------
-
-            // 10. Calculate UTC check-in deadline
-
-            // --------------------------------------------------------
- 
-            var checkInTime =
-
-                request.ExpectedCheckInTime ??
-
-                new TimeOnly(9, 0, 0);
- 
-            var checkInDeadlineUtc =
-
-                DateTime.SpecifyKind(
-
-                    request.BookingDate.ToDateTime(checkInTime),
-
-                    DateTimeKind.Utc);
- 
-            // --------------------------------------------------------
-
-            // 11. Update booking
-
-            // --------------------------------------------------------
- 
-            booking.SeatId =
-
-                request.SeatId;
- 
-            booking.BookingDate =
-
-                request.BookingDate;
- 
-            booking.CheckInDeadline =
-
-                checkInDeadlineUtc;
- 
-            booking.RecordModifiedBy =
-
-                employeeId.ToString();
- 
-            booking.RecordModifiedOn =
-
-                DateTime.UtcNow;
- 
-            // --------------------------------------------------------
-
-            // 12. Save
-
-            // --------------------------------------------------------
- 
-            try
-
-            {
-
-                await _context.SaveChangesAsync();
-
-            }
-
-            catch (DbUpdateException ex)
-
-            {
-
-                return StatusCode(500, new
-
-                {
-
-                    message =
-
-                        "An error occurred while updating the hotseat booking.",
- 
-                    detail =
-
-                        ex.InnerException?.Message ??
-
-                        ex.Message
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 13. Return
-
-            // --------------------------------------------------------
- 
-            return Ok(new
-
-            {
-
-                message =
-
-                    "Hotseat booking updated successfully.",
- 
-                bookingId =
-
-                    booking.HotseatBookingId,
- 
-                seatId =
-
-                    booking.SeatId,
- 
-                seatNumber =
-
-                    seat.SeatNumber,
- 
-                module =
-
-                    seat.Module?.ModuleName,
- 
-                bookingDate =
-
-                    booking.BookingDate,
- 
-                bookingStatus =
-
-                    booking.BookingStatus,
- 
-                checkInDeadline =
-
-                    booking.CheckInDeadline,
- 
-                modifiedOn =
-
-                    booking.RecordModifiedOn
-
-            });
-
-        }
- 
- 
-        // ============================================================
-
-        // POST: api/Hotseat/{id}/check-in
-
-        // Check in to a hotseat booking
-
-        // ============================================================
- 
-        [HttpPost("{id:int}/check-in")]
-
-        public async Task<IActionResult> CheckIn(int id)
-
-        {
-
-            // --------------------------------------------------------
-
-            // 1. Get employee ID
-
-            // --------------------------------------------------------
- 
-            var employeeIdClaim =
-
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
- 
-            if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
-
-                !int.TryParse(
-
-                    employeeIdClaim,
-
-                    out int employeeId))
-
-            {
-
-                return Unauthorized(new
-
-                {
-
-                    message =
-
-                        "Employee information could not be determined."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 2. Find booking
-
-            // --------------------------------------------------------
- 
-            var booking =
-
-                await _context.HotseatBookings
-
-                    .Include(b => b.Seat)
-
-                    .FirstOrDefaultAsync(b =>
-
-                        b.HotseatBookingId == id);
- 
-            if (booking == null)
-
-            {
-
-                return NotFound(new
-
-                {
-
-                    message =
-
-                        "Hotseat booking not found."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 3. Verify ownership
-
-            // --------------------------------------------------------
- 
-            if (booking.EmployeeId != employeeId)
-
-            {
-
-                return Forbid();
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 4. Check status
-
-            // --------------------------------------------------------
- 
-            if (booking.BookingStatus == "CheckedIn")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "You have already checked in to this hotseat."
-
-                });
-
-            }
- 
-            if (booking.BookingStatus == "Cancelled")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "Cancelled bookings cannot be checked in."
-
-                });
-
-            }
- 
-            if (booking.BookingStatus == "Released")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "Released bookings cannot be checked in."
-
-                });
-
-            }
- 
-            if (booking.BookingStatus == "Expired")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "Expired bookings cannot be checked in."
-
-                });
-
-            }
- 
-            if (booking.BookingStatus != "Confirmed")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "This booking cannot be checked in."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 5. Validate check-in date
-
-            // --------------------------------------------------------
- 
-            var todayUtc =
-
-                DateOnly.FromDateTime(DateTime.UtcNow);
- 
-            if (booking.BookingDate != todayUtc)
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "You can only check in on the booking date."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 6. Set check-in information
-
-            // --------------------------------------------------------
- 
-            var checkInTimeUtc =
-
-                DateTime.UtcNow;
- 
-            booking.BookingStatus =
-
-                "CheckedIn";
- 
-            booking.CheckInTime =
-
-                checkInTimeUtc;
- 
-            booking.RecordModifiedBy =
-
-                employeeId.ToString();
- 
-            booking.RecordModifiedOn =
-
-                DateTime.UtcNow;
- 
-            // --------------------------------------------------------
-
-            // 7. Save
-
-            // --------------------------------------------------------
- 
-            try
-
-            {
-
-                await _context.SaveChangesAsync();
-
-            }
-
-            catch (DbUpdateException ex)
-
-            {
-
-                return StatusCode(500, new
-
-                {
-
-                    message =
-
-                        "An error occurred while checking in.",
- 
-                    detail =
-
-                        ex.InnerException?.Message ??
-
-                        ex.Message
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 8. Return
-
-            // --------------------------------------------------------
- 
-            return Ok(new
-
-            {
-
-                message =
-
-                    "Checked in successfully.",
- 
-                bookingId =
-
-                    booking.HotseatBookingId,
- 
-                seatId =
-
-                    booking.SeatId,
- 
-                seatNumber =
-
-                    booking.Seat?.SeatNumber,
- 
-                bookingDate =
-
-                    booking.BookingDate,
- 
-                bookingStatus =
-
-                    booking.BookingStatus,
- 
-                checkInTime =
-
-                    booking.CheckInTime
-
-            });
-
-        }
- 
- 
-        // ============================================================
-
-        // DELETE: api/Hotseat/{id}
-
-        // Cancel a hotseat booking
-
-        //
-
-        // IMPORTANT:
-
-        // This performs a SOFT DELETE.
-
-        // The database row is NOT physically deleted.
-
-        // ============================================================
- 
-        [HttpDelete("{id:int}")]
-
-        public async Task<IActionResult> CancelBooking(int id)
-
-        {
-
-            // --------------------------------------------------------
-
-            // 1. Get logged-in employee
-
-            // --------------------------------------------------------
- 
-            var employeeIdClaim =
-
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
- 
-            if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
-
-                !int.TryParse(
-
-                    employeeIdClaim,
-
-                    out int employeeId))
-
-            {
-
-                return Unauthorized(new
-
-                {
-
-                    message =
-
-                        "Employee information could not be determined."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 2. Find booking
-
-            // --------------------------------------------------------
- 
-            var booking =
-
-                await _context.HotseatBookings
-
-                    .FirstOrDefaultAsync(b =>
-
-                        b.HotseatBookingId == id);
- 
-            if (booking == null)
-
-            {
-
-                return NotFound(new
-
-                {
-
-                    message =
-
-                        "Hotseat booking not found."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 3. Make sure employee owns booking
-
-            // --------------------------------------------------------
- 
-            if (booking.EmployeeId != employeeId)
-
-            {
-
-                return Forbid();
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 4. Check current status
-
-            // --------------------------------------------------------
- 
-            if (booking.BookingStatus == "Cancelled")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "This hotseat booking is already cancelled."
-
-                });
-
-            }
- 
-            if (booking.BookingStatus == "Released")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "This hotseat booking has already been released."
-
-                });
-
-            }
- 
-            if (booking.BookingStatus == "Expired")
-
-            {
-
-                return BadRequest(new
-
-                {
-
-                    message =
-
-                        "This hotseat booking has expired."
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 5. Cancel instead of deleting row
-
-            // --------------------------------------------------------
- 
-            booking.BookingStatus =
-
-                "Cancelled";
- 
-            // --------------------------------------------------------
-
-            // 6. Audit information
-
-            // --------------------------------------------------------
- 
-            booking.RecordModifiedBy =
-
-                employeeId.ToString();
- 
-            booking.RecordModifiedOn =
-
-                DateTime.UtcNow;
- 
-            // --------------------------------------------------------
-
-            // 7. Save
-
-            // --------------------------------------------------------
- 
-            try
-
-            {
-
-                await _context.SaveChangesAsync();
-
-            }
-
-            catch (DbUpdateException ex)
-
-            {
-
-                return StatusCode(500, new
-
-                {
-
-                    message =
-
-                        "An error occurred while cancelling the hotseat booking.",
- 
-                    detail =
-
-                        ex.InnerException?.Message ??
-
-                        ex.Message
-
-                });
-
-            }
- 
-            // --------------------------------------------------------
-
-            // 8. Return
-
-            // --------------------------------------------------------
- 
-            return Ok(new
-
-            {
-
-                message =
-
-                    "Hotseat booking cancelled successfully.",
- 
-                bookingId =
-
-                    booking.HotseatBookingId,
- 
-                seatId =
-
-                    booking.SeatId,
- 
-                employeeId =
-
-                    booking.EmployeeId,
- 
-                bookingDate =
-
-                    booking.BookingDate,
- 
-                bookingStatus =
-
-                    booking.BookingStatus,
- 
-                modifiedOn =
-
-                    booking.RecordModifiedOn
-
-            });
-
-        }
-
+            checkInDeadline =
+                booking.CheckInDeadline
+        });
     }
 
+    // ============================================================
+    // PUT: api/Hotseat/{id}
+    // UPDATE HOTSEAT BOOKING
+    // ============================================================
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateBooking(
+        int id,
+        [FromBody] CreateHotseatBookingDto request)
+    {
+        if (request == null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Booking request is required."
+            });
+        }
+
+        var employeeIdClaim =
+            User.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
+            !int.TryParse(
+                employeeIdClaim,
+                out int employeeId))
+        {
+            return Unauthorized(new
+            {
+                message =
+                    "Employee information could not be determined."
+            });
+        }
+
+        // --------------------------------------------------------
+        // GET BOOKING
+        // --------------------------------------------------------
+
+        var booking =
+            await _context.HotseatBookings
+                .FirstOrDefaultAsync(b =>
+                    b.HotseatBookingId == id);
+
+        if (booking == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Hotseat booking not found."
+            });
+        }
+
+        if (booking.EmployeeId != employeeId)
+        {
+            return Forbid();
+        }
+
+        if (!string.Equals(
+                booking.BookingStatus,
+                "Confirmed",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Only confirmed bookings can be edited."
+            });
+        }
+
+        // --------------------------------------------------------
+        // DATE VALIDATION
+        // --------------------------------------------------------
+
+        var todayUtc =
+            DateOnly.FromDateTime(
+                DateTime.UtcNow);
+
+        if (request.BookingDate < todayUtc)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Booking date cannot be in the past."
+            });
+        }
+
+        // --------------------------------------------------------
+        // GET NEW SEAT
+        // --------------------------------------------------------
+
+        var seat =
+            await _context.Seats
+                .Include(s => s.Module)
+
+                .FirstOrDefaultAsync(s =>
+                    s.SeatId == request.SeatId &&
+                    s.IsActive);
+
+        if (seat == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Seat not found or inactive."
+            });
+        }
+
+        // --------------------------------------------------------
+        // CHECK SEAT AVAILABILITY
+        // --------------------------------------------------------
+
+        var seatAlreadyBooked =
+            await _context.HotseatBookings
+                .AsNoTracking()
+
+                .AnyAsync(b =>
+                    b.HotseatBookingId != id &&
+                    b.SeatId == request.SeatId &&
+                    b.BookingDate ==
+                        request.BookingDate &&
+                    (
+                        b.BookingStatus ==
+                            "Confirmed" ||
+
+                        b.BookingStatus ==
+                            "CheckedIn"
+                    ));
+
+        if (seatAlreadyBooked)
+        {
+            return Conflict(new
+            {
+                message =
+                    "This seat is already booked for the selected date."
+            });
+        }
+
+        // --------------------------------------------------------
+        // CHECK EMPLOYEE DUPLICATE
+        // --------------------------------------------------------
+
+        var employeeAlreadyBooked =
+            await _context.HotseatBookings
+                .AsNoTracking()
+
+                .AnyAsync(b =>
+                    b.HotseatBookingId != id &&
+                    b.EmployeeId == employeeId &&
+                    b.BookingDate ==
+                        request.BookingDate &&
+                    (
+                        b.BookingStatus ==
+                            "Confirmed" ||
+
+                        b.BookingStatus ==
+                            "CheckedIn"
+                    ));
+
+        if (employeeAlreadyBooked)
+        {
+            return Conflict(new
+            {
+                message =
+                    "You already have another hotseat booking for this date."
+            });
+        }
+
+        // --------------------------------------------------------
+        // CHECK-IN DEADLINE
+        // --------------------------------------------------------
+
+        var checkInTime =
+            request.ExpectedCheckInTime ??
+            new TimeOnly(9, 0, 0);
+
+        var checkInDeadlineUtc =
+            DateTime.SpecifyKind(
+                request.BookingDate
+                    .ToDateTime(checkInTime),
+                DateTimeKind.Utc);
+
+        // --------------------------------------------------------
+        // UPDATE
+        // --------------------------------------------------------
+
+        booking.SeatId =
+            request.SeatId;
+
+        booking.BookingDate =
+            request.BookingDate;
+
+        booking.CheckInDeadline =
+            checkInDeadlineUtc;
+
+        booking.RecordModifiedBy =
+            employeeId.ToString();
+
+        booking.RecordModifiedOn =
+            DateTime.UtcNow;
+
+        try
+        {
+            await _context
+                .SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(
+                500,
+                new
+                {
+                    message =
+                        "An error occurred while updating the hotseat booking.",
+
+                    detail =
+                        ex.InnerException?.Message ??
+                        ex.Message
+                });
+        }
+
+        // --------------------------------------------------------
+        // UPDATE NOTIFICATION
+        // --------------------------------------------------------
+
+        await CreateHotseatNotificationAsync(
+            employeeId,
+            booking.HotseatBookingId,
+            $"Your hotseat booking has been updated to " +
+            $"{seat.SeatNumber} on " +
+            $"{booking.BookingDate:dd-MMM-yyyy}.");
+
+        return Ok(new
+        {
+            message =
+                "Hotseat booking updated successfully.",
+
+            bookingId =
+                booking.HotseatBookingId,
+
+            seatId =
+                booking.SeatId,
+
+            seatNumber =
+                seat.SeatNumber,
+
+            module =
+                seat.Module?.ModuleName,
+
+            bookingDate =
+                booking.BookingDate,
+
+            bookingStatus =
+                booking.BookingStatus,
+
+            checkInDeadline =
+                booking.CheckInDeadline,
+
+            modifiedOn =
+                booking.RecordModifiedOn
+        });
+    }
+
+    // ============================================================
+    // POST: api/Hotseat/{id}/check-in
+    // ============================================================
+
+    [HttpPost("{id:int}/check-in")]
+    public async Task<IActionResult> CheckIn(
+        int id)
+    {
+        var employeeIdClaim =
+            User.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
+            !int.TryParse(
+                employeeIdClaim,
+                out int employeeId))
+        {
+            return Unauthorized(new
+            {
+                message =
+                    "Employee information could not be determined."
+            });
+        }
+
+        // --------------------------------------------------------
+        // FIND BOOKING
+        // --------------------------------------------------------
+
+        var booking =
+            await _context.HotseatBookings
+                .Include(b => b.Seat)
+
+                .FirstOrDefaultAsync(b =>
+                    b.HotseatBookingId == id);
+
+        if (booking == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Hotseat booking not found."
+            });
+        }
+
+        if (booking.EmployeeId != employeeId)
+        {
+            return Forbid();
+        }
+
+        // --------------------------------------------------------
+        // STATUS VALIDATION
+        // --------------------------------------------------------
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "CheckedIn",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "You have already checked in to this hotseat."
+            });
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Cancelled bookings cannot be checked in."
+            });
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Released",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Released bookings cannot be checked in."
+            });
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Expired",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Expired bookings cannot be checked in."
+            });
+        }
+
+        if (!string.Equals(
+                booking.BookingStatus,
+                "Confirmed",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "This booking cannot be checked in."
+            });
+        }
+
+        // --------------------------------------------------------
+        // DATE VALIDATION
+        // --------------------------------------------------------
+
+        var todayUtc =
+            DateOnly.FromDateTime(
+                DateTime.UtcNow);
+
+        if (booking.BookingDate != todayUtc)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "You can only check in on the booking date."
+            });
+        }
+
+        // --------------------------------------------------------
+        // CHECK-IN
+        // --------------------------------------------------------
+
+        booking.BookingStatus =
+            "CheckedIn";
+
+        booking.CheckInTime =
+            DateTime.UtcNow;
+
+        booking.RecordModifiedBy =
+            employeeId.ToString();
+
+        booking.RecordModifiedOn =
+            DateTime.UtcNow;
+
+        try
+        {
+            await _context
+                .SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(
+                500,
+                new
+                {
+                    message =
+                        "An error occurred while checking in.",
+
+                    detail =
+                        ex.InnerException?.Message ??
+                        ex.Message
+                });
+        }
+
+        // --------------------------------------------------------
+        // CHECK-IN NOTIFICATION
+        // --------------------------------------------------------
+
+        var seatNumber =
+            booking.Seat?.SeatNumber ??
+            $"Seat {booking.SeatId}";
+
+        await CreateHotseatNotificationAsync(
+            employeeId,
+            booking.HotseatBookingId,
+            $"You have successfully checked in to {seatNumber}.");
+
+        return Ok(new
+        {
+            message =
+                "Checked in successfully.",
+
+            bookingId =
+                booking.HotseatBookingId,
+
+            seatId =
+                booking.SeatId,
+
+            seatNumber =
+                booking.Seat?.SeatNumber,
+
+            bookingDate =
+                booking.BookingDate,
+
+            bookingStatus =
+                booking.BookingStatus,
+
+            checkInTime =
+                booking.CheckInTime
+        });
+    }
+
+    // ============================================================
+    // DELETE: api/Hotseat/{id}
+    // SOFT CANCEL HOTSEAT BOOKING
+    // ============================================================
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> CancelBooking(
+        int id)
+    {
+        var employeeIdClaim =
+            User.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
+            !int.TryParse(
+                employeeIdClaim,
+                out int employeeId))
+        {
+            return Unauthorized(new
+            {
+                message =
+                    "Employee information could not be determined."
+            });
+        }
+
+        // --------------------------------------------------------
+        // GET BOOKING + SEAT
+        // --------------------------------------------------------
+
+        var booking =
+            await _context.HotseatBookings
+                .Include(b => b.Seat)
+
+                .FirstOrDefaultAsync(b =>
+                    b.HotseatBookingId == id);
+
+        if (booking == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Hotseat booking not found."
+            });
+        }
+
+        if (booking.EmployeeId != employeeId)
+        {
+            return Forbid();
+        }
+
+        // --------------------------------------------------------
+        // STATUS VALIDATION
+        // --------------------------------------------------------
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "This hotseat booking is already cancelled."
+            });
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Released",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "This hotseat booking has already been released."
+            });
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Expired",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "This hotseat booking has expired."
+            });
+        }
+
+        // --------------------------------------------------------
+        // CANCEL
+        // --------------------------------------------------------
+
+        booking.BookingStatus =
+            "Cancelled";
+
+        booking.RecordModifiedBy =
+            employeeId.ToString();
+
+        booking.RecordModifiedOn =
+            DateTime.UtcNow;
+
+        try
+        {
+            await _context
+                .SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(
+                500,
+                new
+                {
+                    message =
+                        "An error occurred while cancelling the hotseat booking.",
+
+                    detail =
+                        ex.InnerException?.Message ??
+                        ex.Message
+                });
+        }
+
+        // --------------------------------------------------------
+        // CANCELLATION NOTIFICATION
+        // --------------------------------------------------------
+
+        var seatNumber =
+            booking.Seat?.SeatNumber ??
+            $"Seat {booking.SeatId}";
+
+        await CreateHotseatNotificationAsync(
+            employeeId,
+            booking.HotseatBookingId,
+            $"Your hotseat booking for {seatNumber} " +
+            $"on {booking.BookingDate:dd-MMM-yyyy} has been cancelled. " +
+            $"Reason: You cancelled the booking.");
+
+        return Ok(new
+        {
+            message =
+                "Hotseat booking cancelled successfully.",
+
+            bookingId =
+                booking.HotseatBookingId,
+
+            seatId =
+                booking.SeatId,
+
+            employeeId =
+                booking.EmployeeId,
+
+            bookingDate =
+                booking.BookingDate,
+
+            bookingStatus =
+                booking.BookingStatus,
+
+            modifiedOn =
+                booking.RecordModifiedOn
+        });
+    }
 }
- 
- 
