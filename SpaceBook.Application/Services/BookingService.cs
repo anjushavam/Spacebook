@@ -79,13 +79,27 @@ public class BookingService : IBookingService
         }
 
         // -----------------------------------------------------
-        // 3. APPROVE BOOKING
+        // 3. VALIDATE CURRENT STATUS
+        // -----------------------------------------------------
+        // Only Pending bookings are eligible for approval.
+
+        if (!string.Equals(
+                booking.Status,
+                "Pending",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Booking cannot be approved because its current status is {booking.Status}.");
+        }
+
+        // -----------------------------------------------------
+        // 4. APPROVE BOOKING
         // -----------------------------------------------------
 
         await _bookingRepository.ApproveAsync(bookingId);
 
         // -----------------------------------------------------
-        // 4. CREATE EMPLOYEE NOTIFICATION
+        // 5. CREATE EMPLOYEE NOTIFICATION
         // -----------------------------------------------------
 
         try
@@ -109,9 +123,7 @@ public class BookingService : IBookingService
             }
 
             // -------------------------------------------------
-            // IMPORTANT:
-            //
-            // PostgreSQL column is:
+            // PostgreSQL column:
             // timestamp without time zone
             //
             // Therefore DateTime must be Kind = Unspecified.
@@ -144,10 +156,7 @@ public class BookingService : IBookingService
         catch (Exception ex)
         {
             // -------------------------------------------------
-            // IMPORTANT
-            // -------------------------------------------------
-            // Do NOT fail the approval because notification
-            // persistence failed.
+            // Notification failure must not fail approval
             // -------------------------------------------------
 
             Console.WriteLine(
@@ -192,13 +201,27 @@ public class BookingService : IBookingService
         }
 
         // -----------------------------------------------------
-        // 3. REJECT BOOKING
+        // 3. VALIDATE CURRENT STATUS
+        // -----------------------------------------------------
+        // Only Pending bookings are eligible for rejection.
+
+        if (!string.Equals(
+                booking.Status,
+                "Pending",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Booking cannot be rejected because its current status is {booking.Status}.");
+        }
+
+        // -----------------------------------------------------
+        // 4. REJECT BOOKING
         // -----------------------------------------------------
 
         await _bookingRepository.RejectAsync(bookingId);
 
         // -----------------------------------------------------
-        // 4. CREATE EMPLOYEE NOTIFICATION
+        // 5. CREATE EMPLOYEE NOTIFICATION
         // -----------------------------------------------------
 
         try
@@ -222,9 +245,7 @@ public class BookingService : IBookingService
             }
 
             // -------------------------------------------------
-            // IMPORTANT:
-            //
-            // PostgreSQL column is:
+            // PostgreSQL column:
             // timestamp without time zone
             //
             // Therefore DateTime must be Kind = Unspecified.
@@ -257,10 +278,7 @@ public class BookingService : IBookingService
         catch (Exception ex)
         {
             // -------------------------------------------------
-            // IMPORTANT
-            // -------------------------------------------------
-            // Do NOT fail the rejection because notification
-            // persistence failed.
+            // Notification failure must not fail rejection
             // -------------------------------------------------
 
             Console.WriteLine(

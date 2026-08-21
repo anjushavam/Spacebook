@@ -204,30 +204,17 @@ public class BookingRepository : IBookingRepository
                 "Booking not found.");
         }
 
-        if (string.Equals(
-                booking.Status,
-                "Approved",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
+        // -----------------------------------------------------
+        // ONLY PENDING BOOKINGS CAN BE APPROVED
+        // -----------------------------------------------------
 
-        if (string.Equals(
+        if (!string.Equals(
                 booking.Status,
-                "Cancelled",
+                "Pending",
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "A cancelled booking cannot be approved.");
-        }
-
-        if (string.Equals(
-                booking.Status,
-                "Rejected",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                "A rejected booking cannot be approved.");
+                $"Booking cannot be approved because its current status is {booking.Status}.");
         }
 
         booking.Status =
@@ -254,21 +241,17 @@ public class BookingRepository : IBookingRepository
                 "Booking not found.");
         }
 
-        if (string.Equals(
-                booking.Status,
-                "Rejected",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
+        // -----------------------------------------------------
+        // ONLY PENDING BOOKINGS CAN BE REJECTED
+        // -----------------------------------------------------
 
-        if (string.Equals(
+        if (!string.Equals(
                 booking.Status,
-                "Cancelled",
+                "Pending",
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "A cancelled booking cannot be rejected.");
+                $"Booking cannot be rejected because its current status is {booking.Status}.");
         }
 
         booking.Status =
