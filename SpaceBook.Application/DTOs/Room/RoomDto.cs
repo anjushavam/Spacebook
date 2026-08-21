@@ -5,6 +5,7 @@ public class RoomDto
     public int RoomId { get; set; }
 
     public string RoomName { get; set; } = string.Empty;
+    public string RoomNumber { get; set; } = string.Empty;
 
     public string RoomType { get; set; } = string.Empty;
 

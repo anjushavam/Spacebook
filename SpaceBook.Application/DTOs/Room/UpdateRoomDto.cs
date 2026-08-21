@@ -5,6 +5,7 @@ public class UpdateRoomDto
     public int RoomTypeId { get; set; }
 
     public string RoomName { get; set; } = string.Empty;
+    public string RoomNumber { get; set; } = string.Empty;
 
     public int Capacity { get; set; }
 

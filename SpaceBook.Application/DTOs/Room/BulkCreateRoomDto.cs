@@ -61,4 +61,5 @@ public class BulkCreateRoomDto
     // =========================================================
  
     public List<int> FacilityIds { get; set; } = new();
+    public string RoomNumber { get; set; } = string.Empty;
 }
