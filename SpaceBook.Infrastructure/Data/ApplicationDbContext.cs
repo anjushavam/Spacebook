@@ -375,86 +375,85 @@ public class ApplicationDbContext : DbContext
         });
 
         // =========================================================
-        // BOOKING
-        // =========================================================
+// BOOKING
+// =========================================================
 
-        modelBuilder.Entity<Booking>(entity =>
-        {
-            entity.ToTable("bookings");
+modelBuilder.Entity<Booking>(entity =>
+{
+    entity.ToTable("bookings");
 
-            entity.HasKey(x => x.BookingId);
+    entity.HasKey(x => x.BookingId);
 
-            entity.Property(x => x.BookingId)
-                .HasColumnName("bookingid");
+    entity.Property(x => x.BookingId)
+        .HasColumnName("bookingid");
 
-            entity.Property(x => x.RoomId)
-                .HasColumnName("roomid");
+    entity.Property(x => x.RoomId)
+        .HasColumnName("roomid");
 
-            entity.Property(x => x.EmployeeId)
-                .HasColumnName("employeeid");
+    entity.Property(x => x.EmployeeId)
+        .HasColumnName("employeeid");
 
-            entity.Property(x => x.MeetingTitle)
-                .HasColumnName("meetingtitle");
+    entity.Property(x => x.MeetingTitle)
+        .HasColumnName("meetingtitle");
 
-            entity.Property(x => x.Purpose)
-                .HasColumnName("purpose");
+    entity.Property(x => x.Purpose)
+        .HasColumnName("purpose");
 
-            entity.Property(x => x.ParticipantCount)
-                .HasColumnName("participantcount");
+    entity.Property(x => x.ParticipantCount)
+        .HasColumnName("participantcount");
 
-            entity.Property(x => x.BookingDate)
-                .HasColumnName("bookingdate");
+    entity.Property(x => x.BookingDate)
+        .HasColumnName("bookingdate");
 
-            entity.Property(x => x.StartTime)
-                .HasColumnName("starttime");
+    entity.Property(x => x.StartTime)
+        .HasColumnName("starttime");
 
-            entity.Property(x => x.EndTime)
-                .HasColumnName("endtime");
+    entity.Property(x => x.EndTime)
+        .HasColumnName("endtime");
 
-            // =====================================================
-            // IMPORTANT:
-            // PostgreSQL database column:
-            //
-            // bookedon timestamp without time zone
-            //
-            // Therefore EF Core MUST use:
-            // timestamp without time zone
-            // =====================================================
+    // =========================================================
+    // BOOKED ON
+    // =========================================================
+    // PostgreSQL:
+    // timestamp with time zone
+    //
+    // IMPORTANT:
+    // BookedOn must be assigned using DateTime.UtcNow
+    // =========================================================
 
-            entity.Property(x => x.BookedOn)
-                .HasColumnName("bookedon")
-                .HasColumnType("timestamp without time zone");
+    entity.Property(x => x.BookedOn)
+        .HasColumnName("bookedon")
+        .HasColumnType("timestamp with time zone");
 
-            entity.Property(x => x.Status)
-                .HasColumnName("status");
+    entity.Property(x => x.Status)
+        .HasColumnName("status");
 
-            // =====================================================
-            // CANCELLATION REASON
-            // =====================================================
+    // =========================================================
+    // CANCELLATION REASON
+    // =========================================================
 
-            entity.Property(x => x.CancellationReason)
-                .HasColumnName("cancellationreason")
-                .HasMaxLength(500);
+    entity.Property(x => x.CancellationReason)
+        .HasColumnName("cancellationreason")
+        .HasMaxLength(500);
 
-            // =====================================================
-            // EMPLOYEE RELATIONSHIP
-            // =====================================================
+    // =========================================================
+    // EMPLOYEE RELATIONSHIP
+    // =========================================================
 
-            entity.HasOne(x => x.Employee)
-                .WithMany(x => x.Bookings)
-                .HasForeignKey(x => x.EmployeeId)
-                .OnDelete(DeleteBehavior.Restrict);
+    entity.HasOne(x => x.Employee)
+        .WithMany(x => x.Bookings)
+        .HasForeignKey(x => x.EmployeeId)
+        .OnDelete(DeleteBehavior.Restrict);
 
-            // =====================================================
-            // ROOM RELATIONSHIP
-            // =====================================================
+    // =========================================================
+    // ROOM RELATIONSHIP
+    // =========================================================
 
-            entity.HasOne(x => x.Room)
-                .WithMany(x => x.Bookings)
-                .HasForeignKey(x => x.RoomId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
+    entity.HasOne(x => x.Room)
+        .WithMany(x => x.Bookings)
+        .HasForeignKey(x => x.RoomId)
+        .OnDelete(DeleteBehavior.Restrict);
+});
         // =========================================================
         // CHECK-IN
         // =========================================================
