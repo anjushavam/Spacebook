@@ -11,6 +11,11 @@ public interface IEmployeeBookingRepository
 
     Task CreateBookingAsync(Booking booking);
 
+    // =========================================================
+    // SAVE CHANGES
+    // =========================================================
+
+    Task SaveChangesAsync();
 
     // =========================================================
     // CHECK ROOM AVAILABILITY
@@ -22,11 +27,9 @@ public interface IEmployeeBookingRepository
         TimeOnly startTime,
         TimeOnly endTime);
 
-
     // =========================================================
     // CHECK ROOM AVAILABILITY
     // EXCLUDE EXISTING BOOKING
-    // Used while updating/rescheduling a booking
     // =========================================================
 
     Task<bool> IsRoomAvailableAsync(
@@ -36,7 +39,6 @@ public interface IEmployeeBookingRepository
         TimeOnly endTime,
         int excludeBookingId);
 
-
     // =========================================================
     // GET BOOKING DETAILS
     // =========================================================
@@ -45,16 +47,14 @@ public interface IEmployeeBookingRepository
         int bookingId,
         int employeeId);
 
-
     // =========================================================
     // CANCEL BOOKING
     // =========================================================
 
     Task<bool> CancelBookingAsync(
-    int bookingId,
-    int employeeId,
-    string reason);
-
+        int bookingId,
+        int employeeId,
+        string reason);
 
     // =========================================================
     // UPDATE / RESCHEDULE BOOKING
@@ -65,7 +65,6 @@ public interface IEmployeeBookingRepository
         int employeeId,
         UpdateBookingRequestDto request);
 
-
     // =========================================================
     // SEARCH AVAILABLE ROOMS
     // =========================================================
@@ -73,16 +72,12 @@ public interface IEmployeeBookingRepository
     Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
         SearchRoomsRequestDto request);
 
-
     // =========================================================
     // CHECK ROOM CAPACITY
-    // Used to determine whether any room satisfies
-    // the requested participant count.
     // =========================================================
 
     Task<bool> HasRoomWithRequiredCapacityAsync(
         SearchRoomsRequestDto request);
-
 
     // =========================================================
     // GET ROOMS BY MODULE
@@ -91,7 +86,6 @@ public interface IEmployeeBookingRepository
     Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
         string module);
 
-
     // =========================================================
     // GET ROOM CAPACITY
     // =========================================================
@@ -99,12 +93,10 @@ public interface IEmployeeBookingRepository
     Task<int?> GetRoomCapacityAsync(
         int roomId);
 
-    Task<string?> GetEmployeeNameAsync(int employeeId);
-
-
     // =========================================================
-    // SAVE CHANGES
+    // GET EMPLOYEE NAME
     // =========================================================
 
-    Task SaveChangesAsync();
+    Task<string?> GetEmployeeNameAsync(
+        int employeeId);
 }

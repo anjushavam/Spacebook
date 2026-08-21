@@ -20,7 +20,7 @@ public class EmployeeController : ControllerBase
     // =========================================================
     // SpaceBook office booking/search hours:
     //
-    // 10:00 AM - 07:30 PM
+    // 10:00 AM - 10:00 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
@@ -159,7 +159,7 @@ public class EmployeeController : ControllerBase
             return BadRequest(new
             {
                 Message =
-                    "Time must end by 07:30 PM."
+                    "Time must end by 10:00 PM."
             });
         }
 
@@ -430,16 +430,20 @@ public class EmployeeController : ControllerBase
                         employeeId,
                         request);
 
+            // -------------------------------------------------
+            // AUTO-APPROVED RESPONSE
+            // -------------------------------------------------
+
             return Ok(new
             {
                 Message =
-                    "Booking created successfully.",
+                    "Booking created and approved successfully.",
 
                 BookingId =
                     bookingId,
 
                 Status =
-                    "Pending"
+                    "Approved"
             });
         }
         catch (KeyNotFoundException ex)
@@ -911,7 +915,7 @@ public class EmployeeController : ControllerBase
                     bookingId,
 
                 Status =
-                    "Pending"
+                    "Approved"
             });
         }
         catch (KeyNotFoundException ex)

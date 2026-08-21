@@ -13,7 +13,7 @@ public class EmployeeBookingService : IEmployeeBookingService
     // OFFICE HOURS
     // =========================================================
     // Booking/Search Hours:
-    // 10:00 AM to 07:00 PM
+    // 10:00 AM to 10:00 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
@@ -140,7 +140,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:00 PM.");
+                "Bookings must end by 10:00 PM.");
         }
 
         // -----------------------------------------------------
@@ -219,9 +219,22 @@ public class EmployeeBookingService : IEmployeeBookingService
                 ? request.Purpose.Trim()
                 : resolvedTitle;
 
-        // -----------------------------------------------------
+        // =====================================================
         // CREATE BOOKING ENTITY
-        // -----------------------------------------------------
+        // =====================================================
+        //
+        // IMPORTANT:
+        // New employee bookings are now AUTO-APPROVED.
+        //
+        // Previously:
+        //
+        // Status = "Pending"
+        //
+        // Now:
+        //
+        // Status = "Approved"
+        //
+        // =====================================================
 
         var booking = new Booking
         {
@@ -253,7 +266,7 @@ public class EmployeeBookingService : IEmployeeBookingService
                 GetDatabaseDateTime(),
 
             Status =
-                "Pending"
+                "Approved"
         };
 
         try
@@ -268,7 +281,11 @@ public class EmployeeBookingService : IEmployeeBookingService
             await _bookingRepository.SaveChangesAsync();
 
             // -------------------------------------------------
-            // CREATE NOTIFICATION
+            // CREATE EMPLOYEE NOTIFICATION
+            // -------------------------------------------------
+            //
+            // Since the booking is automatically approved,
+            // tell the employee that it is approved.
             // -------------------------------------------------
 
             var notification = new Notification
@@ -280,7 +297,7 @@ public class EmployeeBookingService : IEmployeeBookingService
                     booking.BookingId,
 
                 Message =
-                    $"New booking request submitted for {resolvedTitle}.",
+                    $"Your booking for {resolvedTitle} has been automatically approved.",
 
                 IsRead =
                     false,
@@ -513,7 +530,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:00 PM.");
+                "Bookings must end by 10:00 PM.");
         }
 
         // -----------------------------------------------------
@@ -563,6 +580,19 @@ public class EmployeeBookingService : IEmployeeBookingService
         {
             throw new Exception(
                 "Cancelled bookings cannot be rescheduled.");
+        }
+
+        // -----------------------------------------------------
+        // PREVENT RESCHEDULE OF REJECTED BOOKING
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                existingBooking.Status,
+                "Rejected",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "Rejected bookings cannot be rescheduled.");
         }
 
         // -----------------------------------------------------
@@ -650,6 +680,16 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         // -----------------------------------------------------
         // CREATE ADMIN NOTIFICATION
+        // -----------------------------------------------------
+        //
+        // NOTE:
+        // The repository currently sets updated bookings
+        // to Pending. Therefore the notification correctly
+        // says that rescheduling requires approval.
+        //
+        // If you also want RESCHEDULES to be auto-approved,
+        // the repository method UpdateBookingAsync must be
+        // changed from Pending to Approved.
         // -----------------------------------------------------
 
         var notification = new Notification
@@ -782,7 +822,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             if (endTime > OfficeEndTime)
             {
                 throw new Exception(
-                    "Rooms can only be searched until 07:00 PM.");
+                    "Rooms can only be searched until 10:00 PM.");
             }
 
             if (hasBookingDate &&

@@ -15,7 +15,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // =========================================================
     // Rooms can only be searched/booked between:
     //
-    // 10:00 AM and 07:30 PM
+    // 10:00 AM and 10:00 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
@@ -89,7 +89,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         if (booking.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:30 PM.");
+                "Bookings must end by 10:00 PM.");
         }
 
         if (booking.StartTime >= booking.EndTime)
@@ -171,10 +171,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         //
         // timestamp with time zone
         //
-        // Therefore the DateTime MUST be UTC.
-        //
-        // IMPORTANT:
-        // Do NOT use DateTimeKind.Unspecified here.
+        // Therefore DateTime MUST be UTC.
         // -----------------------------------------------------
 
         booking.BookedOn = DateTime.UtcNow;
@@ -184,6 +181,15 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
 
         booking.CancellationReason = null;
+
+        // -----------------------------------------------------
+        // AUTO APPROVE BOOKING
+        // -----------------------------------------------------
+        //
+        // Employee bookings do not require admin approval.
+        //
+
+        booking.Status = "Approved";
 
         // -----------------------------------------------------
         // ADD BOOKING
@@ -234,7 +240,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         if (endTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:30 PM.");
+                "Bookings must end by 10:00 PM.");
         }
 
         if (startTime >= endTime)
@@ -247,7 +253,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // CHECK OVERLAPPING BOOKINGS
         // -----------------------------------------------------
         //
-        // Pending and Approved bookings block the room.
+        // Approved bookings block the room.
         //
         // Cancelled and Rejected bookings do not block it.
         //
@@ -306,7 +312,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         if (endTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:30 PM.");
+                "Bookings must end by 10:00 PM.");
         }
 
         if (startTime >= endTime)
@@ -718,7 +724,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:30 PM.");
+                "Bookings must end by 10:00 PM.");
         }
 
         // -----------------------------------------------------
@@ -805,11 +811,15 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             null;
 
         // -----------------------------------------------------
-        // RESCHEDULE REQUIRES ADMIN APPROVAL
+        // AUTO APPROVE RESCHEDULE
         // -----------------------------------------------------
+        //
+        // Rescheduled bookings are automatically approved.
+        // No admin approval is required.
+        //
 
         booking.Status =
-            "Pending";
+            "Approved";
 
         // -----------------------------------------------------
         // SAVE
@@ -873,7 +883,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             if (endTime > OfficeEndTime)
             {
                 throw new Exception(
-                    "Rooms can only be searched until 07:30 PM.");
+                    "Rooms can only be searched until 10:00 PM.");
             }
         }
 
@@ -1036,12 +1046,14 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                     booking.BookingDate ==
                     bookingDate &&
 
-                    // Pending and Approved bookings
-                    // block the room.
+                    // Approved bookings block the room.
+                    // Cancelled and Rejected do not.
+
                     booking.Status != "Cancelled" &&
                     booking.Status != "Rejected" &&
 
                     // OVERLAP CHECK
+
                     booking.StartTime < endTime &&
                     booking.EndTime > startTime
                 ));
@@ -1265,12 +1277,18 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             .FirstOrDefaultAsync();
     }
 
+    // =========================================================
+    // GET EMPLOYEE NAME
+    // =========================================================
 
-    public async Task<string?> GetEmployeeNameAsync(int employeeId)
-{
-    return await _context.Employees
-        .Where(e => e.EmployeeId == employeeId)
-        .Select(e => e.Name)
-        .FirstOrDefaultAsync();
-}
+    public async Task<string?> GetEmployeeNameAsync(
+        int employeeId)
+    {
+        return await _context.Employees
+            .Where(e =>
+                e.EmployeeId == employeeId)
+            .Select(e =>
+                e.Name)
+            .FirstOrDefaultAsync();
+    }
 }

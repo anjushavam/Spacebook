@@ -49,6 +49,13 @@ public class BookingService : IBookingService
     // =========================================================
     // APPROVE BOOKING
     // =========================================================
+    // This method is retained for:
+    // - Existing Pending bookings
+    // - Manual admin approval if required
+    //
+    // New employee bookings should now be created as
+    // "Approved" directly from EmployeeBookingService.
+    // =========================================================
 
     public async Task ApproveAsync(int bookingId)
     {
@@ -81,7 +88,7 @@ public class BookingService : IBookingService
         // -----------------------------------------------------
         // 3. VALIDATE CURRENT STATUS
         // -----------------------------------------------------
-        // Only Pending bookings are eligible for approval.
+        // Only Pending bookings are eligible for manual approval.
 
         if (!string.Equals(
                 booking.Status,
@@ -170,6 +177,11 @@ public class BookingService : IBookingService
 
     // =========================================================
     // REJECT BOOKING
+    // =========================================================
+    // This method is retained for existing Pending bookings.
+    //
+    // New employee bookings are auto-approved, so normally
+    // new bookings will not reach this method.
     // =========================================================
 
     public async Task RejectAsync(int bookingId)
