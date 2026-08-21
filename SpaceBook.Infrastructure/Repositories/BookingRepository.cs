@@ -54,6 +54,10 @@ public class BookingRepository : IBookingRepository
             .Include(x => x.Employee)
             .AsQueryable();
 
+        // -----------------------------------------------------
+        // SEARCH
+        // -----------------------------------------------------
+
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var search =
@@ -70,11 +74,19 @@ public class BookingRepository : IBookingRepository
                  x.Room.Module.ModuleName.Contains(search)));
         }
 
+        // -----------------------------------------------------
+        // STATUS FILTER
+        // -----------------------------------------------------
+
         if (!string.IsNullOrWhiteSpace(filter.Status))
         {
             query = query.Where(x =>
                 x.Status == filter.Status);
         }
+
+        // -----------------------------------------------------
+        // RETURN BOOKINGS
+        // -----------------------------------------------------
 
         return await query
             .OrderByDescending(x => x.BookedOn)
@@ -184,80 +196,6 @@ public class BookingRepository : IBookingRepository
                     x.BookedOn
             })
             .FirstOrDefaultAsync();
-    }
-
-    // =========================================================
-    // APPROVE BOOKING
-    // =========================================================
-
-    public async Task ApproveAsync(
-        int bookingId)
-    {
-        var booking =
-            await _context.Bookings
-                .FirstOrDefaultAsync(x =>
-                    x.BookingId == bookingId);
-
-        if (booking == null)
-        {
-            throw new KeyNotFoundException(
-                "Booking not found.");
-        }
-
-        // -----------------------------------------------------
-        // ONLY PENDING BOOKINGS CAN BE APPROVED
-        // -----------------------------------------------------
-
-        if (!string.Equals(
-                booking.Status,
-                "Pending",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Booking cannot be approved because its current status is {booking.Status}.");
-        }
-
-        booking.Status =
-            "Approved";
-
-        await _context.SaveChangesAsync();
-    }
-
-    // =========================================================
-    // REJECT BOOKING
-    // =========================================================
-
-    public async Task RejectAsync(
-        int bookingId)
-    {
-        var booking =
-            await _context.Bookings
-                .FirstOrDefaultAsync(x =>
-                    x.BookingId == bookingId);
-
-        if (booking == null)
-        {
-            throw new KeyNotFoundException(
-                "Booking not found.");
-        }
-
-        // -----------------------------------------------------
-        // ONLY PENDING BOOKINGS CAN BE REJECTED
-        // -----------------------------------------------------
-
-        if (!string.Equals(
-                booking.Status,
-                "Pending",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Booking cannot be rejected because its current status is {booking.Status}.");
-        }
-
-        booking.Status =
-            "Rejected";
-
-        await _context.SaveChangesAsync();
     }
 
     // =========================================================

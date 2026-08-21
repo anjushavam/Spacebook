@@ -69,96 +69,6 @@ public class BookingController : ControllerBase
     }
 
     // =========================================================
-    // APPROVE BOOKING
-    // =========================================================
-
-    // PATCH: api/admin/bookings/1/approve
-    [HttpPatch("{id:int}/approve")]
-    public async Task<IActionResult> Approve(int id)
-    {
-        try
-        {
-            await _bookingService.ApproveAsync(id);
-
-            return Ok(new
-            {
-                message =
-                    "Booking approved successfully."
-            });
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new
-            {
-                message = "Booking not found."
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(
-                StatusCodes.Status500InternalServerError,
-                new
-                {
-                    message =
-                        "An unexpected error occurred while approving the booking.",
-                    error = ex.Message
-                });
-        }
-    }
-
-    // =========================================================
-    // REJECT BOOKING
-    // =========================================================
-
-    // PATCH: api/admin/bookings/1/reject
-    [HttpPatch("{id:int}/reject")]
-    public async Task<IActionResult> Reject(int id)
-    {
-        try
-        {
-            await _bookingService.RejectAsync(id);
-
-            return Ok(new
-            {
-                message =
-                    "Booking rejected successfully."
-            });
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new
-            {
-                message = "Booking not found."
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(
-                StatusCodes.Status500InternalServerError,
-                new
-                {
-                    message =
-                        "An unexpected error occurred while rejecting the booking.",
-                    error = ex.Message
-                });
-        }
-    }
-
-    // =========================================================
     // DELETE BOOKING
     // =========================================================
 
@@ -172,8 +82,7 @@ public class BookingController : ControllerBase
 
             return Ok(new
             {
-                message =
-                    "Booking deleted successfully."
+                message = "Booking deleted successfully."
             });
         }
         catch (KeyNotFoundException)
