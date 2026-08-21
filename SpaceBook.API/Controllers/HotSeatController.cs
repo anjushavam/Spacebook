@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SpaceBook.Application.DTOs.Hotseat;
@@ -10,6 +11,7 @@ namespace SpaceBook.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize(Roles = "Employee")]
 public class HotseatController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -48,10 +50,8 @@ public class HotseatController : ControllerBase
             {
                 EmployeeId = employeeId,
 
-                // Normal room booking does not apply
                 BookingId = null,
 
-                // Hotseat booking reference
                 HotseatBookingId = hotseatBookingId,
 
                 Message = message,
@@ -70,7 +70,8 @@ public class HotseatController : ControllerBase
         catch (Exception ex)
         {
             // Notification failure should not fail
-            // the hotseat operation itself.
+            // the hotseat operation.
+
             Console.WriteLine(
                 $"[HotseatController] Notification creation failed " +
                 $"for hotseat booking {hotseatBookingId}.");
@@ -82,6 +83,7 @@ public class HotseatController : ControllerBase
 
     // ============================================================
     // GET: api/Hotseat
+    // GET ACTIVE HOTSEATS AND STATUS
     // ============================================================
 
     [HttpGet]
@@ -123,10 +125,13 @@ public class HotseatController : ControllerBase
         var seatsQuery =
             _context.Seats
                 .AsNoTracking()
+
                 .Include(s => s.Module)
                     .ThenInclude(m => m!.Office)
                     .ThenInclude(o => o!.Location)
+
                 .Where(s => s.IsActive)
+
                 .AsQueryable();
 
         // --------------------------------------------------------
@@ -135,6 +140,7 @@ public class HotseatController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(module))
         {
+            queryModule:
             seatsQuery =
                 seatsQuery.Where(s =>
                     s.Module != null &&
@@ -180,6 +186,7 @@ public class HotseatController : ControllerBase
                 .ThenBy(s => s.Section)
                 .ThenBy(s => s.RowNumber)
                 .ThenBy(s => s.ColumnNumber)
+
                 .Select(s => new
                 {
                     s.SeatId,
@@ -205,10 +212,11 @@ public class HotseatController : ControllerBase
                                     "CheckedIn"
                             ))
                 })
+
                 .ToListAsync();
 
         // --------------------------------------------------------
-        // 7. MAP
+        // 7. MAP RESULT
         // --------------------------------------------------------
 
         var result =
@@ -241,6 +249,10 @@ public class HotseatController : ControllerBase
     [HttpGet("my-bookings")]
     public async Task<IActionResult> GetMyBookings()
     {
+        // --------------------------------------------------------
+        // 1. GET EMPLOYEE ID
+        // --------------------------------------------------------
+
         var employeeIdClaim =
             User.FindFirst(
                 ClaimTypes.NameIdentifier)?.Value;
@@ -256,6 +268,10 @@ public class HotseatController : ControllerBase
                     "Employee information could not be determined."
             });
         }
+
+        // --------------------------------------------------------
+        // 2. GET BOOKINGS
+        // --------------------------------------------------------
 
         var bookings =
             await _context.HotseatBookings
@@ -328,6 +344,10 @@ public class HotseatController : ControllerBase
     public async Task<IActionResult> CreateBooking(
         [FromBody] CreateHotseatBookingDto request)
     {
+        // --------------------------------------------------------
+        // 1. VALIDATE REQUEST
+        // --------------------------------------------------------
+
         if (request == null)
         {
             return BadRequest(new
@@ -338,7 +358,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // DATE VALIDATION
+        // 2. VALIDATE BOOKING DATE
         // --------------------------------------------------------
 
         var todayUtc =
@@ -355,28 +375,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // GET SEAT
-        // --------------------------------------------------------
-
-        var seat =
-            await _context.Seats
-                .Include(s => s.Module)
-
-                .FirstOrDefaultAsync(s =>
-                    s.SeatId == request.SeatId &&
-                    s.IsActive);
-
-        if (seat == null)
-        {
-            return NotFound(new
-            {
-                message =
-                    "Seat not found or inactive."
-            });
-        }
-
-        // --------------------------------------------------------
-        // GET EMPLOYEE
+        // 3. GET EMPLOYEE ID
         // --------------------------------------------------------
 
         var employeeIdClaim =
@@ -403,6 +402,10 @@ public class HotseatController : ControllerBase
             });
         }
 
+        // --------------------------------------------------------
+        // 4. VALIDATE EMPLOYEE
+        // --------------------------------------------------------
+
         var employeeExists =
             await _context.Employees
                 .AnyAsync(e =>
@@ -419,7 +422,28 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK SEAT ALREADY BOOKED
+        // 5. VALIDATE SEAT
+        // --------------------------------------------------------
+
+        var seat =
+            await _context.Seats
+                .Include(s => s.Module)
+
+                .FirstOrDefaultAsync(s =>
+                    s.SeatId == request.SeatId &&
+                    s.IsActive);
+
+        if (seat == null)
+        {
+            return NotFound(new
+            {
+                message =
+                    "Seat not found or inactive."
+            });
+        }
+
+        // --------------------------------------------------------
+        // 6. CHECK SEAT ALREADY BOOKED
         // --------------------------------------------------------
 
         var existingBooking =
@@ -456,7 +480,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // PREVENT EMPLOYEE DUPLICATE BOOKING
+        // 7. PREVENT EMPLOYEE DUPLICATE BOOKING
         // --------------------------------------------------------
 
         var employeeExistingBooking =
@@ -496,7 +520,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK-IN DEADLINE
+        // 8. CHECK-IN DEADLINE
         // --------------------------------------------------------
 
         var checkInTime =
@@ -510,7 +534,7 @@ public class HotseatController : ControllerBase
                 DateTimeKind.Utc);
 
         // --------------------------------------------------------
-        // CREATE BOOKING
+        // 9. CREATE BOOKING
         // --------------------------------------------------------
 
         var booking =
@@ -554,7 +578,7 @@ public class HotseatController : ControllerBase
             };
 
         // --------------------------------------------------------
-        // SAVE BOOKING
+        // 10. SAVE BOOKING
         // --------------------------------------------------------
 
         try
@@ -587,17 +611,19 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CREATE CONFIRMATION NOTIFICATION
+        // 11. CREATE CONFIRMATION NOTIFICATION
         // --------------------------------------------------------
 
         await CreateHotseatNotificationAsync(
             employeeId,
             booking.HotseatBookingId,
+
             $"Your hotseat booking for {seat.SeatNumber} " +
-            $"on {booking.BookingDate:dd-MMM-yyyy} has been confirmed.");
+            $"on {booking.BookingDate:dd-MMM-yyyy} " +
+            $"has been confirmed.");
 
         // --------------------------------------------------------
-        // RETURN
+        // 12. RETURN
         // --------------------------------------------------------
 
         return Ok(new
@@ -641,6 +667,10 @@ public class HotseatController : ControllerBase
         int id,
         [FromBody] CreateHotseatBookingDto request)
     {
+        // --------------------------------------------------------
+        // 1. VALIDATE REQUEST
+        // --------------------------------------------------------
+
         if (request == null)
         {
             return BadRequest(new
@@ -649,6 +679,10 @@ public class HotseatController : ControllerBase
                     "Booking request is required."
             });
         }
+
+        // --------------------------------------------------------
+        // 2. GET EMPLOYEE
+        // --------------------------------------------------------
 
         var employeeIdClaim =
             User.FindFirst(
@@ -667,7 +701,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // GET BOOKING
+        // 3. GET BOOKING
         // --------------------------------------------------------
 
         var booking =
@@ -684,10 +718,18 @@ public class HotseatController : ControllerBase
             });
         }
 
+        // --------------------------------------------------------
+        // 4. VERIFY OWNER
+        // --------------------------------------------------------
+
         if (booking.EmployeeId != employeeId)
         {
             return Forbid();
         }
+
+        // --------------------------------------------------------
+        // 5. VALIDATE STATUS
+        // --------------------------------------------------------
 
         if (!string.Equals(
                 booking.BookingStatus,
@@ -702,7 +744,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // DATE VALIDATION
+        // 6. VALIDATE DATE
         // --------------------------------------------------------
 
         var todayUtc =
@@ -719,7 +761,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // GET NEW SEAT
+        // 7. VALIDATE SEAT
         // --------------------------------------------------------
 
         var seat =
@@ -740,7 +782,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK SEAT AVAILABILITY
+        // 8. CHECK SEAT AVAILABILITY
         // --------------------------------------------------------
 
         var seatAlreadyBooked =
@@ -749,7 +791,8 @@ public class HotseatController : ControllerBase
 
                 .AnyAsync(b =>
                     b.HotseatBookingId != id &&
-                    b.SeatId == request.SeatId &&
+                    b.SeatId ==
+                        request.SeatId &&
                     b.BookingDate ==
                         request.BookingDate &&
                     (
@@ -770,7 +813,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK EMPLOYEE DUPLICATE
+        // 9. CHECK EMPLOYEE DUPLICATE
         // --------------------------------------------------------
 
         var employeeAlreadyBooked =
@@ -779,7 +822,8 @@ public class HotseatController : ControllerBase
 
                 .AnyAsync(b =>
                     b.HotseatBookingId != id &&
-                    b.EmployeeId == employeeId &&
+                    b.EmployeeId ==
+                        employeeId &&
                     b.BookingDate ==
                         request.BookingDate &&
                     (
@@ -800,7 +844,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK-IN DEADLINE
+        // 10. CHECK-IN DEADLINE
         // --------------------------------------------------------
 
         var checkInTime =
@@ -814,7 +858,7 @@ public class HotseatController : ControllerBase
                 DateTimeKind.Utc);
 
         // --------------------------------------------------------
-        // UPDATE
+        // 11. UPDATE
         // --------------------------------------------------------
 
         booking.SeatId =
@@ -831,6 +875,10 @@ public class HotseatController : ControllerBase
 
         booking.RecordModifiedOn =
             DateTime.UtcNow;
+
+        // --------------------------------------------------------
+        // 12. SAVE
+        // --------------------------------------------------------
 
         try
         {
@@ -853,15 +901,20 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // UPDATE NOTIFICATION
+        // 13. UPDATE NOTIFICATION
         // --------------------------------------------------------
 
         await CreateHotseatNotificationAsync(
             employeeId,
             booking.HotseatBookingId,
+
             $"Your hotseat booking has been updated to " +
             $"{seat.SeatNumber} on " +
             $"{booking.BookingDate:dd-MMM-yyyy}.");
+
+        // --------------------------------------------------------
+        // 14. RETURN
+        // --------------------------------------------------------
 
         return Ok(new
         {
@@ -902,6 +955,10 @@ public class HotseatController : ControllerBase
     public async Task<IActionResult> CheckIn(
         int id)
     {
+        // --------------------------------------------------------
+        // 1. GET EMPLOYEE
+        // --------------------------------------------------------
+
         var employeeIdClaim =
             User.FindFirst(
                 ClaimTypes.NameIdentifier)?.Value;
@@ -919,7 +976,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // FIND BOOKING
+        // 2. GET BOOKING
         // --------------------------------------------------------
 
         var booking =
@@ -938,13 +995,17 @@ public class HotseatController : ControllerBase
             });
         }
 
+        // --------------------------------------------------------
+        // 3. VERIFY OWNER
+        // --------------------------------------------------------
+
         if (booking.EmployeeId != employeeId)
         {
             return Forbid();
         }
 
         // --------------------------------------------------------
-        // STATUS VALIDATION
+        // 4. STATUS VALIDATION
         // --------------------------------------------------------
 
         if (string.Equals(
@@ -1008,7 +1069,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // DATE VALIDATION
+        // 5. VALIDATE DATE
         // --------------------------------------------------------
 
         var todayUtc =
@@ -1025,7 +1086,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK-IN
+        // 6. CHECK-IN
         // --------------------------------------------------------
 
         booking.BookingStatus =
@@ -1039,6 +1100,10 @@ public class HotseatController : ControllerBase
 
         booking.RecordModifiedOn =
             DateTime.UtcNow;
+
+        // --------------------------------------------------------
+        // 7. SAVE
+        // --------------------------------------------------------
 
         try
         {
@@ -1061,7 +1126,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK-IN NOTIFICATION
+        // 8. CHECK-IN NOTIFICATION
         // --------------------------------------------------------
 
         var seatNumber =
@@ -1071,7 +1136,13 @@ public class HotseatController : ControllerBase
         await CreateHotseatNotificationAsync(
             employeeId,
             booking.HotseatBookingId,
-            $"You have successfully checked in to {seatNumber}.");
+
+            $"You have successfully checked in to " +
+            $"{seatNumber}.");
+
+        // --------------------------------------------------------
+        // 9. RETURN
+        // --------------------------------------------------------
 
         return Ok(new
         {
@@ -1107,6 +1178,10 @@ public class HotseatController : ControllerBase
     public async Task<IActionResult> CancelBooking(
         int id)
     {
+        // --------------------------------------------------------
+        // 1. GET EMPLOYEE
+        // --------------------------------------------------------
+
         var employeeIdClaim =
             User.FindFirst(
                 ClaimTypes.NameIdentifier)?.Value;
@@ -1124,7 +1199,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // GET BOOKING + SEAT
+        // 2. GET BOOKING + SEAT
         // --------------------------------------------------------
 
         var booking =
@@ -1143,13 +1218,17 @@ public class HotseatController : ControllerBase
             });
         }
 
+        // --------------------------------------------------------
+        // 3. VERIFY OWNER
+        // --------------------------------------------------------
+
         if (booking.EmployeeId != employeeId)
         {
             return Forbid();
         }
 
         // --------------------------------------------------------
-        // STATUS VALIDATION
+        // 4. STATUS VALIDATION
         // --------------------------------------------------------
 
         if (string.Equals(
@@ -1189,7 +1268,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CANCEL
+        // 5. CANCEL
         // --------------------------------------------------------
 
         booking.BookingStatus =
@@ -1200,6 +1279,10 @@ public class HotseatController : ControllerBase
 
         booking.RecordModifiedOn =
             DateTime.UtcNow;
+
+        // --------------------------------------------------------
+        // 6. SAVE
+        // --------------------------------------------------------
 
         try
         {
@@ -1222,7 +1305,7 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CANCELLATION NOTIFICATION
+        // 7. CANCELLATION NOTIFICATION
         // --------------------------------------------------------
 
         var seatNumber =
@@ -1232,9 +1315,15 @@ public class HotseatController : ControllerBase
         await CreateHotseatNotificationAsync(
             employeeId,
             booking.HotseatBookingId,
+
             $"Your hotseat booking for {seatNumber} " +
-            $"on {booking.BookingDate:dd-MMM-yyyy} has been cancelled. " +
+            $"on {booking.BookingDate:dd-MMM-yyyy} " +
+            $"has been cancelled. " +
             $"Reason: You cancelled the booking.");
+
+        // --------------------------------------------------------
+        // 8. RETURN
+        // --------------------------------------------------------
 
         return Ok(new
         {
