@@ -27,7 +27,7 @@ public class EmployeeController : ControllerBase
         new TimeOnly(10, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(19, 0);
+        new TimeOnly(22, 0);
 
     public EmployeeController(
         IEmployeeDashboardService dashboardService,

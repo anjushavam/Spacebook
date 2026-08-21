@@ -1349,4 +1349,94 @@ public class HotseatController : ControllerBase
                 booking.RecordModifiedOn
         });
     }
+
+    // ============================================================
+// GET: api/Hotseat/stats
+// Get real-time hotseat statistics from database
+// ============================================================
+
+[HttpGet("stats")]
+public async Task<ActionResult<HotseatStatsDto>> GetStats()
+{
+    // --------------------------------------------------------
+    // 1. Get today's date
+    // --------------------------------------------------------
+
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+
+    // --------------------------------------------------------
+    // 2. Count all active hotseat spaces
+    // --------------------------------------------------------
+
+    var totalSpaces = await _context.Seats
+        .AsNoTracking()
+        .CountAsync(s => s.IsActive);
+
+
+    // --------------------------------------------------------
+    // 3. Count seats booked for TODAY
+    //
+    // Confirmed and CheckedIn seats are occupied.
+    // Cancelled / Released / Expired are not counted.
+    // --------------------------------------------------------
+
+    var bookedCount = await _context.HotseatBookings
+        .AsNoTracking()
+        .CountAsync(b =>
+            b.BookingDate == today &&
+            (
+                b.BookingStatus == "Confirmed" ||
+                b.BookingStatus == "CheckedIn"
+            ));
+
+
+    // --------------------------------------------------------
+    // 4. Count today's bookings waiting for check-in
+    // --------------------------------------------------------
+
+    var pendingCheckInCount = await _context.HotseatBookings
+        .AsNoTracking()
+        .CountAsync(b =>
+            b.BookingDate == today &&
+            b.BookingStatus == "Confirmed" &&
+            b.CheckInTime == null &&
+            b.ReleasedOn == null);
+
+
+    // --------------------------------------------------------
+    // 5. Count all bookings for today
+    // --------------------------------------------------------
+
+    var bookingsToday = await _context.HotseatBookings
+        .AsNoTracking()
+        .CountAsync(b =>
+            b.BookingDate == today &&
+            b.BookingStatus != "Cancelled" &&
+            b.BookingStatus != "Released" &&
+            b.BookingStatus != "Expired");
+
+
+    // --------------------------------------------------------
+    // 6. Calculate available spaces
+    // --------------------------------------------------------
+
+    var availableCount = Math.Max(
+        0,
+        totalSpaces - bookedCount);
+
+
+    // --------------------------------------------------------
+    // 7. Return real database values
+    // --------------------------------------------------------
+
+    return Ok(new HotseatStatsDto
+    {
+        TotalSpaces = totalSpaces,
+        Available = availableCount,
+        Booked = bookedCount,
+        PendingCheckIn = pendingCheckInCount,
+        BookingsToday = bookingsToday
+    });
+}
 }

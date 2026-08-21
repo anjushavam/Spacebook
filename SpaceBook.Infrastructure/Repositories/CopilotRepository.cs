@@ -314,7 +314,10 @@ public class CopilotRepository : ICopilotRepository
             (new TimeOnly(15, 0), new TimeOnly(16, 0)),
             (new TimeOnly(16, 0), new TimeOnly(17, 0)),
             (new TimeOnly(17, 0), new TimeOnly(18, 0)),
-            (new TimeOnly(18, 0), new TimeOnly(19, 0))
+            (new TimeOnly(18, 0), new TimeOnly(19, 0)),
+            (new TimeOnly(19, 0), new TimeOnly(20, 0)),
+            (new TimeOnly(20, 0), new TimeOnly(21, 0)),
+            (new TimeOnly(21, 0), new TimeOnly(22, 0))
       
         };
 

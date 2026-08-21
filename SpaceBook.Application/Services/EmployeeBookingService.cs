@@ -20,7 +20,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         new TimeOnly(10, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(19, 0);
+        new TimeOnly(22, 0);
 
     public EmployeeBookingService(
         IEmployeeBookingRepository bookingRepository,
