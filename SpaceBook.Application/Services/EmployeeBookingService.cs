@@ -34,17 +34,18 @@ public class EmployeeBookingService : IEmployeeBookingService
     // DATABASE DATETIME
     // =========================================================
     // PostgreSQL columns:
-    // timestamp without time zone
+    // timestamp with time zone
     //
-    // Therefore DateTime must be written with
-    // DateTimeKind.Unspecified.
+    // IMPORTANT:
+    // PostgreSQL timestamp with time zone requires UTC
+    // DateTime.
+    //
+    // DO NOT use DateTimeKind.Unspecified here.
     // =========================================================
 
     private static DateTime GetDatabaseDateTime()
     {
-        return DateTime.SpecifyKind(
-            DateTime.Now,
-            DateTimeKind.Unspecified);
+        return DateTime.UtcNow;
     }
 
     // =========================================================
@@ -104,6 +105,8 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         ValidateWeekday(request.BookingDate);
 
+        // Use local server/application time for office booking
+        // validation.
         var now = DateTime.Now;
 
         var today =
@@ -257,6 +260,8 @@ public class EmployeeBookingService : IEmployeeBookingService
             EndTime =
                 request.EndTime,
 
+            // PostgreSQL timestamp with time zone
+            // requires UTC.
             BookedOn =
                 GetDatabaseDateTime(),
 
@@ -293,6 +298,8 @@ public class EmployeeBookingService : IEmployeeBookingService
                 IsRead =
                     false,
 
+                // PostgreSQL timestamp with time zone
+                // requires UTC.
                 CreatedAt =
                     GetDatabaseDateTime()
             };
@@ -320,11 +327,19 @@ public class EmployeeBookingService : IEmployeeBookingService
         int bookingId,
         int employeeId)
     {
+        // -----------------------------------------------------
+        // VALIDATE BOOKING ID
+        // -----------------------------------------------------
+
         if (bookingId <= 0)
         {
             throw new Exception(
                 "Invalid booking ID.");
         }
+
+        // -----------------------------------------------------
+        // VALIDATE EMPLOYEE
+        // -----------------------------------------------------
 
         if (employeeId <= 0)
         {
@@ -339,14 +354,6 @@ public class EmployeeBookingService : IEmployeeBookingService
 
     // =========================================================
     // CANCEL BOOKING
-    // =========================================================
-    // IMPORTANT:
-    // Interface expects:
-    //
-    // CancelBookingAsync(
-    //     int bookingId,
-    //     int employeeId,
-    //     string reason)
     // =========================================================
 
     public async Task<bool> CancelBookingAsync(
@@ -419,6 +426,8 @@ public class EmployeeBookingService : IEmployeeBookingService
             IsRead =
                 false,
 
+            // PostgreSQL timestamp with time zone
+            // requires UTC.
             CreatedAt =
                 GetDatabaseDateTime()
         };
@@ -656,6 +665,8 @@ public class EmployeeBookingService : IEmployeeBookingService
             IsRead =
                 false,
 
+            // PostgreSQL timestamp with time zone
+            // requires UTC.
             CreatedAt =
                 GetDatabaseDateTime()
         };
@@ -833,6 +844,10 @@ public class EmployeeBookingService : IEmployeeBookingService
         GetRoomsByModuleAsync(
             string module)
     {
+        // -----------------------------------------------------
+        // VALIDATE MODULE
+        // -----------------------------------------------------
+
         if (string.IsNullOrWhiteSpace(module))
         {
             throw new Exception(
