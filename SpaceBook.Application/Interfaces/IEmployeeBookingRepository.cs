@@ -99,6 +99,8 @@ public interface IEmployeeBookingRepository
     Task<int?> GetRoomCapacityAsync(
         int roomId);
 
+    Task<string?> GetEmployeeNameAsync(int employeeId);
+
 
     // =========================================================
     // SAVE CHANGES

@@ -13,7 +13,7 @@ public class EmployeeBookingService : IEmployeeBookingService
     // OFFICE HOURS
     // =========================================================
     // Booking/Search Hours:
-    // 10:00 AM to 07:30 PM
+    // 10:00 AM to 07:00 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
@@ -32,15 +32,6 @@ public class EmployeeBookingService : IEmployeeBookingService
 
     // =========================================================
     // DATABASE DATETIME
-    // =========================================================
-    // PostgreSQL columns:
-    // timestamp with time zone
-    //
-    // IMPORTANT:
-    // PostgreSQL timestamp with time zone requires UTC
-    // DateTime.
-    //
-    // DO NOT use DateTimeKind.Unspecified here.
     // =========================================================
 
     private static DateTime GetDatabaseDateTime()
@@ -105,8 +96,6 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         ValidateWeekday(request.BookingDate);
 
-        // Use local server/application time for office booking
-        // validation.
         var now = DateTime.Now;
 
         var today =
@@ -151,7 +140,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:30 PM.");
+                "Bookings must end by 07:00 PM.");
         }
 
         // -----------------------------------------------------
@@ -260,8 +249,6 @@ public class EmployeeBookingService : IEmployeeBookingService
             EndTime =
                 request.EndTime,
 
-            // PostgreSQL timestamp with time zone
-            // requires UTC.
             BookedOn =
                 GetDatabaseDateTime(),
 
@@ -298,8 +285,6 @@ public class EmployeeBookingService : IEmployeeBookingService
                 IsRead =
                     false,
 
-                // PostgreSQL timestamp with time zone
-                // requires UTC.
                 CreatedAt =
                     GetDatabaseDateTime()
             };
@@ -327,19 +312,11 @@ public class EmployeeBookingService : IEmployeeBookingService
         int bookingId,
         int employeeId)
     {
-        // -----------------------------------------------------
-        // VALIDATE BOOKING ID
-        // -----------------------------------------------------
-
         if (bookingId <= 0)
         {
             throw new Exception(
                 "Invalid booking ID.");
         }
-
-        // -----------------------------------------------------
-        // VALIDATE EMPLOYEE
-        // -----------------------------------------------------
 
         if (employeeId <= 0)
         {
@@ -394,6 +371,19 @@ public class EmployeeBookingService : IEmployeeBookingService
         reason = reason.Trim();
 
         // -----------------------------------------------------
+        // GET EMPLOYEE NAME
+        // -----------------------------------------------------
+
+        var employeeName =
+            await _bookingRepository.GetEmployeeNameAsync(
+                employeeId);
+
+        if (string.IsNullOrWhiteSpace(employeeName))
+        {
+            employeeName = "Unknown user";
+        }
+
+        // -----------------------------------------------------
         // CANCEL BOOKING
         // -----------------------------------------------------
 
@@ -421,13 +411,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                 bookingId,
 
             Message =
-                $"Booking #{bookingId} was cancelled by employee. Reason: {reason}",
+                $"Booking was cancelled by {employeeName}. Reason: {reason}",
 
             IsRead =
                 false,
 
-            // PostgreSQL timestamp with time zone
-            // requires UTC.
             CreatedAt =
                 GetDatabaseDateTime()
         };
@@ -525,7 +513,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         if (request.EndTime > OfficeEndTime)
         {
             throw new Exception(
-                "Bookings must end by 07:30 PM.");
+                "Bookings must end by 07:00 PM.");
         }
 
         // -----------------------------------------------------
@@ -648,6 +636,19 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
+        // GET EMPLOYEE NAME
+        // -----------------------------------------------------
+
+        var employeeName =
+            await _bookingRepository.GetEmployeeNameAsync(
+                employeeId);
+
+        if (string.IsNullOrWhiteSpace(employeeName))
+        {
+            employeeName = "Unknown user";
+        }
+
+        // -----------------------------------------------------
         // CREATE ADMIN NOTIFICATION
         // -----------------------------------------------------
 
@@ -660,13 +661,11 @@ public class EmployeeBookingService : IEmployeeBookingService
                 bookingId,
 
             Message =
-                $"Booking #{bookingId} was rescheduled by employee and requires approval.",
+                $"Booking was rescheduled by {employeeName} and requires approval.",
 
             IsRead =
                 false,
 
-            // PostgreSQL timestamp with time zone
-            // requires UTC.
             CreatedAt =
                 GetDatabaseDateTime()
         };
@@ -687,19 +686,11 @@ public class EmployeeBookingService : IEmployeeBookingService
         SearchAvailableRoomsAsync(
             SearchRoomsRequestDto request)
     {
-        // -----------------------------------------------------
-        // VALIDATE REQUEST
-        // -----------------------------------------------------
-
         if (request == null)
         {
             throw new Exception(
                 "Search request is required.");
         }
-
-        // -----------------------------------------------------
-        // DETERMINE SEARCH CRITERIA
-        // -----------------------------------------------------
 
         var hasModule =
             !string.IsNullOrWhiteSpace(request.Module);
@@ -725,10 +716,6 @@ public class EmployeeBookingService : IEmployeeBookingService
             request.FacilityIds != null &&
             request.FacilityIds.Any(id => id > 0);
 
-        // -----------------------------------------------------
-        // AT LEAST ONE SEARCH CRITERION
-        // -----------------------------------------------------
-
         if (!hasModule &&
             !hasRoomType &&
             !hasParticipantCount &&
@@ -740,10 +727,6 @@ public class EmployeeBookingService : IEmployeeBookingService
             throw new Exception(
                 "Please provide at least one search criterion.");
         }
-
-        // -----------------------------------------------------
-        // TIME RANGE MUST BE COMPLETE
-        // -----------------------------------------------------
 
         if (hasStartTime != hasEndTime)
         {
@@ -773,7 +756,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // VALIDATE TIME RANGE
+        // VALIDATE TIME
         // -----------------------------------------------------
 
         if (hasStartTime && hasEndTime)
@@ -799,7 +782,7 @@ public class EmployeeBookingService : IEmployeeBookingService
             if (endTime > OfficeEndTime)
             {
                 throw new Exception(
-                    "Rooms can only be searched until 07:30 PM.");
+                    "Rooms can only be searched until 07:00 PM.");
             }
 
             if (hasBookingDate &&
@@ -844,10 +827,6 @@ public class EmployeeBookingService : IEmployeeBookingService
         GetRoomsByModuleAsync(
             string module)
     {
-        // -----------------------------------------------------
-        // VALIDATE MODULE
-        // -----------------------------------------------------
-
         if (string.IsNullOrWhiteSpace(module))
         {
             throw new Exception(

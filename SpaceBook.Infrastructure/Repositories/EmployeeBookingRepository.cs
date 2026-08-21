@@ -1264,4 +1264,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
             .FirstOrDefaultAsync();
     }
+
+
+    public async Task<string?> GetEmployeeNameAsync(int employeeId)
+{
+    return await _context.Employees
+        .Where(e => e.EmployeeId == employeeId)
+        .Select(e => e.Name)
+        .FirstOrDefaultAsync();
+}
 }
