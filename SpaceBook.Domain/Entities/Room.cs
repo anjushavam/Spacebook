@@ -4,6 +4,8 @@ public class Room
 {
     public int RoomId { get; set; }
 
+    public string RoomNumber { get; set; } = string.Empty;
+
     public int RoomTypeId { get; set; }
 
     public int ModuleId { get; set; }
@@ -16,7 +18,9 @@ public class Room
 
     public bool IsBlocked { get; set; } = false;
 
-    // Navigation properties
+    // =========================================================
+    // NAVIGATION PROPERTIES
+    // =========================================================
 
     public RoomType? RoomType { get; set; }
 

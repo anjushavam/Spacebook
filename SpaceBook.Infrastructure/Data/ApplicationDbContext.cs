@@ -274,56 +274,61 @@ public class ApplicationDbContext : DbContext
         });
 
         // =========================================================
-        // ROOM
-        // =========================================================
+// ROOM
+// =========================================================
 
-        modelBuilder.Entity<Room>(entity =>
-        {
-            entity.ToTable("rooms");
+modelBuilder.Entity<Room>(entity =>
+{
+    entity.ToTable("rooms");
 
-            entity.HasKey(x => x.RoomId);
+    entity.HasKey(x => x.RoomId);
 
-            entity.Property(x => x.RoomId)
-                .HasColumnName("roomid");
+    entity.Property(x => x.RoomId)
+        .HasColumnName("roomid");
 
-            entity.Property(x => x.RoomTypeId)
-                .HasColumnName("roomtypeid");
+    entity.Property(x => x.RoomNumber)
+        .HasColumnName("roomnumber")
+        .HasMaxLength(50)
+        .IsRequired();
 
-            entity.Property(x => x.ModuleId)
-                .HasColumnName("moduleid");
+    entity.Property(x => x.RoomTypeId)
+        .HasColumnName("roomtypeid");
 
-            entity.Property(x => x.RoomName)
-                .HasColumnName("roomname");
+    entity.Property(x => x.ModuleId)
+        .HasColumnName("moduleid");
 
-            entity.Property(x => x.Capacity)
-                .HasColumnName("capacity");
+    entity.Property(x => x.RoomName)
+        .HasColumnName("roomname");
 
-            entity.Property(x => x.Status)
-                .HasColumnName("status");
+    entity.Property(x => x.Capacity)
+        .HasColumnName("capacity");
 
-            entity.Property(x => x.IsBlocked)
-                .HasColumnName("isblocked");
+    entity.Property(x => x.Status)
+        .HasColumnName("status");
 
-            entity.HasOne(x => x.RoomType)
-                .WithMany(x => x.Rooms)
-                .HasForeignKey(x => x.RoomTypeId)
-                .OnDelete(DeleteBehavior.Restrict);
+    entity.Property(x => x.IsBlocked)
+        .HasColumnName("isblocked");
 
-            entity.HasOne(x => x.Module)
-                .WithMany(x => x.Rooms)
-                .HasForeignKey(x => x.ModuleId)
-                .OnDelete(DeleteBehavior.Restrict);
+    entity.HasOne(x => x.RoomType)
+        .WithMany(x => x.Rooms)
+        .HasForeignKey(x => x.RoomTypeId)
+        .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasMany(x => x.RoomFacilities)
-                .WithOne(x => x.Room)
-                .HasForeignKey(x => x.RoomId)
-                .OnDelete(DeleteBehavior.Cascade);
+    entity.HasOne(x => x.Module)
+        .WithMany(x => x.Rooms)
+        .HasForeignKey(x => x.ModuleId)
+        .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasMany(x => x.Bookings)
-                .WithOne(x => x.Room)
-                .HasForeignKey(x => x.RoomId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
+    entity.HasMany(x => x.RoomFacilities)
+        .WithOne(x => x.Room)
+        .HasForeignKey(x => x.RoomId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasMany(x => x.Bookings)
+        .WithOne(x => x.Room)
+        .HasForeignKey(x => x.RoomId)
+        .OnDelete(DeleteBehavior.Restrict);
+});
 
         // =========================================================
         // FACILITY
