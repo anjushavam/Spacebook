@@ -126,11 +126,14 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                             ? x.Room.Module.ModuleName
                             : string.Empty,
 
-                    StartTime = x.StartTime,
+                    StartTime =
+                        x.StartTime,
 
-                    EndTime = x.EndTime,
+                    EndTime =
+                        x.EndTime,
 
-                    Status = x.Status
+                    Status =
+                        x.Status
                 })
                 .ToListAsync();
 
@@ -140,16 +143,19 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
         return new EmployeeDashboardDto
         {
-            BookingsToday = bookingsToday,
+            BookingsToday =
+                bookingsToday,
 
-            UpcomingCount = upcomingCount,
+            UpcomingCount =
+                upcomingCount,
 
             RecentReservations =
                 recentReservations
                     .Take(5)
                     .ToList(),
 
-            TodayMeetings = todayMeetings
+            TodayMeetings =
+                todayMeetings
         };
     }
 
@@ -161,7 +167,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         DateOnly date,
         int? roomTypeId)
     {
-        var now = DateTime.Now;
+        var now =
+            DateTime.Now;
 
         var today =
             DateOnly.FromDateTime(now);
@@ -177,7 +184,9 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             new AvailabilityCalendarDto
             {
                 Date = date,
-                Rooms = new List<RoomAvailabilityDto>()
+
+                Rooms =
+                    new List<RoomAvailabilityDto>()
             };
 
         // =====================================================
@@ -218,24 +227,12 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         {
             roomsQuery =
                 roomsQuery.Where(r =>
-                    r.RoomTypeId == roomTypeId.Value);
+                    r.RoomTypeId ==
+                    roomTypeId.Value);
         }
 
         // =====================================================
         // LOAD ROOMS
-        // =====================================================
-        //
-        // IMPORTANT:
-        // Load RoomFacilities -> Facility.
-        //
-        // Your database structure is:
-        //
-        // rooms
-        //   |
-        //   +-- roomfacilities
-        //             |
-        //             +-- facilities
-        //
         // =====================================================
 
         var rooms =
@@ -280,7 +277,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             var bookings =
                 allBookings
                     .Where(b =>
-                        b.RoomId == room.RoomId)
+                        b.RoomId ==
+                        room.RoomId)
                     .ToList();
 
             // =================================================
@@ -312,7 +310,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             // CURRENT / NEXT BOOKING
             // =================================================
 
-            Booking? currentBooking = null;
+            Booking? currentBooking =
+                null;
 
             // -------------------------------------------------
             // CURRENT BOOKING
@@ -360,26 +359,6 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             // =================================================
             // FACILITIES
             // =================================================
-            //
-            // IMPORTANT FIX
-            //
-            // We explicitly read RoomFacilities and then
-            // Facility.FacilityName.
-            //
-            // Example:
-            //
-            // RoomFacility:
-            // RoomId = 1
-            // FacilityId = 1
-            //
-            // Facility:
-            // FacilityId = 1
-            // FacilityName = "Projector"
-            //
-            // Result:
-            // ["Projector"]
-            //
-            // =================================================
 
             var facilities =
                 room.RoomFacilities
@@ -388,34 +367,41 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                         !string.IsNullOrWhiteSpace(
                             rf.Facility.FacilityName))
                     .Select(rf =>
-                        rf.Facility!.FacilityName.Trim())
+                        rf.Facility!
+                            .FacilityName
+                            .Trim())
                     .Distinct()
-                    .OrderBy(name => name)
+                    .OrderBy(name =>
+                        name)
                     .ToList();
 
             // =================================================
             // ROOM STATUS
             // =================================================
 
-            string roomStatus = "Available";
+            string roomStatus =
+                "Available";
 
             if (date == today)
             {
                 var activeBooking =
-                    bookings.FirstOrDefault(b =>
-                        b.StartTime <= currentTime &&
-                        b.EndTime > currentTime);
+                    bookings
+                        .FirstOrDefault(b =>
+                            b.StartTime <= currentTime &&
+                            b.EndTime > currentTime);
 
                 if (activeBooking != null)
                 {
-                    roomStatus = "Booked";
+                    roomStatus =
+                        "Booked";
                 }
             }
             else if (date > today)
             {
                 if (bookings.Any())
                 {
-                    roomStatus = "Booked";
+                    roomStatus =
+                        "Booked";
                 }
             }
 
@@ -432,10 +418,14 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                     RoomName =
                         room.RoomName,
 
+                    // =========================================
+                    // ROOM TYPE FROM DATABASE
+                    // =========================================
+
                     RoomType =
                         room.RoomType != null
                             ? room.RoomType.TypeName
-                            : "Conference",
+                            : string.Empty,
 
                     Module =
                         room.Module != null
@@ -446,7 +436,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                         room.Capacity,
 
                     // =========================================
-                    // FIXED FACILITIES
+                    // FACILITIES
                     // =========================================
 
                     Facilities =
@@ -474,8 +464,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                                         : (
                                             !string.IsNullOrWhiteSpace(
                                                 currentBooking.MeetingTitle)
-                                                    ? currentBooking.MeetingTitle
-                                                    : "Reserved Workspace"
+                                                ? currentBooking.MeetingTitle
+                                                : "Reserved Workspace"
                                           ),
 
                                 StartTime =
@@ -503,7 +493,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         TimeOnly officeStart,
         TimeOnly officeEnd)
     {
-        var start = officeStart;
+        var start =
+            officeStart;
 
         while (start < officeEnd)
         {
@@ -512,7 +503,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
             if (end > officeEnd)
             {
-                end = officeEnd;
+                end =
+                    officeEnd;
             }
 
             if (end <= start)
@@ -528,14 +520,18 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             slots.Add(
                 new TimeSlotDto
                 {
-                    StartTime = start,
+                    StartTime =
+                        start,
 
-                    EndTime = end,
+                    EndTime =
+                        end,
 
-                    IsBooked = isBooked
+                    IsBooked =
+                        isBooked
                 });
 
-            start = end;
+            start =
+                end;
         }
     }
 
@@ -550,7 +546,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
         TimeOnly officeEnd,
         TimeOnly currentTime)
     {
-        var start = officeStart;
+        var start =
+            officeStart;
 
         while (start < officeEnd)
         {
@@ -559,7 +556,8 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
 
             if (end > officeEnd)
             {
-                end = officeEnd;
+                end =
+                    officeEnd;
             }
 
             if (end <= start)
@@ -567,10 +565,15 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 break;
             }
 
-            // Skip completely passed slots.
+            // -------------------------------------------------
+            // SKIP COMPLETELY PASSED SLOTS
+            // -------------------------------------------------
+
             if (end <= currentTime)
             {
-                start = end;
+                start =
+                    end;
+
                 continue;
             }
 
@@ -582,14 +585,18 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             slots.Add(
                 new TimeSlotDto
                 {
-                    StartTime = start,
+                    StartTime =
+                        start,
 
-                    EndTime = end,
+                    EndTime =
+                        end,
 
-                    IsBooked = isBooked
+                    IsBooked =
+                        isBooked
                 });
 
-            start = end;
+            start =
+                end;
         }
     }
 
@@ -605,51 +612,55 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             .Include(x => x.Room)
                 .ThenInclude(r => r!.Module)
             .Where(x =>
-                x.EmployeeId == employeeId)
+                x.EmployeeId ==
+                employeeId)
             .OrderByDescending(x =>
                 x.BookingDate)
             .ThenByDescending(x =>
                 x.StartTime)
-            .Select(x => new MyBookingDto
-            {
-                BookingId =
-                    x.BookingId,
+            .Select(x =>
+                new MyBookingDto
+                {
+                    BookingId =
+                        x.BookingId,
 
-                RoomId =
-                    x.RoomId,
+                    RoomId =
+                        x.RoomId,
 
-                RoomName =
-                    x.Room != null
-                        ? x.Room.RoomName
-                        : $"Room {x.RoomId}",
+                    RoomName =
+                        x.Room != null
+                            ? x.Room.RoomName
+                            : $"Room {x.RoomId}",
 
-                Module =
-                    x.Room != null &&
-                    x.Room.Module != null
-                        ? x.Room.Module.ModuleName
-                        : string.Empty,
+                    Module =
+                        x.Room != null &&
+                        x.Room.Module != null
+                            ? x.Room.Module.ModuleName
+                            : string.Empty,
 
-                Purpose =
-                    !string.IsNullOrWhiteSpace(x.Purpose)
-                        ? x.Purpose
-                        : (
-                            !string.IsNullOrWhiteSpace(x.MeetingTitle)
-                                ? x.MeetingTitle
-                                : "Reserved Workspace"
-                          ),
+                    Purpose =
+                        !string.IsNullOrWhiteSpace(
+                            x.Purpose)
+                            ? x.Purpose
+                            : (
+                                !string.IsNullOrWhiteSpace(
+                                    x.MeetingTitle)
+                                    ? x.MeetingTitle
+                                    : "Reserved Workspace"
+                              ),
 
-                BookingDate =
-                    x.BookingDate,
+                    BookingDate =
+                        x.BookingDate,
 
-                StartTime =
-                    x.StartTime,
+                    StartTime =
+                        x.StartTime,
 
-                EndTime =
-                    x.EndTime,
+                    EndTime =
+                        x.EndTime,
 
-                Status =
-                    x.Status
-            })
+                    Status =
+                        x.Status
+                })
             .ToListAsync();
     }
 
@@ -666,41 +677,43 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             .Include(x => x.Room)
                 .ThenInclude(r => r!.Module)
             .Where(x =>
-                x.EmployeeId == employeeId &&
+                x.EmployeeId ==
+                employeeId &&
                 x.Status != "Cancelled" &&
                 x.Status != "Rejected")
             .OrderByDescending(x =>
                 x.BookingDate)
             .ThenByDescending(x =>
                 x.StartTime)
-            .Select(x => new RecentReservationDto
-            {
-                BookingId =
-                    x.BookingId,
+            .Select(x =>
+                new RecentReservationDto
+                {
+                    BookingId =
+                        x.BookingId,
 
-                RoomName =
-                    x.Room != null
-                        ? x.Room.RoomName
-                        : $"Room {x.RoomId}",
+                    RoomName =
+                        x.Room != null
+                            ? x.Room.RoomName
+                            : $"Room {x.RoomId}",
 
-                Module =
-                    x.Room != null &&
-                    x.Room.Module != null
-                        ? x.Room.Module.ModuleName
-                        : string.Empty,
+                    Module =
+                        x.Room != null &&
+                        x.Room.Module != null
+                            ? x.Room.Module.ModuleName
+                            : string.Empty,
 
-                BookingDate =
-                    x.BookingDate,
+                    BookingDate =
+                        x.BookingDate,
 
-                StartTime =
-                    x.StartTime,
+                    StartTime =
+                        x.StartTime,
 
-                EndTime =
-                    x.EndTime,
+                    EndTime =
+                        x.EndTime,
 
-                Status =
-                    x.Status
-            })
+                    Status =
+                        x.Status
+                })
             .ToListAsync();
     }
 }

@@ -1,54 +1,54 @@
-using SpaceBook.Application.DTOs.Booking;
+    using SpaceBook.Application.DTOs.Booking;
 
-namespace SpaceBook.Application.Interfaces;
+    namespace SpaceBook.Application.Interfaces;
 
-public interface IEmployeeBookingService
-{
-    // =========================================================
-    // CREATE BOOKING
-    // =========================================================
+    public interface IEmployeeBookingService
+    {
+        // =========================================================
+        // CREATE BOOKING
+        // =========================================================
 
-    Task<int> CreateBookingAsync(
-        int employeeId,
-        CreateBookingRequestDto request);
+        Task<int> CreateBookingAsync(
+            int employeeId,
+            CreateBookingRequestDto request);
 
-    // =========================================================
-    // GET BOOKING DETAILS
-    // =========================================================
+        // =========================================================
+        // GET BOOKING DETAILS
+        // =========================================================
 
-    Task<BookingDetailsDto?> GetBookingByIdAsync(
-        int bookingId,
-        int employeeId);
+        Task<BookingDetailsDto?> GetBookingByIdAsync(
+            int bookingId,
+            int employeeId);
 
-    // =========================================================
-    // CANCEL BOOKING
-    // =========================================================
+        // =========================================================
+        // CANCEL BOOKING
+        // =========================================================
 
-    Task<bool> CancelBookingAsync(
-        int bookingId,
-        int employeeId,
-        string cancellationReason);
+        Task<bool> CancelBookingAsync(
+            int bookingId,
+            int employeeId,
+            string cancellationReason);
 
-    // =========================================================
-    // UPDATE / RESCHEDULE BOOKING
-    // =========================================================
+        // =========================================================
+        // UPDATE / RESCHEDULE BOOKING
+        // =========================================================
 
-    Task<bool> UpdateBookingAsync(
-        int bookingId,
-        int employeeId,
-        UpdateBookingRequestDto request);
+        Task<bool> UpdateBookingAsync(
+            int bookingId,
+            int employeeId,
+            UpdateBookingRequestDto request);
 
-    // =========================================================
-    // SEARCH AVAILABLE ROOMS
-    // =========================================================
+        // =========================================================
+        // SEARCH AVAILABLE ROOMS
+        // =========================================================
 
-    Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
-        SearchRoomsRequestDto request);
+        Task<List<AvailableRoomDto>> SearchAvailableRoomsAsync(
+            SearchRoomsRequestDto request);
 
-    // =========================================================
-    // GET ROOMS BY MODULE
-    // =========================================================
+        // =========================================================
+        // GET ROOMS BY MODULE
+        // =========================================================
 
-    Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
-        string module);
-}
+        Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
+            string module);
+    }
