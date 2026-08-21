@@ -300,7 +300,7 @@ public class CopilotRepository : ICopilotRepository
 
         // =====================================================
         // OFFICE HOURS
-        // 09:00 - 19:30
+        // 09:00 - 19:00
         // =====================================================
 
         var timeSlots = new List<(TimeOnly Start, TimeOnly End)>

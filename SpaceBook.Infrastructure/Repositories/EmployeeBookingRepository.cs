@@ -22,7 +22,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         new TimeOnly(10, 0);
 
     private static readonly TimeOnly OfficeEndTime =
-        new TimeOnly(19, 30);
+        new TimeOnly(19, 0);
 
     public EmployeeBookingRepository(
         ApplicationDbContext context)
