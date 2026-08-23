@@ -321,17 +321,14 @@ public class EmployeeBookingService : IEmployeeBookingService
             // -------------------------------------------------
             // SEND CONFIRMATION & ADMIN ALERT EMAILS
             // -------------------------------------------------
-            _ = Task.Run(async () =>
+            try
             {
-                try
-                {
-                    await SendBookingConfirmationAndAdminAlertEmailsAsync(booking, employeeId, resolvedTitle, resolvedPurpose);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Background email dispatch failed for booking ID {BookingId}", booking.BookingId);
-                }
-            });
+                await SendBookingConfirmationAndAdminAlertEmailsAsync(booking, employeeId, resolvedTitle, resolvedPurpose);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Email dispatch failed for booking ID {BookingId}", booking.BookingId);
+            }
 
             return booking.BookingId;
         }
@@ -467,17 +464,14 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
         // SEND CANCELLATION EMAILS
         // -----------------------------------------------------
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await SendBookingCancellationEmailsAsync(bookingId, employeeId, employeeName, reason);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Background cancellation email dispatch failed for booking ID {BookingId}", bookingId);
-            }
-        });
+            await SendBookingCancellationEmailsAsync(bookingId, employeeId, employeeName, reason);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cancellation email dispatch failed for booking ID {BookingId}", bookingId);
+        }
 
         return true;
     }
@@ -755,17 +749,14 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
         // SEND RESCHEDULE EMAILS
         // -----------------------------------------------------
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await SendBookingRescheduleEmailsAsync(bookingId, employeeId, employeeName, request);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Background reschedule email dispatch failed for booking ID {BookingId}", bookingId);
-            }
-        });
+            await SendBookingRescheduleEmailsAsync(bookingId, employeeId, employeeName, request);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reschedule email dispatch failed for booking ID {BookingId}", bookingId);
+        }
 
         return true;
     }
