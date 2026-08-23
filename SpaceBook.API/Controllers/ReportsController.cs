@@ -38,6 +38,35 @@ public class ReportsController : ControllerBase
         return Ok(await _service.GetRoomUsageAsync(filter));
     }
 
+    [HttpPost("analytics")]
+    public async Task<IActionResult> GetAnalyticsPost(
+        [FromBody] ReportFilterDto filter)
+    {
+        return Ok(await _service.GetWorkplaceAnalyticsAsync(filter));
+    }
+
+    [HttpGet("analytics")]
+    public async Task<IActionResult> GetAnalyticsGet(
+        [FromQuery] string? timeframe,
+        [FromQuery] string? module,
+        [FromQuery] int? roomTypeId,
+        [FromQuery] string? status,
+        [FromQuery] DateOnly? startDate,
+        [FromQuery] DateOnly? endDate)
+    {
+        var filter = new ReportFilterDto
+        {
+            Timeframe = timeframe,
+            Module = module,
+            RoomTypeId = roomTypeId,
+            Status = status,
+            StartDate = startDate,
+            EndDate = endDate
+        };
+
+        return Ok(await _service.GetWorkplaceAnalyticsAsync(filter));
+    }
+
     [HttpPost("export-csv")]
     public async Task<IActionResult> ExportCsvPost(
         [FromBody] ReportFilterDto filter)

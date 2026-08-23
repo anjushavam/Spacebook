@@ -10,5 +10,7 @@ public interface IReportRepository
 
     Task<List<RoomUsageDto>> GetRoomUsageAsync(ReportFilterDto filter);
 
+    Task<WorkplaceAnalyticsDto> GetWorkplaceAnalyticsAsync(ReportFilterDto filter);
+
     Task<byte[]> ExportBookingsCsvAsync(ReportFilterDto filter);
 }

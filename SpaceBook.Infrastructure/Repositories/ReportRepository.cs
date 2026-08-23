@@ -327,6 +327,225 @@ public class ReportRepository : IReportRepository
     }
 
     // =========================================================
+    // WORKPLACE ANALYTICS & INTELLIGENCE
+    // =========================================================
+
+    public async Task<WorkplaceAnalyticsDto> GetWorkplaceAnalyticsAsync(
+        ReportFilterDto filter)
+    {
+        var now = DateTime.Now;
+        var today = DateOnly.FromDateTime(now);
+
+        // Determine Date Range from Timeframe
+        DateOnly? startDate = filter.StartDate;
+        DateOnly? endDate = filter.EndDate;
+
+        if (!string.IsNullOrWhiteSpace(filter.Timeframe))
+        {
+            var tf = filter.Timeframe.Trim().ToLowerInvariant();
+            if (tf.Contains("7") || tf.Contains("week"))
+            {
+                startDate = today.AddDays(-7);
+                endDate = today;
+            }
+            else if (tf.Contains("30"))
+            {
+                startDate = today.AddDays(-30);
+                endDate = today;
+            }
+            else if (tf.Contains("month"))
+            {
+                startDate = new DateOnly(today.Year, today.Month, 1);
+                endDate = today;
+            }
+        }
+
+        // Room Bookings Query
+        var roomQuery = _context.Bookings
+            .AsNoTracking()
+            .Include(b => b.Employee)
+            .Include(b => b.Room).ThenInclude(r => r!.Module)
+            .Include(b => b.Room).ThenInclude(r => r!.RoomType)
+            .AsQueryable();
+
+        if (startDate.HasValue)
+        {
+            roomQuery = roomQuery.Where(b => b.BookingDate >= startDate.Value);
+        }
+        if (endDate.HasValue)
+        {
+            roomQuery = roomQuery.Where(b => b.BookingDate <= endDate.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Module) && !filter.Module.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Module.Equals("All Modules", StringComparison.OrdinalIgnoreCase))
+        {
+            var moduleName = filter.Module.Trim();
+            roomQuery = roomQuery.Where(b =>
+                b.Room != null &&
+                b.Room.Module != null &&
+                (b.Room.Module.ModuleName == moduleName || b.Room.Module.ModuleName.Contains(moduleName)));
+        }
+        if (filter.RoomTypeId.HasValue)
+        {
+            roomQuery = roomQuery.Where(b => b.Room != null && b.Room.RoomTypeId == filter.RoomTypeId.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Status) && !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
+        {
+            roomQuery = roomQuery.Where(b => b.Status == filter.Status);
+        }
+
+        var bookings = await roomQuery.ToListAsync();
+
+        // 1. Total Reservations
+        int totalReservations = bookings.Count;
+
+        // 2. Active Rooms Count
+        int activeRoomsCount = bookings.Select(b => b.RoomId).Distinct().Count();
+
+        // 3. Confirmed Bookings (Approved)
+        int confirmedBookings = bookings.Count(b => b.Status == "Approved" || b.Status == "Confirmed");
+        double confirmedRate = totalReservations > 0
+            ? Math.Round(confirmedBookings * 100.0 / totalReservations, 1)
+            : 0;
+
+        // 4. Cancelled Bookings
+        int cancelledBookings = bookings.Count(b => b.Status == "Cancelled");
+        double cancelledRate = totalReservations > 0
+            ? Math.Round(cancelledBookings * 100.0 / totalReservations, 1)
+            : 0;
+
+        // 5. Workforce Engagement
+        int activeTeamMembers = bookings.Select(b => b.EmployeeId).Distinct().Count();
+        double avgPerPerson = activeTeamMembers > 0
+            ? Math.Round((double)totalReservations / activeTeamMembers, 1)
+            : 0;
+
+        // 6. Employee Booking vs Cancellation Ratio
+        var employeeRatios = bookings
+            .GroupBy(b => new { b.EmployeeId, Name = b.Employee?.Name ?? $"Employee {b.EmployeeId}" })
+            .Select(g => new EmployeeBookingRatioDto
+            {
+                EmployeeName = g.Key.Name,
+                ConfirmedCount = g.Count(b => b.Status == "Approved" || b.Status == "Confirmed"),
+                CancelledCount = g.Count(b => b.Status == "Cancelled")
+            })
+            .OrderByDescending(e => e.ConfirmedCount + e.CancelledCount)
+            .Take(10)
+            .ToList();
+
+        // 7. Reservation Outcome Breakdown (Donut)
+        var outcomeBreakdown = new List<OutcomeBreakdownDto>();
+        if (confirmedBookings > 0 || totalReservations == 0)
+        {
+            outcomeBreakdown.Add(new OutcomeBreakdownDto
+            {
+                Status = "Confirmed",
+                Count = confirmedBookings,
+                Percentage = confirmedRate
+            });
+        }
+        if (cancelledBookings > 0)
+        {
+            outcomeBreakdown.Add(new OutcomeBreakdownDto
+            {
+                Status = "Cancelled",
+                Count = cancelledBookings,
+                Percentage = cancelledRate
+            });
+        }
+        var otherCount = totalReservations - confirmedBookings - cancelledBookings;
+        if (otherCount > 0)
+        {
+            outcomeBreakdown.Add(new OutcomeBreakdownDto
+            {
+                Status = "Pending / Other",
+                Count = otherCount,
+                Percentage = Math.Round(otherCount * 100.0 / totalReservations, 1)
+            });
+        }
+
+        // 8. Reservation Volume Trendline
+        var trendline = bookings
+            .GroupBy(b => b.Status)
+            .Select(g => new TrendlinePointDto
+            {
+                Label = g.Key,
+                Count = g.Count()
+            })
+            .ToList();
+
+        // Ensure key labels exist for smooth curve
+        var requiredLabels = new[] { "Approved", "Pending", "Cancelled", "Rejected" };
+        foreach (var label in requiredLabels)
+        {
+            if (!trendline.Any(t => t.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
+            {
+                trendline.Add(new TrendlinePointDto { Label = label, Count = 0 });
+            }
+        }
+        trendline = trendline.OrderBy(t => Array.IndexOf(requiredLabels, t.Label) >= 0 ? Array.IndexOf(requiredLabels, t.Label) : 99).ToList();
+
+        // 9. Most Reserved Rooms & Workspaces
+        var mostReserved = bookings
+            .Where(b => b.Room != null)
+            .GroupBy(b => new { b.RoomId, RoomName = b.Room!.RoomName, ModuleName = b.Room.Module?.ModuleName ?? string.Empty })
+            .Select(g => new PopularWorkspaceDto
+            {
+                RoomName = g.Key.RoomName,
+                ModuleName = g.Key.ModuleName,
+                BookingCount = g.Count()
+            })
+            .OrderByDescending(r => r.BookingCount)
+            .Take(6)
+            .ToList();
+
+        // 10. Top Cancellation Reasons & Drivers
+        var cancellationDrivers = bookings
+            .Where(b => b.Status == "Cancelled")
+            .GroupBy(b => !string.IsNullOrWhiteSpace(b.CancellationReason) ? b.CancellationReason.Trim() : "General Schedule Conflict")
+            .Select(g => new CancellationDriverDto
+            {
+                Reason = g.Key,
+                Count = g.Count(),
+                Percentage = cancelledBookings > 0 ? Math.Round(g.Count() * 100.0 / cancelledBookings, 1) : 0
+            })
+            .OrderByDescending(c => c.Count)
+            .Take(5)
+            .ToList();
+
+        // 11. Peak Workspace Demand by Hour (10:00 to 22:00)
+        var peakDemand = new List<HourlyDemandDto>();
+        for (int h = 10; h <= 22; h++)
+        {
+            var countAtHour = bookings.Count(b => b.StartTime.Hour == h);
+
+            peakDemand.Add(new HourlyDemandDto
+            {
+                Hour = $"{h:D2}:00",
+                HourNumber = h,
+                Count = countAtHour
+            });
+        }
+
+        return new WorkplaceAnalyticsDto
+        {
+            TotalReservations = totalReservations,
+            ActiveRoomsCount = activeRoomsCount,
+            ConfirmedBookings = confirmedBookings,
+            ConfirmedRate = confirmedRate,
+            CancelledBookings = cancelledBookings,
+            CancelledRate = cancelledRate,
+            ActiveTeamMembersCount = activeTeamMembers,
+            AvgBookingsPerPerson = avgPerPerson,
+            EmployeeRatios = employeeRatios,
+            OutcomeBreakdown = outcomeBreakdown,
+            Trendline = trendline,
+            MostReservedWorkspaces = mostReserved,
+            TopCancellationDrivers = cancellationDrivers,
+            PeakDemandByHour = peakDemand
+        };
+    }
+
+    // =========================================================
     // EXPORT ELABORATE BOOKINGS CSV
     // =========================================================
 
