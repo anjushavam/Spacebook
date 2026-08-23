@@ -596,9 +596,22 @@ public class CopilotRepository : ICopilotRepository
             // Available
             score += 10;
 
-            // =================================================
-            // ADD RESULT
-            // =================================================
+            var reasons = new List<string>();
+            if (room.Capacity == request.ParticipantCount)
+            {
+                reasons.Add($"Exact capacity match for {request.ParticipantCount} people");
+            }
+            else
+            {
+                reasons.Add($"Accommodates {request.ParticipantCount} people (capacity: {room.Capacity})");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Facility))
+            {
+                reasons.Add($"Equipped with {request.Facility}");
+            }
+
+            var reasonSummary = string.Join(" • ", reasons);
 
             recommendations.Add(
                 new CopilotRecommendationDto
@@ -643,7 +656,9 @@ public class CopilotRepository : ICopilotRepository
 
                     IsAvailable = true,
 
-                    MatchScore = score
+                    MatchScore = score,
+
+                    MatchReason = reasonSummary
                 });
         }
 

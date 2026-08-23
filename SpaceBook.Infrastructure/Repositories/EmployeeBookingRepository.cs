@@ -774,6 +774,10 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         booking.EndTime =
             request.EndTime;
 
+        // Reset reminders for updated time/date
+        booking.StartReminderSent = false;
+        booking.EndReminderSent = false;
+
         // -----------------------------------------------------
         // UPDATE MEETING TITLE
         // -----------------------------------------------------
@@ -1290,5 +1294,48 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             .Select(e =>
                 e.Name)
             .FirstOrDefaultAsync();
+    }
+
+    // =========================================================
+    // GET EMPLOYEE BY ID
+    // =========================================================
+
+    public async Task<Employee?> GetEmployeeByIdAsync(
+        int employeeId)
+    {
+        return await _context.Employees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e =>
+                e.EmployeeId == employeeId);
+    }
+
+    // =========================================================
+    // GET ROOM BY ID
+    // =========================================================
+
+    public async Task<Room?> GetRoomByIdAsync(
+        int roomId)
+    {
+        return await _context.Rooms
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r =>
+                r.RoomId == roomId);
+    }
+
+    // =========================================================
+    // GET ADMIN EMAILS
+    // =========================================================
+
+    public async Task<List<string>> GetAdminEmailsAsync()
+    {
+        return await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Role)
+            .Where(e =>
+                e.Role != null &&
+                (e.Role.RoleName == "Admin" || e.Role.RoleName == "ADMIN" || e.Role.RoleName == "admin") &&
+                !string.IsNullOrWhiteSpace(e.Email))
+            .Select(e => e.Email)
+            .ToListAsync();
     }
 }

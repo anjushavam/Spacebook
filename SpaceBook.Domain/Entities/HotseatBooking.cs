@@ -28,6 +28,8 @@ public class HotseatBooking
 
     public DateTime? RecordModifiedOn { get; set; }
 
-    // Navigation property
+    // Navigation properties
     public Seat? Seat { get; set; }
+
+    public Employee? Employee { get; set; }
 }

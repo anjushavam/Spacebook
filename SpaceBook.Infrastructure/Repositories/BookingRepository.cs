@@ -126,6 +126,7 @@ public class BookingRepository : IBookingRepository
                 Status =
                     x.Status
             })
+            .Take(100)
             .ToListAsync();
     }
 

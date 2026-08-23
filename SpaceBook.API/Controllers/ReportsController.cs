@@ -37,4 +37,33 @@ public class ReportsController : ControllerBase
     {
         return Ok(await _service.GetRoomUsageAsync(filter));
     }
+
+    [HttpPost("export-csv")]
+    public async Task<IActionResult> ExportCsvPost(
+        [FromBody] ReportFilterDto filter)
+    {
+        var csvBytes = await _service.ExportBookingsCsvAsync(filter);
+        var fileName = $"SpaceBook_Bookings_Report_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv";
+        return File(csvBytes, "text/csv", fileName);
+    }
+
+    [HttpGet("export-csv")]
+    public async Task<IActionResult> ExportCsvGet(
+        [FromQuery] string? reportType,
+        [FromQuery] string? module,
+        [FromQuery] int? roomTypeId,
+        [FromQuery] string? status)
+    {
+        var filter = new ReportFilterDto
+        {
+            ReportType = reportType,
+            Module = module,
+            RoomTypeId = roomTypeId,
+            Status = status
+        };
+
+        var csvBytes = await _service.ExportBookingsCsvAsync(filter);
+        var fileName = $"SpaceBook_Bookings_Report_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv";
+        return File(csvBytes, "text/csv", fileName);
+    }
 }

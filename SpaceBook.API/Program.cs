@@ -6,8 +6,10 @@ using Microsoft.OpenApi.Models;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Application.Services;
 using SpaceBook.Infrastructure.Authentication;
+using SpaceBook.Infrastructure.BackgroundServices;
 using SpaceBook.Infrastructure.Data;
 using SpaceBook.Infrastructure.Repositories;
+using SpaceBook.Infrastructure.Services;
 using SpaceBook.API.Middleware;
 using System.Reflection;
 using System.Text;
@@ -169,11 +171,25 @@ builder.Services.AddScoped<IRoomRepository, RoomRepository>();
 builder.Services.AddScoped<IRoomService, RoomService>();
 
 // =====================================================
+// Email Service
+// =====================================================
+
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+// =====================================================
 // Notification
 // =====================================================
 
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// =====================================================
+// Booking Reminders & Background Service
+// =====================================================
+
+builder.Services.AddScoped<IBookingReminderRepository, BookingReminderRepository>();
+builder.Services.AddScoped<IBookingReminderService, BookingReminderService>();
+builder.Services.AddHostedService<BookingReminderBackgroundService>();
 
 // =====================================================
 // Booking

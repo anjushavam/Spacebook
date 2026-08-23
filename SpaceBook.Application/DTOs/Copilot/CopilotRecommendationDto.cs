@@ -21,4 +21,6 @@ public class CopilotRecommendationDto
     public bool IsAvailable { get; set; }
 
     public int MatchScore { get; set; }
+
+    public string MatchReason { get; set; } = string.Empty;
 }

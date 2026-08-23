@@ -29,6 +29,10 @@ public class Booking
 
     public string? CancellationReason { get; set; }
 
+    public bool StartReminderSent { get; set; } = false;
+
+    public bool EndReminderSent { get; set; } = false;
+
     public Room? Room { get; set; }
 
     public Employee? Employee { get; set; }

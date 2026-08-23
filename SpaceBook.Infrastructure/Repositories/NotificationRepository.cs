@@ -713,6 +713,21 @@ public class NotificationRepository
             return "Booking Request";
         }
 
+        if (message.Contains(
+                "reminder",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            message.Contains(
+                "starts in 15 minutes",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            message.Contains(
+                "ends in 15 minutes",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Booking Reminder";
+        }
+
         return isHotseat
             ? "Hotseat Notification"
             : "Notification";

@@ -99,4 +99,16 @@ public interface IEmployeeBookingRepository
 
     Task<string?> GetEmployeeNameAsync(
         int employeeId);
+
+    // =========================================================
+    // GET EMPLOYEE & ROOM & ADMIN EMAILS
+    // =========================================================
+
+    Task<Employee?> GetEmployeeByIdAsync(
+        int employeeId);
+
+    Task<Room?> GetRoomByIdAsync(
+        int roomId);
+
+    Task<List<string>> GetAdminEmailsAsync();
 }

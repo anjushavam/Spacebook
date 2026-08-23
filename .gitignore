@@ -1,3 +1,9 @@
-bin/
-obj/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
 .vs/
+.vscode/
+*.user
+*.userosscache
+*.suo

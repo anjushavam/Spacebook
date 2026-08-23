@@ -9,4 +9,6 @@ public interface IReportService
     Task<List<BookingStatusDto>> GetBookingStatusAsync(ReportFilterDto filter);
 
     Task<List<RoomUsageDto>> GetRoomUsageAsync(ReportFilterDto filter);
+
+    Task<byte[]> ExportBookingsCsvAsync(ReportFilterDto filter);
 }

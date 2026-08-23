@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SpaceBook.Application.DTOs.Booking;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
@@ -8,6 +9,8 @@ public class EmployeeBookingService : IEmployeeBookingService
 {
     private readonly IEmployeeBookingRepository _bookingRepository;
     private readonly INotificationRepository _notificationRepository;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<EmployeeBookingService> _logger;
 
     // =========================================================
     // OFFICE HOURS
@@ -24,10 +27,14 @@ public class EmployeeBookingService : IEmployeeBookingService
 
     public EmployeeBookingService(
         IEmployeeBookingRepository bookingRepository,
-        INotificationRepository notificationRepository)
+        INotificationRepository notificationRepository,
+        IEmailService emailService,
+        ILogger<EmployeeBookingService> logger)
     {
         _bookingRepository = bookingRepository;
         _notificationRepository = notificationRepository;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     // =========================================================
@@ -311,6 +318,21 @@ public class EmployeeBookingService : IEmployeeBookingService
 
             await _notificationRepository.SaveChangesAsync();
 
+            // -------------------------------------------------
+            // SEND CONFIRMATION & ADMIN ALERT EMAILS
+            // -------------------------------------------------
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SendBookingConfirmationAndAdminAlertEmailsAsync(booking, employeeId, resolvedTitle, resolvedPurpose);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Background email dispatch failed for booking ID {BookingId}", booking.BookingId);
+                }
+            });
+
             return booking.BookingId;
         }
         catch (Exception ex)
@@ -441,6 +463,21 @@ public class EmployeeBookingService : IEmployeeBookingService
             notification);
 
         await _notificationRepository.SaveChangesAsync();
+
+        // -----------------------------------------------------
+        // SEND CANCELLATION EMAILS
+        // -----------------------------------------------------
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await SendBookingCancellationEmailsAsync(bookingId, employeeId, employeeName, reason);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Background cancellation email dispatch failed for booking ID {BookingId}", bookingId);
+            }
+        });
 
         return true;
     }
@@ -701,7 +738,7 @@ public class EmployeeBookingService : IEmployeeBookingService
                 bookingId,
 
             Message =
-                $"Booking was rescheduled by {employeeName} and requires approval.",
+                $"Booking was rescheduled by {employeeName} and has been approved.",
 
             IsRead =
                 false,
@@ -714,6 +751,21 @@ public class EmployeeBookingService : IEmployeeBookingService
             notification);
 
         await _notificationRepository.SaveChangesAsync();
+
+        // -----------------------------------------------------
+        // SEND RESCHEDULE EMAILS
+        // -----------------------------------------------------
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await SendBookingRescheduleEmailsAsync(bookingId, employeeId, employeeName, request);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Background reschedule email dispatch failed for booking ID {BookingId}", bookingId);
+            }
+        });
 
         return true;
     }
@@ -876,5 +928,293 @@ public class EmployeeBookingService : IEmployeeBookingService
         return await _bookingRepository
             .GetRoomsByModuleAsync(
                 module.Trim());
+    }
+
+    // =========================================================
+    // EMAIL DISPATCH HELPERS
+    // =========================================================
+
+    private async Task SendBookingConfirmationAndAdminAlertEmailsAsync(
+        Booking booking,
+        int employeeId,
+        string meetingTitle,
+        string purpose)
+    {
+        var employee = await _bookingRepository.GetEmployeeByIdAsync(employeeId);
+        var room = await _bookingRepository.GetRoomByIdAsync(booking.RoomId);
+
+        var employeeName = employee?.Name ?? "Colleague";
+        var roomName = room != null
+            ? (!string.IsNullOrWhiteSpace(room.RoomName) ? room.RoomName : room.RoomNumber)
+            : "Meeting Room";
+
+        // 1. Employee Confirmation Email
+        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+        {
+            var empSubject = $"Booking Confirmed: '{meetingTitle}' in {roomName}";
+            var empHtml = BuildBookingConfirmedEmailHtml(
+                employeeName,
+                meetingTitle,
+                purpose,
+                roomName,
+                room?.RoomNumber ?? string.Empty,
+                booking.BookingDate,
+                booking.StartTime,
+                booking.EndTime,
+                booking.ParticipantCount);
+
+            await _emailService.SendEmailAsync(employee.Email, empSubject, empHtml, isHtml: true);
+        }
+
+        // 2. Admin Alert Emails
+        var adminEmails = await _bookingRepository.GetAdminEmailsAsync();
+        if (adminEmails.Count > 0)
+        {
+            var adminSubject = $"[Admin Alert] New Room Booking: '{meetingTitle}' by {employeeName}";
+            var adminHtml = BuildAdminBookingAlertEmailHtml(
+                employeeName,
+                employee?.Email ?? string.Empty,
+                employee?.Department ?? string.Empty,
+                meetingTitle,
+                purpose,
+                roomName,
+                booking.BookingDate,
+                booking.StartTime,
+                booking.EndTime,
+                booking.ParticipantCount);
+
+            foreach (var adminEmail in adminEmails)
+            {
+                try
+                {
+                    await _emailService.SendEmailAsync(adminEmail, adminSubject, adminHtml, isHtml: true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send admin booking alert email to {Email}", adminEmail);
+                }
+            }
+        }
+    }
+
+    private async Task SendBookingCancellationEmailsAsync(
+        int bookingId,
+        int employeeId,
+        string employeeName,
+        string reason)
+    {
+        var employee = await _bookingRepository.GetEmployeeByIdAsync(employeeId);
+        var booking = await _bookingRepository.GetBookingByIdAsync(bookingId, employeeId);
+
+        var roomName = booking?.RoomName ?? "Meeting Room";
+        var meetingTitle = booking?.MeetingTitle ?? "Room Booking";
+
+        // 1. Employee Cancellation Email
+        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+        {
+            var subject = $"Booking Cancelled: '{meetingTitle}'";
+            var body = $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset=""utf-8""><title>Booking Cancelled</title></head>
+<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+        <h2 style=""color: #dc2626; margin-top: 0;"">Booking Cancelled</h2>
+        <p>Hello {employeeName},</p>
+        <p>Your room booking for <strong>'{meetingTitle}'</strong> in <strong>{roomName}</strong> has been cancelled.</p>
+        <div style=""background: #fef2f2; border: 1px solid #fee2e2; border-radius: 6px; padding: 12px 16px; margin: 16px 0;"">
+            <strong>Reason for cancellation:</strong> {reason}
+        </div>
+        <p style=""font-size: 13px; color: #64748b;"">If this was a mistake, please make a new booking in SpaceBook.</p>
+    </div>
+</body>
+</html>";
+            await _emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
+        }
+
+        // 2. Admin Cancellation Alert
+        var adminEmails = await _bookingRepository.GetAdminEmailsAsync();
+        if (adminEmails.Count > 0)
+        {
+            var adminSubject = $"[Admin Alert] Booking Cancelled: '{meetingTitle}' by {employeeName}";
+            var adminBody = $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset=""utf-8""><title>Booking Cancelled Alert</title></head>
+<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+        <h2 style=""color: #dc2626; margin-top: 0;"">Room Booking Cancelled</h2>
+        <p>The following booking has been cancelled by <strong>{employeeName}</strong>:</p>
+        <ul>
+            <li><strong>Meeting:</strong> {meetingTitle}</li>
+            <li><strong>Room:</strong> {roomName}</li>
+            <li><strong>Reason:</strong> {reason}</li>
+        </ul>
+    </div>
+</body>
+</html>";
+
+            foreach (var adminEmail in adminEmails)
+            {
+                try
+                {
+                    await _emailService.SendEmailAsync(adminEmail, adminSubject, adminBody, isHtml: true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send admin cancellation alert to {Email}", adminEmail);
+                }
+            }
+        }
+    }
+
+    private async Task SendBookingRescheduleEmailsAsync(
+        int bookingId,
+        int employeeId,
+        string employeeName,
+        UpdateBookingRequestDto request)
+    {
+        var employee = await _bookingRepository.GetEmployeeByIdAsync(employeeId);
+        var room = request.RoomId.HasValue ? await _bookingRepository.GetRoomByIdAsync(request.RoomId.Value) : null;
+        var roomName = room?.RoomName ?? "Meeting Room";
+        var meetingTitle = !string.IsNullOrWhiteSpace(request.MeetingTitle) ? request.MeetingTitle : "Room Booking";
+
+        // 1. Employee Reschedule Email
+        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+        {
+            var subject = $"Booking Rescheduled: '{meetingTitle}'";
+            var body = $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset=""utf-8""><title>Booking Rescheduled</title></head>
+<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+        <h2 style=""color: #2563eb; margin-top: 0;"">Booking Rescheduled & Approved</h2>
+        <p>Hello {employeeName},</p>
+        <p>Your booking for <strong>'{meetingTitle}'</strong> has been successfully rescheduled:</p>
+        <table width=""100%"" style=""background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;"">
+            <tr><td><strong>Room:</strong></td><td>{roomName}</td></tr>
+            <tr><td><strong>New Date:</strong></td><td>{request.BookingDate:MMMM dd, yyyy}</td></tr>
+            <tr><td><strong>New Time:</strong></td><td>{request.StartTime:hh\\:mm tt} - {request.EndTime:hh\\:mm tt}</td></tr>
+        </table>
+    </div>
+</body>
+</html>";
+            await _emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
+        }
+
+        // 2. Admin Reschedule Alert
+        var adminEmails = await _bookingRepository.GetAdminEmailsAsync();
+        if (adminEmails.Count > 0)
+        {
+            var adminSubject = $"[Admin Alert] Booking Rescheduled: '{meetingTitle}' by {employeeName}";
+            var adminBody = $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset=""utf-8""><title>Booking Rescheduled Alert</title></head>
+<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+        <h2 style=""color: #2563eb; margin-top: 0;"">Booking Rescheduled</h2>
+        <p><strong>{employeeName}</strong> has rescheduled their booking:</p>
+        <ul>
+            <li><strong>Meeting:</strong> {meetingTitle}</li>
+            <li><strong>Room:</strong> {roomName}</li>
+            <li><strong>Date:</strong> {request.BookingDate:MMMM dd, yyyy}</li>
+            <li><strong>Time:</strong> {request.StartTime:hh\\:mm tt} - {request.EndTime:hh\\:mm tt}</li>
+        </ul>
+    </div>
+</body>
+</html>";
+
+            foreach (var adminEmail in adminEmails)
+            {
+                try
+                {
+                    await _emailService.SendEmailAsync(adminEmail, adminSubject, adminBody, isHtml: true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send admin reschedule alert to {Email}", adminEmail);
+                }
+            }
+        }
+    }
+
+    private static string BuildBookingConfirmedEmailHtml(
+        string employeeName,
+        string meetingTitle,
+        string purpose,
+        string roomName,
+        string roomNumber,
+        DateOnly bookingDate,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        int participantCount)
+    {
+        return $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset=""utf-8""><title>Booking Confirmed</title></head>
+<body style=""font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; margin: 0; padding: 24px; color: #1e293b;"">
+    <table align=""center"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);"">
+        <tr>
+            <td style=""background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px 28px; text-align: center;"">
+                <h1 style=""color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;"">SpaceBook</h1>
+                <p style=""color: #d1fae5; margin: 6px 0 0; font-size: 14px;"">Booking Confirmed & Approved</p>
+            </td>
+        </tr>
+        <tr>
+            <td style=""padding: 28px;"">
+                <h2 style=""color: #0f172a; margin: 0 0 12px; font-size: 18px;"">Hello {employeeName},</h2>
+                <p style=""color: #475569; font-size: 15px; line-height: 1.5; margin: 0 0 20px;"">
+                    Your room booking for <strong>'{meetingTitle}'</strong> has been automatically approved and confirmed.
+                </p>
+                <table width=""100%"" cellpadding=""6"" cellspacing=""0"" style=""background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px;"">
+                    <tr><td width=""35%"" style=""color: #64748b; font-size: 13px;"">Room</td><td style=""color: #0f172a; font-weight: 600; font-size: 14px;"">{roomName} {(string.IsNullOrWhiteSpace(roomNumber) ? "" : $"({roomNumber})")}</td></tr>
+                    <tr><td style=""color: #64748b; font-size: 13px;"">Date</td><td style=""color: #0f172a; font-size: 14px;"">{bookingDate:MMMM dd, yyyy}</td></tr>
+                    <tr><td style=""color: #64748b; font-size: 13px;"">Time</td><td style=""color: #059669; font-weight: 600; font-size: 14px;"">{startTime:hh\\:mm tt} - {endTime:hh\\:mm tt}</td></tr>
+                    {(participantCount > 0 ? $"<tr><td style=\"color: #64748b; font-size: 13px;\">Attendees</td><td style=\"color: #0f172a; font-size: 14px;\">{participantCount} people</td></tr>" : "")}
+                    {(!string.IsNullOrWhiteSpace(purpose) ? $"<tr><td style=\"color: #64748b; font-size: 13px;\">Purpose</td><td style=\"color: #0f172a; font-size: 14px;\">{purpose}</td></tr>" : "")}
+                </table>
+                <p style=""color: #64748b; font-size: 13px; margin: 0;"">You will receive an email reminder 15 minutes before your meeting starts.</p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+    }
+
+    private static string BuildAdminBookingAlertEmailHtml(
+        string employeeName,
+        string employeeEmail,
+        string department,
+        string meetingTitle,
+        string purpose,
+        string roomName,
+        DateOnly bookingDate,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        int participantCount)
+    {
+        return $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset=""utf-8""><title>New Booking Alert</title></head>
+<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+    <div style=""max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 24px; border-left: 4px solid #3b82f6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+        <h2 style=""color: #1e40af; margin-top: 0;"">[Admin Alert] New Room Booking</h2>
+        <p>A new room booking has been automatically approved in SpaceBook:</p>
+        <table width=""100%"" cellpadding=""4"" cellspacing=""0"" style=""background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 16px 0;"">
+            <tr><td><strong>Booked By:</strong></td><td>{employeeName} ({employeeEmail})</td></tr>
+            {(!string.IsNullOrWhiteSpace(department) ? $"<tr><td><strong>Department:</strong></td><td>{department}</td></tr>" : "")}
+            <tr><td><strong>Meeting:</strong></td><td>{meetingTitle}</td></tr>
+            <tr><td><strong>Room:</strong></td><td>{roomName}</td></tr>
+            <tr><td><strong>Date:</strong></td><td>{bookingDate:MMMM dd, yyyy}</td></tr>
+            <tr><td><strong>Time:</strong></td><td>{startTime:hh\\:mm tt} - {endTime:hh\\:mm tt}</td></tr>
+            <tr><td><strong>Attendees:</strong></td><td>{participantCount}</td></tr>
+        </table>
+    </div>
+</body>
+</html>";
     }
 }

@@ -618,6 +618,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 x.BookingDate)
             .ThenByDescending(x =>
                 x.StartTime)
+            .Take(100)
             .Select(x =>
                 new MyBookingDto
                 {
@@ -665,55 +666,76 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
     }
 
     // =========================================================
-    // RECENT RESERVATIONS
+    // RECENT & ACTIVE RESERVATIONS
     // =========================================================
 
     public async Task<List<RecentReservationDto>>
         GetRecentReservationsAsync(
             int employeeId)
     {
-        return await _context.Bookings
+        var now = DateTime.Now;
+        var today = DateOnly.FromDateTime(now);
+        var currentTime = TimeOnly.FromDateTime(now);
+
+        // Fetch active and early/upcoming reservations first (ordered chronologically)
+        var activeAndUpcoming = await _context.Bookings
             .AsNoTracking()
             .Include(x => x.Room)
                 .ThenInclude(r => r!.Module)
             .Where(x =>
-                x.EmployeeId ==
-                employeeId &&
+                x.EmployeeId == employeeId &&
                 x.Status != "Cancelled" &&
-                x.Status != "Rejected")
-            .OrderByDescending(x =>
-                x.BookingDate)
-            .ThenByDescending(x =>
-                x.StartTime)
+                x.Status != "Rejected" &&
+                (x.BookingDate > today || (x.BookingDate == today && x.EndTime >= currentTime)))
+            .OrderBy(x => x.BookingDate)
+            .ThenBy(x => x.StartTime)
+            .Take(10)
             .Select(x =>
                 new RecentReservationDto
                 {
-                    BookingId =
-                        x.BookingId,
-
-                    RoomName =
-                        x.Room != null
-                            ? x.Room.RoomName
-                            : $"Room {x.RoomId}",
-
-                    Module =
-                        x.Room != null &&
-                        x.Room.Module != null
-                            ? x.Room.Module.ModuleName
-                            : string.Empty,
-
-                    BookingDate =
-                        x.BookingDate,
-
-                    StartTime =
-                        x.StartTime,
-
-                    EndTime =
-                        x.EndTime,
-
-                    Status =
-                        x.Status
+                    BookingId = x.BookingId,
+                    RoomName = x.Room != null ? x.Room.RoomName : $"Room {x.RoomId}",
+                    Module = x.Room != null && x.Room.Module != null ? x.Room.Module.ModuleName : string.Empty,
+                    BookingDate = x.BookingDate,
+                    StartTime = x.StartTime,
+                    EndTime = x.EndTime,
+                    Status = x.Status
                 })
             .ToListAsync();
+
+        if (activeAndUpcoming.Count >= 5)
+        {
+            return activeAndUpcoming;
+        }
+
+        // If fewer than 5 active/upcoming, append recent past bookings
+        var remainingNeeded = 5 - activeAndUpcoming.Count;
+        var pastBookings = await _context.Bookings
+            .AsNoTracking()
+            .Include(x => x.Room)
+                .ThenInclude(r => r!.Module)
+            .Where(x =>
+                x.EmployeeId == employeeId &&
+                x.Status != "Cancelled" &&
+                x.Status != "Rejected" &&
+                (x.BookingDate < today || (x.BookingDate == today && x.EndTime < currentTime)))
+            .OrderByDescending(x => x.BookingDate)
+            .ThenByDescending(x => x.StartTime)
+            .Take(remainingNeeded)
+            .Select(x =>
+                new RecentReservationDto
+                {
+                    BookingId = x.BookingId,
+                    RoomName = x.Room != null ? x.Room.RoomName : $"Room {x.RoomId}",
+                    Module = x.Room != null && x.Room.Module != null ? x.Room.Module.ModuleName : string.Empty,
+                    BookingDate = x.BookingDate,
+                    StartTime = x.StartTime,
+                    EndTime = x.EndTime,
+                    Status = x.Status
+                })
+            .ToListAsync();
+
+        activeAndUpcoming.AddRange(pastBookings);
+        return activeAndUpcoming;
     }
 }

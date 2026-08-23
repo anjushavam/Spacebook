@@ -29,4 +29,10 @@ public class ReportService : IReportService
     {
         return await _repository.GetRoomUsageAsync(filter);
     }
+
+    public async Task<byte[]> ExportBookingsCsvAsync(
+        ReportFilterDto filter)
+    {
+        return await _repository.ExportBookingsCsvAsync(filter);
+    }
 }

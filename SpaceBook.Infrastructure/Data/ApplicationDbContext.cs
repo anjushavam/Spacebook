@@ -483,6 +483,16 @@ public class ApplicationDbContext : DbContext
                 .HasColumnName("cancellationreason")
                 .HasMaxLength(500);
 
+            entity.Property(x => x.StartReminderSent)
+                .HasColumnName("startremindersent")
+                .HasDefaultValue(false)
+                .IsRequired();
+
+            entity.Property(x => x.EndReminderSent)
+                .HasColumnName("endremindersent")
+                .HasDefaultValue(false)
+                .IsRequired();
+
             // -------------------------------------------------
             // EMPLOYEE
             // -------------------------------------------------
@@ -843,7 +853,7 @@ public class ApplicationDbContext : DbContext
             // EMPLOYEE RELATIONSHIP
             // -------------------------------------------------
 
-            entity.HasOne<Employee>()
+            entity.HasOne(x => x.Employee)
                 .WithMany()
                 .HasForeignKey(x =>
                     x.EmployeeId)
