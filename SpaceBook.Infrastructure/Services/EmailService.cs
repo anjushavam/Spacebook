@@ -24,6 +24,10 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
+    // =========================================================
+    // GENERIC EMAIL SENDER
+    // =========================================================
+
     public async Task SendEmailAsync(
         string toEmail,
         string subject,
@@ -32,68 +36,110 @@ public class EmailService : IEmailService
     {
         if (string.IsNullOrWhiteSpace(toEmail))
         {
-            _logger.LogWarning(
-                "Email recipient is empty. Email was not sent.");
-            return;
+            throw new InvalidOperationException(
+                "Email recipient is empty.");
         }
 
         // =====================================================
-        // 1. TRY RESEND HTTPS API (PORT 443 - NEVER BLOCKED)
+        // 1. TRY RESEND HTTPS API
         // =====================================================
-        var resendApiKey = _configuration["Resend:ApiKey"]
-                           ?? _configuration["Resend__ApiKey"]
-                           ?? _configuration["RESEND_API_KEY"]
-                           ?? _configuration["Resend_ApiKey"]
-                           ?? Environment.GetEnvironmentVariable("Resend__ApiKey")
-                           ?? Environment.GetEnvironmentVariable("Resend_ApiKey")
-                           ?? Environment.GetEnvironmentVariable("RESEND_API_KEY");
+        //
+        // If Resend is configured, try it first.
+        //
+        // If it succeeds:
+        //      return
+        //
+        // If it fails:
+        //      log error
+        //      continue to SMTP fallback
+        //
+        // =====================================================
+
+        var resendApiKey =
+            _configuration["Resend:ApiKey"]
+            ?? _configuration["RESEND_API_KEY"]
+            ?? Environment.GetEnvironmentVariable(
+                "Resend__ApiKey")
+            ?? Environment.GetEnvironmentVariable(
+                "RESEND_API_KEY");
 
         if (!string.IsNullOrWhiteSpace(resendApiKey))
         {
             try
             {
                 _logger.LogInformation(
-                    "Attempting to send email via Resend HTTPS API. To={To}, Subject={Subject}",
+                    "Attempting email through Resend API. To={To}, Subject={Subject}",
                     toEmail,
                     subject);
 
-                var resendFrom = _configuration["Resend:From"] ?? "SpaceBook <onboarding@resend.dev>";
-                using var httpClient = new HttpClient();
-                httpClient.Timeout = TimeSpan.FromSeconds(15);
-                httpClient.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", resendApiKey.Trim());
+                var resendFrom =
+                    _configuration["Resend:From"]
+                    ?? "SpaceBook <onboarding@resend.dev>";
+
+                using var httpClient =
+                    new HttpClient
+                    {
+                        Timeout =
+                            TimeSpan.FromSeconds(15)
+                    };
+
+                httpClient
+                    .DefaultRequestHeaders
+                    .Authorization =
+                    new AuthenticationHeaderValue(
+                        "Bearer",
+                        resendApiKey.Trim());
 
                 var payload = new
                 {
                     from = resendFrom,
-                    to = new[] { toEmail.Trim() },
-                    subject = subject,
-                    html = isHtml ? body : null,
-                    text = !isHtml ? body : null
+
+                    to = new[]
+                    {
+                        toEmail.Trim()
+                    },
+
+                    subject,
+
+                    html =
+                        isHtml
+                            ? body
+                            : null,
+
+                    text =
+                        !isHtml
+                            ? body
+                            : null
                 };
 
-                var jsonContent = new StringContent(
-                    JsonSerializer.Serialize(payload),
-                    Encoding.UTF8,
-                    "application/json");
+                var jsonContent =
+                    new StringContent(
+                        JsonSerializer.Serialize(
+                            payload),
+                        Encoding.UTF8,
+                        "application/json");
 
-                var response = await httpClient.PostAsync(
-                    "https://api.resend.com/emails",
-                    jsonContent);
+                var response =
+                    await httpClient.PostAsync(
+                        "https://api.resend.com/emails",
+                        jsonContent);
 
-                var responseBody = await response.Content.ReadAsStringAsync();
+                var responseBody =
+                    await response.Content
+                        .ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation(
-                        "Email successfully sent to {To} via Resend HTTPS API. Response: {Response}",
+                        "Email successfully sent to {To} via Resend. Response={Response}",
                         toEmail,
                         responseBody);
+
                     return;
                 }
 
                 _logger.LogWarning(
-                    "Resend API returned status {StatusCode}: {Error}. Attempting SMTP fallback.",
+                    "Resend failed. Status={StatusCode}, Response={Response}. Falling back to SMTP.",
                     response.StatusCode,
                     responseBody);
             }
@@ -101,27 +147,64 @@ public class EmailService : IEmailService
             {
                 _logger.LogError(
                     ex,
-                    "Resend API dispatch failed. Attempting SMTP fallback.");
+                    "Resend email failed for {To}. Falling back to SMTP.",
+                    toEmail);
             }
         }
 
         // =====================================================
-        // 2. SMTP FALLBACK (MAILKIT)
+        // 2. SMTP FALLBACK
         // =====================================================
-        var host = _configuration["EmailSettings:Host"] ?? _configuration["Smtp:Host"];
-        var portValue = _configuration["EmailSettings:Port"] ?? _configuration["Smtp:Port"];
-        var username = _configuration["EmailSettings:Username"] ?? _configuration["Smtp:Username"];
-        var password = _configuration["EmailSettings:Password"] ?? _configuration["Smtp:Password"];
-        var fromEmail = _configuration["EmailSettings:FromEmail"] ?? _configuration["Smtp:From"];
-        var senderName = _configuration["EmailSettings:FromName"]
-                         ?? _configuration["Smtp:SenderName"]
-                         ?? "SpaceBook";
 
-        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        var host =
+            _configuration["EmailSettings:Host"]
+            ?? _configuration["Smtp:Host"];
+
+        var portValue =
+            _configuration["EmailSettings:Port"]
+            ?? _configuration["Smtp:Port"];
+
+        var username =
+            _configuration["EmailSettings:Username"]
+            ?? _configuration["Smtp:Username"];
+
+        var password =
+            _configuration["EmailSettings:Password"]
+            ?? _configuration["Smtp:Password"];
+
+        var fromEmail =
+            _configuration["EmailSettings:FromEmail"]
+            ?? _configuration["Smtp:From"];
+
+        var senderName =
+            _configuration["EmailSettings:FromName"]
+            ?? _configuration["Smtp:SenderName"]
+            ?? "SpaceBook";
+
+        var enableSslValue =
+            _configuration["EmailSettings:EnableSsl"]
+            ?? _configuration["Smtp:EnableSsl"];
+
+        // =====================================================
+        // VALIDATE SMTP CONFIGURATION
+        // =====================================================
+
+        if (string.IsNullOrWhiteSpace(host))
         {
-            _logger.LogWarning(
-                "SMTP is not configured (Host/Username/Password missing). Skipping SMTP delivery.");
-            return;
+            throw new InvalidOperationException(
+                "SMTP Host is not configured.");
+        }
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            throw new InvalidOperationException(
+                "SMTP Username is not configured.");
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            throw new InvalidOperationException(
+                "SMTP Password is not configured.");
         }
 
         if (string.IsNullOrWhiteSpace(fromEmail))
@@ -129,55 +212,120 @@ public class EmailService : IEmailService
             fromEmail = username;
         }
 
+        // =====================================================
+        // PORT
+        // =====================================================
+
         var port = 587;
-        if (!string.IsNullOrWhiteSpace(portValue) && int.TryParse(portValue, out var configuredPort))
+
+        if (!string.IsNullOrWhiteSpace(
+                portValue) &&
+            int.TryParse(
+                portValue,
+                out var configuredPort))
         {
             port = configuredPort;
         }
 
-        if (host.Contains("gmail.com", StringComparison.OrdinalIgnoreCase) && port == 587)
+        // =====================================================
+        // SSL
+        // =====================================================
+
+        var enableSsl = true;
+
+        if (!string.IsNullOrWhiteSpace(
+                enableSslValue) &&
+            bool.TryParse(
+                enableSslValue,
+                out var configuredSsl))
         {
-            port = 465;
+            enableSsl = configuredSsl;
         }
+
+        // =====================================================
+        // SEND THROUGH SMTP
+        // =====================================================
 
         try
         {
             _logger.LogInformation(
-                "Attempting to send email via SMTP. To={To}, Host={Host}, Port={Port}",
+                "Attempting SMTP email. To={To}, Host={Host}, Port={Port}",
                 toEmail,
                 host,
                 port);
 
-            var cleanPassword = password.Replace(" ", "").Trim();
+            // Google App Passwords are sometimes copied
+            // with spaces. Remove them safely.
+            var cleanPassword =
+                password
+                    .Replace(" ", "")
+                    .Trim();
 
-            var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(senderName, fromEmail));
-            message.To.Add(MailboxAddress.Parse(toEmail));
-            message.Subject = subject;
+            var message =
+                new MimeMessage();
 
-            var bodyBuilder = new BodyBuilder();
+            message.From.Add(
+                new MailboxAddress(
+                    senderName,
+                    fromEmail));
+
+            message.To.Add(
+                MailboxAddress.Parse(
+                    toEmail.Trim()));
+
+            message.Subject =
+                subject;
+
+            var bodyBuilder =
+                new BodyBuilder();
+
             if (isHtml)
             {
-                bodyBuilder.HtmlBody = body;
+                bodyBuilder.HtmlBody =
+                    body;
             }
             else
             {
-                bodyBuilder.TextBody = body;
+                bodyBuilder.TextBody =
+                    body;
             }
 
-            message.Body = bodyBuilder.ToMessageBody();
+            message.Body =
+                bodyBuilder
+                    .ToMessageBody();
 
-            using var client = new SmtpClient();
-            client.Timeout = 10000;
+            using var client =
+                new SmtpClient();
 
-            var secureSocketOption = port == 465
-                ? SecureSocketOptions.SslOnConnect
-                : SecureSocketOptions.StartTls;
+            client.Timeout =
+                15000;
 
-            await client.ConnectAsync(host, port, secureSocketOption);
-            await client.AuthenticateAsync(username.Trim(), cleanPassword);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
+            // Gmail:
+            //
+            // 587 -> STARTTLS
+            // 465 -> SSL on connect
+            //
+            var secureSocketOption =
+                !enableSsl
+                    ? SecureSocketOptions.None
+                    : port == 465
+                        ? SecureSocketOptions.SslOnConnect
+                        : SecureSocketOptions.StartTls;
+
+            await client.ConnectAsync(
+                host,
+                port,
+                secureSocketOption);
+
+            await client.AuthenticateAsync(
+                username.Trim(),
+                cleanPassword);
+
+            await client.SendAsync(
+                message);
+
+            await client.DisconnectAsync(
+                true);
 
             _logger.LogInformation(
                 "Email successfully sent to {To}. Subject={Subject}",
@@ -188,13 +336,24 @@ public class EmailService : IEmailService
         {
             _logger.LogError(
                 ex,
-                "Failed to send email to {To}. SMTP={Host}:{Port}",
+                "SMTP email failed. To={To}, Host={Host}, Port={Port}",
                 toEmail,
                 host,
                 port);
+
+            // IMPORTANT:
+            //
+            // Propagate failure to BookingReminderService.
+            //
+            // That prevents the reminder from being marked
+            // as successfully sent when delivery failed.
             throw;
         }
     }
+
+    // =========================================================
+    // SEND TO MULTIPLE RECIPIENTS
+    // =========================================================
 
     public async Task SendEmailsAsync(
         IEnumerable<string> toEmails,
@@ -202,33 +361,41 @@ public class EmailService : IEmailService
         string body,
         bool isHtml = true)
     {
-        var validEmails = toEmails?
-            .Where(e => !string.IsNullOrWhiteSpace(e))
-            .Select(e => e.Trim())
-            .Distinct()
-            .ToList();
+        var validEmails =
+            toEmails?
+                .Where(e =>
+                    !string.IsNullOrWhiteSpace(e))
+                .Select(e =>
+                    e.Trim())
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-        if (validEmails == null || validEmails.Count == 0)
+        if (validEmails == null ||
+            validEmails.Count == 0)
         {
-            _logger.LogWarning("Email recipient list is empty. Skipping email dispatch.");
+            _logger.LogWarning(
+                "Email recipient list is empty.");
+
             return;
         }
 
         foreach (var email in validEmails)
         {
-            try
-            {
-                await SendEmailAsync(email, subject, body, isHtml);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send batch email to {To}", email);
-            }
+            // Do not swallow the exception here.
+            //
+            // If delivery fails, the caller must know.
+            await SendEmailAsync(
+                email,
+                subject,
+                body,
+                isHtml);
         }
     }
 
     // =========================================================
-    // 1. NOTIFICATION 1: BOOKING CONFIRMATION
+    // NOTIFICATION 1
+    // BOOKING CONFIRMATION
     // =========================================================
 
     public async Task SendBookingConfirmationAsync(
@@ -237,47 +404,78 @@ public class EmailService : IEmailService
         Room room,
         IEnumerable<string> adminEmails)
     {
-        var employeeName = employee?.Name ?? "Colleague";
-        var employeeEmail = employee?.Email;
-        var roomName = !string.IsNullOrWhiteSpace(room?.RoomName) ? room.RoomName : (room?.RoomNumber ?? "Meeting Room");
-        var meetingTitle = !string.IsNullOrWhiteSpace(booking.MeetingTitle) ? booking.MeetingTitle : "Room Booking";
-        var purpose = booking.Purpose ?? string.Empty;
+        var employeeName =
+            !string.IsNullOrWhiteSpace(
+                employee?.Name)
+                ? employee.Name
+                : "Colleague";
 
-        // 1. Send confirmation to Employee
-        if (!string.IsNullOrWhiteSpace(employeeEmail))
+        var employeeEmail =
+            employee?.Email;
+
+        var roomName =
+            GetRoomName(room);
+
+        var meetingTitle =
+            !string.IsNullOrWhiteSpace(
+                booking.MeetingTitle)
+                ? booking.MeetingTitle
+                : "Room Booking";
+
+        var purpose =
+            booking.Purpose
+            ?? string.Empty;
+
+        // =====================================================
+        // EMPLOYEE CONFIRMATION
+        // =====================================================
+
+        if (string.IsNullOrWhiteSpace(
+                employeeEmail))
         {
-            try
-            {
-                var empSubject = $"SpaceBook Booking Confirmed - {meetingTitle}";
-                var empBody = BuildConfirmationEmailHtml(
-                    employeeName,
-                    meetingTitle,
-                    purpose,
-                    roomName,
-                    booking.BookingDate,
-                    booking.StartTime,
-                    booking.EndTime,
-                    booking.ParticipantCount);
-
-                await SendEmailAsync(employeeEmail, empSubject, empBody, isHtml: true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send booking confirmation email to employee {Email}", employeeEmail);
-            }
+            throw new InvalidOperationException(
+                $"Employee email is missing for BookingId={booking.BookingId}.");
         }
 
-        // 2. Send alert to Admins
-        var adminList = ResolveAdminEmails(adminEmails);
+        var employeeSubject =
+            $"SpaceBook Booking Confirmed - {meetingTitle}";
+
+        var employeeBody =
+            BuildConfirmationEmailHtml(
+                employeeName,
+                meetingTitle,
+                purpose,
+                roomName,
+                booking.BookingDate,
+                booking.StartTime,
+                booking.EndTime,
+                booking.ParticipantCount);
+
+        await SendEmailAsync(
+            employeeEmail,
+            employeeSubject,
+            employeeBody,
+            true);
+
+        // =====================================================
+        // ADMIN CONFIRMATION
+        // =====================================================
+
+        var adminList =
+            ResolveAdminEmails(
+                adminEmails);
+
         if (adminList.Count > 0)
         {
-            try
-            {
-                var adminSubject = $"[Admin Alert] SpaceBook Booking Confirmed - {meetingTitle}";
-                var adminBody = BuildAdminConfirmationEmailHtml(
+            var adminSubject =
+                $"[Admin Alert] SpaceBook Booking Confirmed - {meetingTitle}";
+
+            var adminBody =
+                BuildAdminConfirmationEmailHtml(
                     employeeName,
-                    employeeEmail ?? string.Empty,
-                    employee?.Department ?? string.Empty,
+                    employeeEmail,
+                    employee?.Department
+                        ?? string.Empty,
                     meetingTitle,
                     purpose,
                     roomName,
@@ -286,17 +484,23 @@ public class EmailService : IEmailService
                     booking.EndTime,
                     booking.ParticipantCount);
 
-                await SendEmailsAsync(adminList, adminSubject, adminBody, isHtml: true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send booking confirmation alert to admins");
-            }
+            await SendEmailsAsync(
+                adminList,
+                adminSubject,
+                adminBody,
+                true);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Booking confirmation sent to employee but no Admin email recipients were configured. BookingId={BookingId}",
+                booking.BookingId);
         }
     }
 
     // =========================================================
-    // 2. NOTIFICATION 2: 15-MINUTE START REMINDER
+    // NOTIFICATION 2
+    // START REMINDER
     // =========================================================
 
     public async Task SendBookingStartReminderAsync(
@@ -305,47 +509,78 @@ public class EmailService : IEmailService
         Room room,
         IEnumerable<string> adminEmails)
     {
-        var employeeName = employee?.Name ?? "Colleague";
-        var employeeEmail = employee?.Email;
-        var roomName = !string.IsNullOrWhiteSpace(room?.RoomName) ? room.RoomName : (room?.RoomNumber ?? "Meeting Room");
-        var meetingTitle = !string.IsNullOrWhiteSpace(booking.MeetingTitle) ? booking.MeetingTitle : "Room Booking";
-        var purpose = booking.Purpose ?? string.Empty;
+        var employeeName =
+            !string.IsNullOrWhiteSpace(
+                employee?.Name)
+                ? employee.Name
+                : "Colleague";
 
-        // 1. Send start reminder to Employee
-        if (!string.IsNullOrWhiteSpace(employeeEmail))
+        var employeeEmail =
+            employee?.Email;
+
+        var roomName =
+            GetRoomName(room);
+
+        var meetingTitle =
+            !string.IsNullOrWhiteSpace(
+                booking.MeetingTitle)
+                ? booking.MeetingTitle
+                : "Room Booking";
+
+        var purpose =
+            booking.Purpose
+            ?? string.Empty;
+
+        // =====================================================
+        // EMPLOYEE START REMINDER
+        // =====================================================
+
+        if (string.IsNullOrWhiteSpace(
+                employeeEmail))
         {
-            try
-            {
-                var empSubject = "SpaceBook Reminder - Booking Starts in 15 Minutes";
-                var empBody = BuildStartReminderEmailHtml(
-                    employeeName,
-                    meetingTitle,
-                    purpose,
-                    roomName,
-                    booking.BookingDate,
-                    booking.StartTime,
-                    booking.EndTime,
-                    booking.ParticipantCount);
-
-                await SendEmailAsync(employeeEmail, empSubject, empBody, isHtml: true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send 15-minute start reminder email to employee {Email}", employeeEmail);
-            }
+            throw new InvalidOperationException(
+                $"Employee email is missing for BookingId={booking.BookingId}.");
         }
 
-        // 2. Send start reminder to Admins
-        var adminList = ResolveAdminEmails(adminEmails);
+        const string employeeSubject =
+            "SpaceBook Reminder - Booking Starts in 15 Minutes";
+
+        var employeeBody =
+            BuildStartReminderEmailHtml(
+                employeeName,
+                meetingTitle,
+                purpose,
+                roomName,
+                booking.BookingDate,
+                booking.StartTime,
+                booking.EndTime,
+                booking.ParticipantCount);
+
+        await SendEmailAsync(
+            employeeEmail,
+            employeeSubject,
+            employeeBody,
+            true);
+
+        // =====================================================
+        // ADMIN START REMINDER
+        // =====================================================
+
+        var adminList =
+            ResolveAdminEmails(
+                adminEmails);
+
         if (adminList.Count > 0)
         {
-            try
-            {
-                var adminSubject = $"[Admin Alert] SpaceBook Reminder - Booking Starts in 15 Minutes: {meetingTitle}";
-                var adminBody = BuildAdminStartReminderEmailHtml(
+            var adminSubject =
+                $"[Admin Alert] SpaceBook Reminder - Booking Starts in 15 Minutes: {meetingTitle}";
+
+            var adminBody =
+                BuildAdminStartReminderEmailHtml(
                     employeeName,
-                    employeeEmail ?? string.Empty,
-                    employee?.Department ?? string.Empty,
+                    employeeEmail,
+                    employee?.Department
+                        ?? string.Empty,
                     meetingTitle,
                     purpose,
                     roomName,
@@ -354,17 +589,23 @@ public class EmailService : IEmailService
                     booking.EndTime,
                     booking.ParticipantCount);
 
-                await SendEmailsAsync(adminList, adminSubject, adminBody, isHtml: true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send 15-minute start reminder alert to admins");
-            }
+            await SendEmailsAsync(
+                adminList,
+                adminSubject,
+                adminBody,
+                true);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Start reminder sent to employee but no Admin recipient was configured. BookingId={BookingId}",
+                booking.BookingId);
         }
     }
 
     // =========================================================
-    // 3. NOTIFICATION 3: 15-MINUTE END REMINDER
+    // NOTIFICATION 3
+    // END REMINDER
     // =========================================================
 
     public async Task SendBookingEndReminderAsync(
@@ -373,81 +614,194 @@ public class EmailService : IEmailService
         Room room,
         IEnumerable<string> adminEmails)
     {
-        var employeeName = employee?.Name ?? "Colleague";
-        var employeeEmail = employee?.Email;
-        var roomName = !string.IsNullOrWhiteSpace(room?.RoomName) ? room.RoomName : (room?.RoomNumber ?? "Meeting Room");
-        var meetingTitle = !string.IsNullOrWhiteSpace(booking.MeetingTitle) ? booking.MeetingTitle : "Room Booking";
+        var employeeName =
+            !string.IsNullOrWhiteSpace(
+                employee?.Name)
+                ? employee.Name
+                : "Colleague";
 
-        // 1. Send end reminder to Employee
-        if (!string.IsNullOrWhiteSpace(employeeEmail))
+        var employeeEmail =
+            employee?.Email;
+
+        var roomName =
+            GetRoomName(room);
+
+        var meetingTitle =
+            !string.IsNullOrWhiteSpace(
+                booking.MeetingTitle)
+                ? booking.MeetingTitle
+                : "Room Booking";
+
+        // =====================================================
+        // EMPLOYEE END REMINDER
+        // =====================================================
+
+        if (string.IsNullOrWhiteSpace(
+                employeeEmail))
         {
-            try
-            {
-                var empSubject = "SpaceBook Reminder - Booking Ends in 15 Minutes";
-                var empBody = BuildEndReminderEmailHtml(
-                    employeeName,
-                    meetingTitle,
-                    roomName,
-                    booking.BookingDate,
-                    booking.StartTime,
-                    booking.EndTime);
-
-                await SendEmailAsync(employeeEmail, empSubject, empBody, isHtml: true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send 15-minute end reminder email to employee {Email}", employeeEmail);
-            }
+            throw new InvalidOperationException(
+                $"Employee email is missing for BookingId={booking.BookingId}.");
         }
 
-        // 2. Send end reminder to Admins
-        var adminList = ResolveAdminEmails(adminEmails);
+        const string employeeSubject =
+            "SpaceBook Reminder - Booking Ends in 15 Minutes";
+
+        var employeeBody =
+            BuildEndReminderEmailHtml(
+                employeeName,
+                meetingTitle,
+                roomName,
+                booking.BookingDate,
+                booking.StartTime,
+                booking.EndTime);
+
+        await SendEmailAsync(
+            employeeEmail,
+            employeeSubject,
+            employeeBody,
+            true);
+
+        // =====================================================
+        // ADMIN END REMINDER
+        // =====================================================
+
+        var adminList =
+            ResolveAdminEmails(
+                adminEmails);
+
         if (adminList.Count > 0)
         {
-            try
-            {
-                var adminSubject = $"[Admin Alert] SpaceBook Reminder - Booking Ends in 15 Minutes: {meetingTitle}";
-                var adminBody = BuildAdminEndReminderEmailHtml(
+            var adminSubject =
+                $"[Admin Alert] SpaceBook Reminder - Booking Ends in 15 Minutes: {meetingTitle}";
+
+            var adminBody =
+                BuildAdminEndReminderEmailHtml(
                     employeeName,
-                    employeeEmail ?? string.Empty,
+                    employeeEmail,
                     meetingTitle,
                     roomName,
                     booking.BookingDate,
                     booking.StartTime,
                     booking.EndTime);
 
-                await SendEmailsAsync(adminList, adminSubject, adminBody, isHtml: true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send 15-minute end reminder alert to admins");
-            }
+            await SendEmailsAsync(
+                adminList,
+                adminSubject,
+                adminBody,
+                true);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "End reminder sent to employee but no Admin recipient was configured. BookingId={BookingId}",
+                booking.BookingId);
         }
     }
 
     // =========================================================
-    // HELPER: RESOLVE ADMIN EMAILS
+    // ADMIN EMAIL RESOLUTION
     // =========================================================
 
-    private List<string> ResolveAdminEmails(IEnumerable<string>? passedAdminEmails)
+    private List<string> ResolveAdminEmails(
+        IEnumerable<string>? passedAdminEmails)
     {
-        var list = new List<string>();
+        var list =
+            new List<string>();
 
         if (passedAdminEmails != null)
         {
-            list.AddRange(passedAdminEmails.Where(e => !string.IsNullOrWhiteSpace(e)));
+            list.AddRange(
+                passedAdminEmails
+                    .Where(e =>
+                        !string.IsNullOrWhiteSpace(e))
+                    .Select(e =>
+                        e.Trim()));
         }
 
-        var configAdminEmail = _configuration["EmailSettings:AdminEmail"]
-                               ?? _configuration["Smtp:AdminEmail"]
-                               ?? _configuration["Resend:AdminEmail"];
+        var configAdminEmail =
+            _configuration[
+                "EmailSettings:AdminEmail"]
+            ?? _configuration[
+                "Smtp:AdminEmail"]
+            ?? _configuration[
+                "Resend:AdminEmail"];
 
-        if (!string.IsNullOrWhiteSpace(configAdminEmail))
+        if (!string.IsNullOrWhiteSpace(
+                configAdminEmail))
         {
-            list.Add(configAdminEmail.Trim());
+            // Allows multiple configured admin addresses,
+            // separated with ; or ,
+            var configuredAdmins =
+                configAdminEmail
+                    .Split(
+                        new[]
+                        {
+                            ';',
+                            ','
+                        },
+                        StringSplitOptions
+                            .RemoveEmptyEntries)
+                    .Select(x =>
+                        x.Trim())
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x));
+
+            list.AddRange(
+                configuredAdmins);
         }
 
-        return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return list
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    // =========================================================
+    // ROOM NAME
+    // =========================================================
+
+    private static string GetRoomName(
+        Room? room)
+    {
+        if (room == null)
+        {
+            return "Meeting Room";
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+                room.RoomName))
+        {
+            if (!string.IsNullOrWhiteSpace(
+                    room.RoomNumber))
+            {
+                return
+                    $"{room.RoomName} ({room.RoomNumber})";
+            }
+
+            return room.RoomName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+                room.RoomNumber))
+        {
+            return room.RoomNumber;
+        }
+
+        return "Meeting Room";
+    }
+
+    // =========================================================
+    // TIME FORMAT
+    // =========================================================
+
+    private static string FormatTime(
+        TimeOnly time)
+    {
+        return DateTime.Today
+            .Add(
+                time.ToTimeSpan())
+            .ToString(
+                "hh:mm tt");
     }
 
     // =========================================================
@@ -464,41 +818,151 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $"""
+        return $$"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>SpaceBook Booking Confirmed</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b; margin: 0;">
-            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Booking Confirmed</title>
+        </head>
+
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
+
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
+
                 <tr>
-                    <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 28px; text-align: center; color: #ffffff;">
-                        <h1 style="margin: 0; font-size: 24px; font-weight: 700;">SpaceBook</h1>
-                        <p style="margin: 6px 0 0; font-size: 14px; color: #d1fae5;">Room Booking Confirmed</p>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
+
+                        <h1 style="
+                            margin:0;
+                            font-size:24px;">
+                            SpaceBook
+                        </h1>
+
+                        <p style="
+                            margin:6px 0 0;">
+                            Room Booking Confirmed
+                        </p>
                     </td>
                 </tr>
+
                 <tr>
-                    <td style="padding: 28px;">
-                        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px;">Hello {employeeName},</h2>
-                        <p style="color: #475569; font-size: 15px; line-height: 1.6;">Your SpaceBook room booking has been confirmed successfully.</p>
-                        <table width="100%" cellpadding="10" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 20px 0;">
-                            <tr><td width="35%" style="color: #64748b; font-weight: 600;">Meeting:</td><td style="color: #0f172a; font-weight: 600;">{meetingTitle}</td></tr>
-                            {(!string.IsNullOrWhiteSpace(purpose) ? $"<tr><td style=\"color: #64748b; font-weight: 600;\">Purpose:</td><td style=\"color: #0f172a;\">{purpose}</td></tr>" : "")}
-                            <tr><td style="color: #64748b; font-weight: 600;">Room:</td><td style="color: #0f172a;">{roomName}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Date:</td><td style="color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Start Time:</td><td style="color: #059669; font-weight: 600;">{startTime:hh\\:mm tt}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">End Time:</td><td style="color: #059669; font-weight: 600;">{endTime:hh\\:mm tt}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Participants:</td><td style="color: #0f172a;">{participantCount}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Status:</td><td style="color: #10b981; font-weight: 700;">Approved</td></tr>
+                    <td style="padding:28px;">
+
+                        <h2 style="margin-top:0;">
+                            Hello {{employeeName}},
+                        </h2>
+
+                        <p>
+                            Your SpaceBook room booking has
+                            been confirmed successfully.
+                        </p>
+
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
+
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{{meetingTitle}}</td>
+                            </tr>
+
+                            {{(
+                                !string.IsNullOrWhiteSpace(purpose)
+                                    ? $"""
+                                      <tr>
+                                          <td><strong>Purpose:</strong></td>
+                                          <td>{purpose}</td>
+                                      </tr>
+                                      """
+                                    : string.Empty
+                            )}}
+
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{{roomName}}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Date:</strong></td>
+                                <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Start Time:</strong></td>
+                                <td>{{FormatTime(startTime)}}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>End Time:</strong></td>
+                                <td>{{FormatTime(endTime)}}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Participants:</strong></td>
+                                <td>{{participantCount}}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td style="
+                                    color:#059669;
+                                    font-weight:bold;">
+                                    Approved
+                                </td>
+                            </tr>
                         </table>
-                        <p style="color: #475569; font-size: 15px; margin: 16px 0 24px;">Your room has been successfully reserved.</p>
-                        <p style="color: #64748b; font-size: 14px; margin: 0;">Regards,<br><strong>SpaceBook</strong></p>
+
+                        <p>
+                            Your room has been successfully
+                            reserved.
+                        </p>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
                     </td>
                 </tr>
+
                 <tr>
-                    <td style="text-align: center; padding: 16px; background: #f1f5f9; color: #64748b; font-size: 12px;">
-                        This is an automated notification from SpaceBook.
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification
+                        from SpaceBook.
                     </td>
                 </tr>
+
             </table>
         </body>
         </html>
@@ -517,26 +981,116 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $"""
+        return $$"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>New Booking Confirmed Alert</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b; margin: 0;">
-            <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 10px; padding: 24px; border-left: 4px solid #10b981; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                <h2 style="color: #047857; margin-top: 0;">[Admin Alert] Room Booking Confirmed</h2>
-                <p style="color: #475569;">A room booking has been auto-approved in SpaceBook:</p>
-                <table width="100%" cellpadding="6" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 16px 0;">
-                    <tr><td width="35%"><strong>Booked By:</strong></td><td>{employeeName} ({employeeEmail})</td></tr>
-                    {(!string.IsNullOrWhiteSpace(department) ? $"<tr><td><strong>Department:</strong></td><td>{department}</td></tr>" : "")}
-                    <tr><td><strong>Meeting:</strong></td><td>{meetingTitle}</td></tr>
-                    {(!string.IsNullOrWhiteSpace(purpose) ? $"<tr><td><strong>Purpose:</strong></td><td>{purpose}</td></tr>" : "")}
-                    <tr><td><strong>Room:</strong></td><td>{roomName}</td></tr>
-                    <tr><td><strong>Date:</strong></td><td>{bookingDate:MMMM dd, yyyy}</td></tr>
-                    <tr><td><strong>Time:</strong></td><td>{startTime:hh\\:mm tt} - {endTime:hh\\:mm tt}</td></tr>
-                    <tr><td><strong>Participants:</strong></td><td>{participantCount}</td></tr>
-                    <tr><td><strong>Status:</strong></td><td style="color: #10b981; font-weight: bold;">Approved</td></tr>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Admin Booking Alert</title>
+        </head>
+
+        <body style="
+            font-family:Arial,sans-serif;
+            background:#f4f6f9;
+            padding:24px;">
+
+            <div style="
+                max-width:580px;
+                margin:0 auto;
+                background:#ffffff;
+                border-radius:10px;
+                padding:24px;
+                border-left:4px solid #10b981;">
+
+                <h2 style="
+                    color:#047857;
+                    margin-top:0;">
+                    Room Booking Confirmed
+                </h2>
+
+                <p>
+                    A room booking has been
+                    automatically approved.
+                </p>
+
+                <table
+                    width="100%"
+                    cellpadding="7"
+                    cellspacing="0"
+                    style="
+                        background:#f8fafc;
+                        border:1px solid #e2e8f0;">
+
+                    <tr>
+                        <td><strong>Employee:</strong></td>
+                        <td>
+                            {{employeeName}}
+                            ({{employeeEmail}})
+                        </td>
+                    </tr>
+
+                    {{(
+                        !string.IsNullOrWhiteSpace(department)
+                            ? $"""
+                              <tr>
+                                  <td><strong>Department:</strong></td>
+                                  <td>{department}</td>
+                              </tr>
+                              """
+                            : string.Empty
+                    )}}
+
+                    <tr>
+                        <td><strong>Meeting:</strong></td>
+                        <td>{{meetingTitle}}</td>
+                    </tr>
+
+                    {{(
+                        !string.IsNullOrWhiteSpace(purpose)
+                            ? $"""
+                              <tr>
+                                  <td><strong>Purpose:</strong></td>
+                                  <td>{purpose}</td>
+                              </tr>
+                              """
+                            : string.Empty
+                    )}}
+
+                    <tr>
+                        <td><strong>Room:</strong></td>
+                        <td>{{roomName}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Date:</strong></td>
+                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Start:</strong></td>
+                        <td>{{FormatTime(startTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>End:</strong></td>
+                        <td>{{FormatTime(endTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Participants:</strong></td>
+                        <td>{{participantCount}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Status:</strong></td>
+                        <td>Approved</td>
+                    </tr>
                 </table>
-                <p style="color: #64748b; font-size: 13px; margin: 0;">Regards,<br><strong>SpaceBook</strong></p>
+
+                <p>
+                    Regards,<br>
+                    <strong>SpaceBook</strong>
+                </p>
             </div>
         </body>
         </html>
@@ -553,41 +1107,102 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $"""
+        return $$"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>SpaceBook Reminder - Booking Starts in 15 Minutes</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b; margin: 0;">
-            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
-                <tr>
-                    <td style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 28px; text-align: center; color: #ffffff;">
-                        <h1 style="margin: 0; font-size: 24px; font-weight: 700;">SpaceBook</h1>
-                        <p style="margin: 6px 0 0; font-size: 14px; color: #bfdbfe;">Meeting Reminder</p>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 28px;">
-                        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px;">Hello {employeeName},</h2>
-                        <p style="color: #475569; font-size: 15px; line-height: 1.6;">This is a reminder that your SpaceBook room booking will start in <strong>15 minutes</strong>.</p>
-                        <table width="100%" cellpadding="10" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 20px 0;">
-                            <tr><td width="35%" style="color: #64748b; font-weight: 600;">Meeting:</td><td style="color: #0f172a; font-weight: 600;">{meetingTitle}</td></tr>
-                            {(!string.IsNullOrWhiteSpace(purpose) ? $"<tr><td style=\"color: #64748b; font-weight: 600;\">Purpose:</td><td style=\"color: #0f172a;\">{purpose}</td></tr>" : "")}
-                            <tr><td style="color: #64748b; font-weight: 600;">Room:</td><td style="color: #0f172a;">{roomName}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Date:</td><td style="color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Start Time:</td><td style="color: #2563eb; font-weight: 600;">{startTime:hh\\:mm tt}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">End Time:</td><td style="color: #2563eb; font-weight: 600;">{endTime:hh\\:mm tt}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Participants:</td><td style="color: #0f172a;">{participantCount}</td></tr>
-                        </table>
-                        <p style="color: #475569; font-size: 15px; margin: 16px 0 24px;">Please be ready for your booking.</p>
-                        <p style="color: #64748b; font-size: 14px; margin: 0;">Regards,<br><strong>SpaceBook</strong></p>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="text-align: center; padding: 16px; background: #f1f5f9; color: #64748b; font-size: 12px;">
-                        This is an automated notification from SpaceBook.
-                    </td>
-                </tr>
-            </table>
+        <head>
+            <meta charset="utf-8">
+            <title>
+                SpaceBook Reminder -
+                Booking Starts in 15 Minutes
+            </title>
+        </head>
+
+        <body style="
+            font-family:Arial,sans-serif;
+            background:#f4f6f9;
+            padding:24px;">
+
+            <div style="
+                max-width:580px;
+                margin:0 auto;
+                background:#ffffff;
+                padding:28px;
+                border-radius:12px;">
+
+                <h1>
+                    SpaceBook
+                </h1>
+
+                <h2>
+                    Hello {{employeeName}},
+                </h2>
+
+                <p>
+                    This is a reminder that your SpaceBook
+                    room booking will start in
+                    <strong>15 minutes</strong>.
+                </p>
+
+                <table
+                    width="100%"
+                    cellpadding="8"
+                    cellspacing="0"
+                    style="
+                        background:#f8fafc;
+                        border:1px solid #e2e8f0;">
+
+                    <tr>
+                        <td><strong>Meeting:</strong></td>
+                        <td>{{meetingTitle}}</td>
+                    </tr>
+
+                    {{(
+                        !string.IsNullOrWhiteSpace(purpose)
+                            ? $"""
+                              <tr>
+                                  <td><strong>Purpose:</strong></td>
+                                  <td>{purpose}</td>
+                              </tr>
+                              """
+                            : string.Empty
+                    )}}
+
+                    <tr>
+                        <td><strong>Room:</strong></td>
+                        <td>{{roomName}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Date:</strong></td>
+                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Start:</strong></td>
+                        <td>{{FormatTime(startTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>End:</strong></td>
+                        <td>{{FormatTime(endTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Participants:</strong></td>
+                        <td>{{participantCount}}</td>
+                    </tr>
+                </table>
+
+                <p>
+                    Please be ready for your booking.
+                </p>
+
+                <p>
+                    Regards,<br>
+                    <strong>SpaceBook</strong>
+                </p>
+            </div>
         </body>
         </html>
         """;
@@ -605,26 +1220,99 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $"""
+        return $$"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>15-Minute Start Reminder Alert</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b; margin: 0;">
-            <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 10px; padding: 24px; border-left: 4px solid #2563eb; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                <h2 style="color: #1e40af; margin-top: 0;">[Admin Alert] Booking Starts in 15 Minutes</h2>
-                <p style="color: #475569;">The following scheduled room booking will start shortly:</p>
-                <table width="100%" cellpadding="6" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 16px 0;">
-                    <tr><td width="35%"><strong>Booked By:</strong></td><td>{employeeName} ({employeeEmail})</td></tr>
-                    {(!string.IsNullOrWhiteSpace(department) ? $"<tr><td><strong>Department:</strong></td><td>{department}</td></tr>" : "")}
-                    <tr><td><strong>Meeting:</strong></td><td>{meetingTitle}</td></tr>
-                    {(!string.IsNullOrWhiteSpace(purpose) ? $"<tr><td><strong>Purpose:</strong></td><td>{purpose}</td></tr>" : "")}
-                    <tr><td><strong>Room:</strong></td><td>{roomName}</td></tr>
-                    <tr><td><strong>Date:</strong></td><td>{bookingDate:MMMM dd, yyyy}</td></tr>
-                    <tr><td><strong>Start Time:</strong></td><td>{startTime:hh\\:mm tt}</td></tr>
-                    <tr><td><strong>End Time:</strong></td><td>{endTime:hh\\:mm tt}</td></tr>
-                    <tr><td><strong>Participants:</strong></td><td>{participantCount}</td></tr>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Start Reminder</title>
+        </head>
+
+        <body style="
+            font-family:Arial,sans-serif;
+            background:#f4f6f9;
+            padding:24px;">
+
+            <div style="
+                max-width:580px;
+                margin:auto;
+                background:#ffffff;
+                padding:24px;
+                border-left:4px solid #2563eb;">
+
+                <h2>
+                    Booking Starts in 15 Minutes
+                </h2>
+
+                <table
+                    width="100%"
+                    cellpadding="7">
+
+                    <tr>
+                        <td><strong>Employee:</strong></td>
+                        <td>
+                            {{employeeName}}
+                            ({{employeeEmail}})
+                        </td>
+                    </tr>
+
+                    {{(
+                        !string.IsNullOrWhiteSpace(department)
+                            ? $"""
+                              <tr>
+                                  <td><strong>Department:</strong></td>
+                                  <td>{department}</td>
+                              </tr>
+                              """
+                            : string.Empty
+                    )}}
+
+                    <tr>
+                        <td><strong>Meeting:</strong></td>
+                        <td>{{meetingTitle}}</td>
+                    </tr>
+
+                    {{(
+                        !string.IsNullOrWhiteSpace(purpose)
+                            ? $"""
+                              <tr>
+                                  <td><strong>Purpose:</strong></td>
+                                  <td>{purpose}</td>
+                              </tr>
+                              """
+                            : string.Empty
+                    )}}
+
+                    <tr>
+                        <td><strong>Room:</strong></td>
+                        <td>{{roomName}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Date:</strong></td>
+                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Start:</strong></td>
+                        <td>{{FormatTime(startTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>End:</strong></td>
+                        <td>{{FormatTime(endTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Participants:</strong></td>
+                        <td>{{participantCount}}</td>
+                    </tr>
                 </table>
-                <p style="color: #64748b; font-size: 13px; margin: 0;">Regards,<br><strong>SpaceBook</strong></p>
+
+                <p>
+                    Regards,<br>
+                    <strong>SpaceBook</strong>
+                </p>
             </div>
         </body>
         </html>
@@ -639,39 +1327,80 @@ public class EmailService : IEmailService
         TimeOnly startTime,
         TimeOnly endTime)
     {
-        return $"""
+        return $$"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>SpaceBook Reminder - Booking Ends in 15 Minutes</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b; margin: 0;">
-            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
-                <tr>
-                    <td style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%); padding: 28px; text-align: center; color: #ffffff;">
-                        <h1 style="margin: 0; font-size: 24px; font-weight: 700;">SpaceBook</h1>
-                        <p style="margin: 6px 0 0; font-size: 14px; color: #fef3c7;">Wrap-up Reminder</p>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 28px;">
-                        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px;">Hello {employeeName},</h2>
-                        <p style="color: #475569; font-size: 15px; line-height: 1.6;">Your SpaceBook room booking will end in <strong>15 minutes</strong>.</p>
-                        <table width="100%" cellpadding="10" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 20px 0;">
-                            <tr><td width="35%" style="color: #64748b; font-weight: 600;">Meeting:</td><td style="color: #0f172a; font-weight: 600;">{meetingTitle}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Room:</td><td style="color: #0f172a;">{roomName}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Date:</td><td style="color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">Start Time:</td><td style="color: #0f172a;">{startTime:hh\\:mm tt}</td></tr>
-                            <tr><td style="color: #64748b; font-weight: 600;">End Time:</td><td style="color: #d97706; font-weight: 700;">{endTime:hh\\:mm tt}</td></tr>
-                        </table>
-                        <p style="color: #475569; font-size: 15px; margin: 16px 0 24px;">Please complete your meeting and vacate the room on time.</p>
-                        <p style="color: #64748b; font-size: 14px; margin: 0;">Regards,<br><strong>SpaceBook</strong></p>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="text-align: center; padding: 16px; background: #f1f5f9; color: #64748b; font-size: 12px;">
-                        This is an automated notification from SpaceBook.
-                    </td>
-                </tr>
-            </table>
+        <head>
+            <meta charset="utf-8">
+            <title>
+                SpaceBook Reminder -
+                Booking Ends in 15 Minutes
+            </title>
+        </head>
+
+        <body style="
+            font-family:Arial,sans-serif;
+            background:#f4f6f9;
+            padding:24px;">
+
+            <div style="
+                max-width:580px;
+                margin:auto;
+                background:#ffffff;
+                padding:28px;
+                border-radius:12px;">
+
+                <h1>SpaceBook</h1>
+
+                <h2>
+                    Hello {{employeeName}},
+                </h2>
+
+                <p>
+                    Your SpaceBook room booking will end
+                    in <strong>15 minutes</strong>.
+                </p>
+
+                <table
+                    width="100%"
+                    cellpadding="8">
+
+                    <tr>
+                        <td><strong>Meeting:</strong></td>
+                        <td>{{meetingTitle}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Room:</strong></td>
+                        <td>{{roomName}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Date:</strong></td>
+                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Start:</strong></td>
+                        <td>{{FormatTime(startTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>End:</strong></td>
+                        <td>{{FormatTime(endTime)}}</td>
+                    </tr>
+                </table>
+
+                <p>
+                    Please complete your meeting and
+                    vacate the room on time.
+                </p>
+
+                <p>
+                    Regards,<br>
+                    <strong>SpaceBook</strong>
+                </p>
+            </div>
         </body>
         </html>
         """;
@@ -686,23 +1415,72 @@ public class EmailService : IEmailService
         TimeOnly startTime,
         TimeOnly endTime)
     {
-        return $"""
+        return $$"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>15-Minute End Reminder Alert</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b; margin: 0;">
-            <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 10px; padding: 24px; border-left: 4px solid #d97706; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                <h2 style="color: #92400e; margin-top: 0;">[Admin Alert] Booking Ends in 15 Minutes</h2>
-                <p style="color: #475569;">The following scheduled room booking will conclude in 15 minutes:</p>
-                <table width="100%" cellpadding="6" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 16px 0;">
-                    <tr><td width="35%"><strong>Booked By:</strong></td><td>{employeeName} ({employeeEmail})</td></tr>
-                    <tr><td><strong>Meeting:</strong></td><td>{meetingTitle}</td></tr>
-                    <tr><td><strong>Room:</strong></td><td>{roomName}</td></tr>
-                    <tr><td><strong>Date:</strong></td><td>{bookingDate:MMMM dd, yyyy}</td></tr>
-                    <tr><td><strong>Start Time:</strong></td><td>{startTime:hh\\:mm tt}</td></tr>
-                    <tr><td><strong>End Time:</strong></td><td>{endTime:hh\\:mm tt}</td></tr>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook End Reminder</title>
+        </head>
+
+        <body style="
+            font-family:Arial,sans-serif;
+            background:#f4f6f9;
+            padding:24px;">
+
+            <div style="
+                max-width:580px;
+                margin:auto;
+                background:#ffffff;
+                padding:24px;
+                border-left:4px solid #d97706;">
+
+                <h2>
+                    Booking Ends in 15 Minutes
+                </h2>
+
+                <table
+                    width="100%"
+                    cellpadding="7">
+
+                    <tr>
+                        <td><strong>Employee:</strong></td>
+                        <td>
+                            {{employeeName}}
+                            ({{employeeEmail}})
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Meeting:</strong></td>
+                        <td>{{meetingTitle}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Room:</strong></td>
+                        <td>{{roomName}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Date:</strong></td>
+                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>Start:</strong></td>
+                        <td>{{FormatTime(startTime)}}</td>
+                    </tr>
+
+                    <tr>
+                        <td><strong>End:</strong></td>
+                        <td>{{FormatTime(endTime)}}</td>
+                    </tr>
                 </table>
-                <p style="color: #64748b; font-size: 13px; margin: 0;">Regards,<br><strong>SpaceBook</strong></p>
+
+                <p>
+                    Regards,<br>
+                    <strong>SpaceBook</strong>
+                </p>
             </div>
         </body>
         </html>
