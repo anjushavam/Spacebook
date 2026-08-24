@@ -11,13 +11,39 @@ namespace SpaceBook.API.Controllers;
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var result = await _authService.LoginAsync(request);
 
         if (result == null)
-            return Unauthorized(new            {
-                Message = "Invalid Email or Password"            });
+            return Unauthorized(new
+            {
+                Message = "Invalid Email or Password"
+            });
+
+        return Ok(result);
+    }
+
+    [HttpPost("sso-login")]
+    public async Task<IActionResult> SsoLogin([FromBody] SsoLoginRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Email))
+        {
+            return BadRequest(new
+            {
+                Message = "Email is required for SSO authentication."
+            });
+        }
+
+        var result = await _authService.SsoLoginAsync(request);
+
+        if (result == null)
+        {
+            return Unauthorized(new
+            {
+                Message = $"No active employee account found for '{request.Email}'."
+            });
+        }
 
         return Ok(result);
     }

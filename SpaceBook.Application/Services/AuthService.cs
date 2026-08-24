@@ -41,4 +41,29 @@ public class AuthService : IAuthService
             Token = token
         };
     }
+
+    public async Task<LoginResponse?> SsoLoginAsync(SsoLoginRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Email))
+            return null;
+
+        var employee = await _employeeRepository.GetByEmailAsync(request.Email);
+
+        if (employee == null)
+            return null;
+
+        if (!employee.IsActive)
+            return null;
+
+        var token = _jwtService.GenerateToken(employee);
+
+        return new LoginResponse
+        {
+            EmployeeId = employee.EmployeeId,
+            Name = employee.Name,
+            Email = employee.Email,
+            Role = employee.Role?.RoleName ?? "Employee",
+            Token = token
+        };
+    }
 }
