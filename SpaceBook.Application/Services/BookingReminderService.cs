@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
+using SpaceBook.Domain.Enums;
 
 namespace SpaceBook.Application.Services;
 
@@ -32,13 +33,11 @@ public class BookingReminderService : IBookingReminderService
         // SpaceBook booking times are India time.
         // =========================================================
 
-        var indiaTimeZone =
-            TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        var indiaTimeZone = GetIndiaTimeZone();
 
-        var now =
-            TimeZoneInfo.ConvertTimeFromUtc(
-                DateTime.UtcNow,
-                indiaTimeZone);
+        var now = TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.UtcNow,
+            indiaTimeZone);
 
         var today = DateOnly.FromDateTime(now);
 
@@ -48,27 +47,29 @@ public class BookingReminderService : IBookingReminderService
             today);
 
         // =========================================================
-        // GET BOOKINGS
+        // GET BOOKINGS & ADMIN EMAILS
         // =========================================================
 
-        var bookings =
-            await _reminderRepository
-                .GetTodayBookingsNeedingRemindersAsync(
-                    today,
-                    cancellationToken);
+        var bookings = await _reminderRepository
+            .GetTodayBookingsNeedingRemindersAsync(
+                today,
+                cancellationToken);
 
         if (bookings == null || bookings.Count == 0)
         {
             _logger.LogInformation(
-                "No bookings requiring reminders found for {Today}.",
+                "No approved bookings found for {Today}.",
                 today);
-
             return;
         }
 
+        var adminEmails = await _reminderRepository
+            .GetAdminEmailsAsync(cancellationToken);
+
         _logger.LogInformation(
-            "Found {Count} booking(s) requiring reminder evaluation.",
-            bookings.Count);
+            "Found {Count} approved booking(s) for reminder evaluation. Admin recipients: {AdminCount}",
+            bookings.Count,
+            adminEmails.Count);
 
         var stateChanged = false;
 
@@ -83,520 +84,194 @@ public class BookingReminderService : IBookingReminderService
                 break;
             }
 
-            var roomName =
-                booking.Room != null
-                    ? !string.IsNullOrWhiteSpace(
-                        booking.Room.RoomName)
-                        ? booking.Room.RoomName
-                        : booking.Room.RoomNumber
-                    : "Meeting Room";
+            // Only Approved bookings receive reminders
+            if (!string.Equals(booking.Status, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
 
-            var roomNumber =
-                booking.Room?.RoomNumber ?? string.Empty;
+            var roomName = booking.Room != null
+                ? (!string.IsNullOrWhiteSpace(booking.Room.RoomName) ? booking.Room.RoomName : booking.Room.RoomNumber)
+                : "Meeting Room";
 
-            var meetingTitle =
-                !string.IsNullOrWhiteSpace(
-                    booking.MeetingTitle)
-                    ? booking.MeetingTitle
-                    : "Room Booking";
+            var meetingTitle = !string.IsNullOrWhiteSpace(booking.MeetingTitle)
+                ? booking.MeetingTitle
+                : "Room Booking";
 
-            var employeeName =
-                booking.Employee?.Name ?? "Colleague";
-
-            var employeeEmail =
-                booking.Employee?.Email;
+            var employeeEmail = booking.Employee?.Email;
 
             // =====================================================
             // CREATE ACTUAL START / END DATE TIME
             // =====================================================
 
-            var bookingStartDateTime =
-                booking.BookingDate.ToDateTime(
-                    booking.StartTime);
+            var bookingStartDateTime = booking.BookingDate.ToDateTime(booking.StartTime);
+            var bookingEndDateTime = booking.BookingDate.ToDateTime(booking.EndTime);
 
-            var bookingEndDateTime =
-                booking.BookingDate.ToDateTime(
-                    booking.EndTime);
-
-            var timeUntilStart =
-                bookingStartDateTime - now;
-
-            var timeUntilEnd =
-                bookingEndDateTime - now;
+            var timeUntilStart = bookingStartDateTime - now;
+            var timeUntilEnd = bookingEndDateTime - now;
 
             _logger.LogInformation(
-                "Booking {BookingId}: Start={Start}, End={End}, " +
-                "MinutesUntilStart={StartMinutes:F2}, " +
-                "MinutesUntilEnd={EndMinutes:F2}, " +
-                "StartSent={StartSent}, EndSent={EndSent}, " +
-                "EmployeeEmail={EmployeeEmail}",
+                "Evaluating Booking {BookingId}: Start={Start}, End={End}, " +
+                "MinsUntilStart={StartMins:F2}, MinsUntilEnd={EndMins:F2}, " +
+                "EmployeeEmail={Email}",
                 booking.BookingId,
                 bookingStartDateTime,
                 bookingEndDateTime,
                 timeUntilStart.TotalMinutes,
                 timeUntilEnd.TotalMinutes,
-                booking.StartReminderSent,
-                booking.EndReminderSent,
                 employeeEmail ?? "NULL");
 
             // =========================================================
-            // START REMINDER
+            // 1. START REMINDER (15 MINUTES BEFORE START TIME)
             // =========================================================
 
-            if (!booking.StartReminderSent &&
+            var hasStartNotification = await _reminderRepository
+                .HasNotificationBeenSentAsync(
+                    booking.BookingId,
+                    BookingNotificationType.StartReminder15Minutes,
+                    cancellationToken)
+                || booking.StartReminderSent;
+
+            if (!hasStartNotification &&
                 timeUntilStart.TotalMinutes > 0 &&
                 timeUntilStart.TotalMinutes <= 15)
             {
                 _logger.LogInformation(
-                    "Start reminder triggered for Booking {BookingId}.",
+                    "15-minute start reminder triggered for Booking {BookingId}.",
                     booking.BookingId);
 
-                // -------------------------------------------------
-                // CREATE IN-APP NOTIFICATION
-                // -------------------------------------------------
-
-                var startNotification =
-                    new Notification
-                    {
-                        EmployeeId = booking.EmployeeId,
-                        BookingId = booking.BookingId,
-
-                        Message =
-                            $"Reminder: Your booking " +
-                            $"'{meetingTitle}' in {roomName} " +
-                            $"starts in approximately 15 minutes " +
-                            $"at {booking.StartTime:hh\\:mm tt}.",
-
-                        IsRead = false,
-
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                await _notificationRepository
-                    .AddAsync(startNotification);
-
-                // -------------------------------------------------
-                // EMAIL
-                // -------------------------------------------------
-
-                if (string.IsNullOrWhiteSpace(employeeEmail))
+                // In-App Notification for Employee
+                var startNotification = new Notification
                 {
-                    _logger.LogWarning(
-                        "Booking {BookingId} has no employee email. " +
-                        "Start reminder email was not sent.",
+                    EmployeeId = booking.EmployeeId,
+                    BookingId = booking.BookingId,
+                    Message =
+                        $"Reminder: Your booking '{meetingTitle}' in {roomName} " +
+                        $"starts in approximately 15 minutes at {booking.StartTime:hh\\:mm tt}.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _notificationRepository.AddAsync(startNotification);
+
+                // Dispatch Start Reminder Email to Employee + Admins
+                try
+                {
+                    await _emailService.SendBookingStartReminderAsync(
+                        booking,
+                        booking.Employee ?? new Employee { Name = "Colleague", Email = employeeEmail ?? string.Empty },
+                        booking.Room ?? new Room { RoomName = roomName },
+                        adminEmails);
+
+                    // Record in tracking table for duplicate prevention
+                    await _reminderRepository.RecordNotificationSentAsync(
+                        booking.BookingId,
+                        BookingNotificationType.StartReminder15Minutes,
+                        "Sent",
+                        cancellationToken);
+
+                    booking.StartReminderSent = true;
+                    stateChanged = true;
+
+                    _logger.LogInformation(
+                        "Start reminder emails dispatched and recorded for Booking {BookingId}.",
                         booking.BookingId);
                 }
-                else
+                catch (Exception ex)
                 {
-                    try
-                    {
-                        var subject =
-                            $"SpaceBook Reminder: {meetingTitle} starts soon";
-
-                        var body =
-                            BuildStartReminderEmailHtml(
-                                employeeName,
-                                meetingTitle,
-                                roomName,
-                                roomNumber,
-                                booking.BookingDate,
-                                booking.StartTime,
-                                booking.EndTime,
-                                booking.ParticipantCount);
-
-                        await _emailService.SendEmailAsync(
-                            employeeEmail,
-                            subject,
-                            body,
-                            true);
-
-                        // IMPORTANT:
-                        // Only mark true AFTER successful email
-                        booking.StartReminderSent = true;
-
-                        stateChanged = true;
-
-                        _logger.LogInformation(
-                            "Start reminder email sent successfully. " +
-                            "BookingId={BookingId}, Email={Email}",
-                            booking.BookingId,
-                            employeeEmail);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(
-                            ex,
-                            "Start reminder email failed. " +
-                            "BookingId={BookingId}, Email={Email}. " +
-                            "StartReminderSent remains false.",
-                            booking.BookingId,
-                            employeeEmail);
-
-                        // DO NOT mark reminder as sent
-                    }
+                    _logger.LogError(
+                        ex,
+                        "Start reminder email dispatch failed for Booking {BookingId}.",
+                        booking.BookingId);
                 }
             }
 
             // =========================================================
-            // END REMINDER
+            // 2. END REMINDER (15 MINUTES BEFORE END TIME)
             // =========================================================
 
-            if (!booking.EndReminderSent &&
+            var hasEndNotification = await _reminderRepository
+                .HasNotificationBeenSentAsync(
+                    booking.BookingId,
+                    BookingNotificationType.EndReminder15Minutes,
+                    cancellationToken)
+                || booking.EndReminderSent;
+
+            if (!hasEndNotification &&
                 timeUntilEnd.TotalMinutes > 0 &&
                 timeUntilEnd.TotalMinutes <= 15)
             {
                 _logger.LogInformation(
-                    "End reminder triggered for Booking {BookingId}.",
+                    "15-minute end reminder triggered for Booking {BookingId}.",
                     booking.BookingId);
 
-                // -------------------------------------------------
-                // CREATE IN-APP NOTIFICATION
-                // -------------------------------------------------
-
-                var endNotification =
-                    new Notification
-                    {
-                        EmployeeId = booking.EmployeeId,
-                        BookingId = booking.BookingId,
-
-                        Message =
-                            $"Reminder: Your booking " +
-                            $"'{meetingTitle}' in {roomName} " +
-                            $"will end in approximately 15 minutes " +
-                            $"at {booking.EndTime:hh\\:mm tt}.",
-
-                        IsRead = false,
-
-                        CreatedAt = DateTime.UtcNow
-                    };
-
-                await _notificationRepository
-                    .AddAsync(endNotification);
-
-                // -------------------------------------------------
-                // EMAIL
-                // -------------------------------------------------
-
-                if (string.IsNullOrWhiteSpace(employeeEmail))
+                // In-App Notification for Employee
+                var endNotification = new Notification
                 {
-                    _logger.LogWarning(
-                        "Booking {BookingId} has no employee email. " +
-                        "End reminder email was not sent.",
+                    EmployeeId = booking.EmployeeId,
+                    BookingId = booking.BookingId,
+                    Message =
+                        $"Reminder: Your booking '{meetingTitle}' in {roomName} " +
+                        $"will end in approximately 15 minutes at {booking.EndTime:hh\\:mm tt}.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _notificationRepository.AddAsync(endNotification);
+
+                // Dispatch End Reminder Email to Employee + Admins
+                try
+                {
+                    await _emailService.SendBookingEndReminderAsync(
+                        booking,
+                        booking.Employee ?? new Employee { Name = "Colleague", Email = employeeEmail ?? string.Empty },
+                        booking.Room ?? new Room { RoomName = roomName },
+                        adminEmails);
+
+                    // Record in tracking table for duplicate prevention
+                    await _reminderRepository.RecordNotificationSentAsync(
+                        booking.BookingId,
+                        BookingNotificationType.EndReminder15Minutes,
+                        "Sent",
+                        cancellationToken);
+
+                    booking.EndReminderSent = true;
+                    stateChanged = true;
+
+                    _logger.LogInformation(
+                        "End reminder emails dispatched and recorded for Booking {BookingId}.",
                         booking.BookingId);
                 }
-                else
+                catch (Exception ex)
                 {
-                    try
-                    {
-                        var subject =
-                            $"SpaceBook Reminder: {meetingTitle} ends soon";
-
-                        var body =
-                            BuildEndReminderEmailHtml(
-                                employeeName,
-                                meetingTitle,
-                                roomName,
-                                roomNumber,
-                                booking.BookingDate,
-                                booking.EndTime);
-
-                        await _emailService.SendEmailAsync(
-                            employeeEmail,
-                            subject,
-                            body,
-                            true);
-
-                        booking.EndReminderSent = true;
-
-                        stateChanged = true;
-
-                        _logger.LogInformation(
-                            "End reminder email sent successfully. " +
-                            "BookingId={BookingId}, Email={Email}",
-                            booking.BookingId,
-                            employeeEmail);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(
-                            ex,
-                            "End reminder email failed. " +
-                            "BookingId={BookingId}, Email={Email}. " +
-                            "EndReminderSent remains false.",
-                            booking.BookingId,
-                            employeeEmail);
-                    }
+                    _logger.LogError(
+                        ex,
+                        "End reminder email dispatch failed for Booking {BookingId}.",
+                        booking.BookingId);
                 }
             }
         }
 
         // =========================================================
-        // SAVE FLAGS
+        // SAVE CHANGES
         // =========================================================
 
         if (stateChanged)
         {
-            await _reminderRepository
-                .SaveChangesAsync(
-                    cancellationToken);
-
-            _logger.LogInformation(
-                "Reminder status changes saved successfully.");
+            await _reminderRepository.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Reminder state changes saved successfully.");
         }
     }
 
-    // =============================================================
-    // START REMINDER EMAIL
-    // =============================================================
-
-    private static string BuildStartReminderEmailHtml(
-        string employeeName,
-        string meetingTitle,
-        string roomName,
-        string roomNumber,
-        DateOnly bookingDate,
-        TimeOnly startTime,
-        TimeOnly endTime,
-        int participantCount)
+    private static TimeZoneInfo GetIndiaTimeZone()
     {
-        return $"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Meeting Starting Soon</title>
-        </head>
-
-        <body style="
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
-            padding: 24px;
-            color: #1e293b;">
-
-            <table
-                align="center"
-                width="100%"
-                cellpadding="0"
-                cellspacing="0"
-                style="
-                    max-width:580px;
-                    background:#ffffff;
-                    border-radius:12px;">
-
-                <tr>
-                    <td style="
-                        background:#2563eb;
-                        padding:28px;
-                        text-align:center;
-                        color:white;">
-
-                        <h1 style="margin:0;">
-                            SpaceBook
-                        </h1>
-
-                        <p>
-                            Room Booking Reminder
-                        </p>
-
-                    </td>
-                </tr>
-
-                <tr>
-                    <td style="padding:28px;">
-
-                        <h2>
-                            Hello {employeeName},
-                        </h2>
-
-                        <p>
-                            Your scheduled room booking will start
-                            in approximately
-                            <strong>15 minutes</strong>.
-                        </p>
-
-                        <table
-                            width="100%"
-                            cellpadding="8"
-                            style="
-                                background:#f8fafc;
-                                border:1px solid #e2e8f0;
-                                border-radius:8px;">
-
-                            <tr>
-                                <td><strong>Meeting</strong></td>
-                                <td>{meetingTitle}</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>Room</strong></td>
-                                <td>
-                                    {roomName}
-                                    {(string.IsNullOrWhiteSpace(roomNumber)
-                                        ? ""
-                                        : $" ({roomNumber})")}
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>Date</strong></td>
-                                <td>
-                                    {bookingDate:MMMM dd, yyyy}
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>Start</strong></td>
-                                <td>
-                                    {startTime:hh\\:mm tt}
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>End</strong></td>
-                                <td>
-                                    {endTime:hh\\:mm tt}
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>Attendees</strong></td>
-                                <td>{participantCount}</td>
-                            </tr>
-
-                        </table>
-
-                        <p>
-                            Please arrive on time and check in
-                            when entering the room.
-                        </p>
-
-                    </td>
-                </tr>
-
-                <tr>
-                    <td style="
-                        text-align:center;
-                        padding:18px;
-                        background:#f1f5f9;
-                        color:#64748b;
-                        font-size:12px;">
-
-                        This is an automated notification
-                        from SpaceBook.
-
-                    </td>
-                </tr>
-
-            </table>
-        </body>
-        </html>
-        """;
-    }
-
-    // =============================================================
-    // END REMINDER EMAIL
-    // =============================================================
-
-    private static string BuildEndReminderEmailHtml(
-        string employeeName,
-        string meetingTitle,
-        string roomName,
-        string roomNumber,
-        DateOnly bookingDate,
-        TimeOnly endTime)
-    {
-        return $"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Meeting Ending Soon</title>
-        </head>
-
-        <body style="
-            font-family:Arial,sans-serif;
-            background:#f4f6f9;
-            padding:24px;">
-
-            <table
-                align="center"
-                width="100%"
-                cellpadding="0"
-                cellspacing="0"
-                style="
-                    max-width:580px;
-                    background:#ffffff;
-                    border-radius:12px;">
-
-                <tr>
-                    <td style="
-                        background:#d97706;
-                        padding:28px;
-                        text-align:center;
-                        color:white;">
-
-                        <h1>SpaceBook</h1>
-
-                        <p>
-                            Meeting Wrap-up Reminder
-                        </p>
-
-                    </td>
-                </tr>
-
-                <tr>
-                    <td style="padding:28px;">
-
-                        <h2>
-                            Hello {employeeName},
-                        </h2>
-
-                        <p>
-                            Your meeting
-                            <strong>{meetingTitle}</strong>
-                            in
-                            <strong>{roomName}</strong>
-                            will end in approximately
-                            <strong>15 minutes</strong>.
-                        </p>
-
-                        <p>
-                            <strong>Date:</strong>
-                            {bookingDate:MMMM dd, yyyy}
-                        </p>
-
-                        <p>
-                            <strong>End Time:</strong>
-                            {endTime:hh\\:mm tt}
-                        </p>
-
-                        <p>
-                            Please prepare to conclude your
-                            meeting and leave the room ready
-                            for the next booking.
-                        </p>
-
-                    </td>
-                </tr>
-
-                <tr>
-                    <td style="
-                        text-align:center;
-                        padding:18px;
-                        background:#f1f5f9;
-                        color:#64748b;
-                        font-size:12px;">
-
-                        This is an automated notification
-                        from SpaceBook.
-
-                    </td>
-                </tr>
-
-            </table>
-
-        </body>
-        </html>
-        """;
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+        }
     }
 }

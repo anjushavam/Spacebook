@@ -38,4 +38,7 @@ public class Booking
     public Employee? Employee { get; set; }
 
     public CheckIn? CheckIn { get; set; }
+
+    public ICollection<BookingEmailNotification> EmailNotifications { get; set; } =
+        new List<BookingEmailNotification>();
 }

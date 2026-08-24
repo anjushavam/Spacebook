@@ -37,6 +37,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications =>
         Set<Notification>();
 
+    public DbSet<BookingEmailNotification> BookingEmailNotifications =>
+        Set<BookingEmailNotification>();
+
     public DbSet<HotseatBooking> HotseatBookings =>
         Set<HotseatBooking>();
 
@@ -876,6 +879,51 @@ public class ApplicationDbContext : DbContext
                 x.EmployeeId,
                 x.BookingDate
             });
+        });
+
+
+        // =====================================================
+        // BOOKING EMAIL NOTIFICATION
+        // =====================================================
+
+        modelBuilder.Entity<BookingEmailNotification>(entity =>
+        {
+            entity.ToTable("bookingemailnotifications");
+
+            entity.HasKey(x => x.BookingEmailNotificationId);
+
+            entity.Property(x => x.BookingEmailNotificationId)
+                .HasColumnName("bookingemailnotificationid")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(x => x.BookingId)
+                .HasColumnName("bookingid")
+                .IsRequired();
+
+            entity.Property(x => x.NotificationType)
+                .HasColumnName("notificationtype")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.SentAt)
+                .HasColumnName("sentat")
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasColumnName("status")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            // Unique constraint on BookingId + NotificationType to prevent duplicates
+            entity.HasIndex(x => new { x.BookingId, x.NotificationType })
+                .IsUnique()
+                .HasDatabaseName("ix_bookingemailnotifications_bookingid_notificationtype");
+
+            entity.HasOne(x => x.Booking)
+                .WithMany(x => x.EmailNotifications)
+                .HasForeignKey(x => x.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -108,7 +108,19 @@ public class NotificationRepository
 
                         EF.Functions.ILike(
                             n.Message,
-                            "%canceled%")
+                            "%canceled%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%approved%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%booked%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%booking%")
                     ))
 
                 .OrderByDescending(
@@ -431,6 +443,15 @@ public class NotificationRepository
                 "canceled",
                 StringComparison.OrdinalIgnoreCase);
 
+        var isApprovedOrNew =
+            n.Message.Contains(
+                "approved",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            n.Message.Contains(
+                "booked",
+                StringComparison.OrdinalIgnoreCase);
+
         string title;
 
         if (isRescheduled)
@@ -442,6 +463,11 @@ public class NotificationRepository
         {
             title =
                 "Booking Cancelled";
+        }
+        else if (isApprovedOrNew)
+        {
+            title =
+                "New Booking";
         }
         else
         {
@@ -455,13 +481,23 @@ public class NotificationRepository
         {
             message =
                 $"{employeeName} rescheduled a booking for " +
-                $"{roomName} and it requires approval.";
+                $"{roomName}.";
         }
         else if (isCancelled)
         {
             message =
                 $"{employeeName} cancelled a booking for " +
                 $"{roomName}.";
+        }
+        else if (isApprovedOrNew)
+        {
+            var meetingTitle =
+                !string.IsNullOrWhiteSpace(booking?.MeetingTitle)
+                    ? $" for '{booking.MeetingTitle}'"
+                    : "";
+
+            message =
+                $"{employeeName} booked {roomName}{meetingTitle}.";
         }
         else if (booking != null)
         {

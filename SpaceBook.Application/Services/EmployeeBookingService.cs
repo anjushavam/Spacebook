@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using SpaceBook.Application.DTOs.Booking;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
+using SpaceBook.Domain.Enums;
 
 namespace SpaceBook.Application.Services;
 
@@ -329,10 +330,6 @@ public class EmployeeBookingService : IEmployeeBookingService
             // is returned immediately without waiting for SMTP network I/O.
             var createdBookingId = booking.BookingId;
             var createdRoomId = booking.RoomId;
-            var createdBookingDate = booking.BookingDate;
-            var createdStartTime = booking.StartTime;
-            var createdEndTime = booking.EndTime;
-            var createdParticipantCount = booking.ParticipantCount;
 
             _ = Task.Run(async () =>
             {
@@ -340,72 +337,35 @@ public class EmployeeBookingService : IEmployeeBookingService
                 {
                     using var scope = _scopeFactory.CreateScope();
                     var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
+                    var reminderRepo = scope.ServiceProvider.GetRequiredService<IBookingReminderRepository>();
                     var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                     var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
 
                     var employee = await repo.GetEmployeeByIdAsync(employeeId);
                     var room = await repo.GetRoomByIdAsync(createdRoomId);
+                    var adminEmails = await repo.GetAdminEmailsAsync();
 
                     var employeeName = employee?.Name ?? "Colleague";
                     var roomName = room != null
                         ? (!string.IsNullOrWhiteSpace(room.RoomName) ? room.RoomName : room.RoomNumber)
                         : "Meeting Room";
 
-                    // 1. Employee Confirmation Email
-                    if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
-                    {
-                        var empSubject = $"Booking Confirmed: '{resolvedTitle}' in {roomName}";
-                        var empHtml = BuildBookingConfirmedEmailHtml(
-                            employeeName,
-                            resolvedTitle,
-                            resolvedPurpose,
-                            roomName,
-                            room?.RoomNumber ?? string.Empty,
-                            createdBookingDate,
-                            createdStartTime,
-                            createdEndTime,
-                            createdParticipantCount);
+                    // Dispatches confirmation email to both Employee and Admins
+                    await emailService.SendBookingConfirmationAsync(
+                        booking,
+                        employee ?? new Employee { Name = employeeName, Email = employee?.Email ?? string.Empty },
+                        room ?? new Room { RoomName = roomName },
+                        adminEmails);
 
-                        try
-                        {
-                            await emailService.SendEmailAsync(employee.Email, empSubject, empHtml, isHtml: true);
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogWarning(ex, "Failed to send employee booking confirmation to {Email}", employee.Email);
-                        }
-                    }
-
-                    // 2. Admin Alert Emails (Batch Delivery)
-                    var adminEmails = await repo.GetAdminEmailsAsync();
-                    if (adminEmails != null && adminEmails.Count > 0)
-                    {
-                        var adminSubject = $"[Admin Alert] New Room Booking: '{resolvedTitle}' by {employeeName}";
-                        var adminHtml = BuildAdminBookingAlertEmailHtml(
-                            employeeName,
-                            employee?.Email ?? string.Empty,
-                            employee?.Department ?? string.Empty,
-                            resolvedTitle,
-                            resolvedPurpose,
-                            roomName,
-                            createdBookingDate,
-                            createdStartTime,
-                            createdEndTime,
-                            createdParticipantCount);
-
-                        try
-                        {
-                            await emailService.SendEmailsAsync(adminEmails, adminSubject, adminHtml, isHtml: true);
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogWarning(ex, "Failed to send admin booking alert emails");
-                        }
-                    }
+                    // Record confirmation notification in tracking table for duplicate prevention
+                    await reminderRepo.RecordNotificationSentAsync(
+                        createdBookingId,
+                        BookingNotificationType.BookingConfirmed,
+                        "Sent");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Background email dispatch failed for booking ID {BookingId}", createdBookingId);
+                    _logger.LogError(ex, "Background confirmation email dispatch failed for booking ID {BookingId}", createdBookingId);
                 }
             });
 
@@ -879,8 +839,12 @@ public class EmployeeBookingService : IEmployeeBookingService
             {
                 using var scope = _scopeFactory.CreateScope();
                 var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
+                var reminderRepo = scope.ServiceProvider.GetRequiredService<IBookingReminderRepository>();
                 var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
+
+                // Reset reminder tracking for rescheduled booking so new date/time gets reminders
+                await reminderRepo.ResetRemindersForBookingAsync(bookingId);
 
                 var employee = await repo.GetEmployeeByIdAsync(employeeId);
                 var room = request.RoomId.HasValue ? await repo.GetRoomByIdAsync(request.RoomId.Value) : null;
