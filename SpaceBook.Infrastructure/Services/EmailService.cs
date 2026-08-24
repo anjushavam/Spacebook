@@ -189,4 +189,35 @@ public class EmailService : IEmailService
             throw;
         }
     }
+
+    public async Task SendEmailsAsync(
+        IEnumerable<string> toEmails,
+        string subject,
+        string body,
+        bool isHtml = true)
+    {
+        var validEmails = toEmails?
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e.Trim())
+            .Distinct()
+            .ToList();
+
+        if (validEmails == null || validEmails.Count == 0)
+        {
+            _logger.LogWarning("Email recipient list is empty. Skipping email dispatch.");
+            return;
+        }
+
+        foreach (var email in validEmails)
+        {
+            try
+            {
+                await SendEmailAsync(email, subject, body, isHtml);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send batch email to {To}", email);
+            }
+        }
+    }
 }
