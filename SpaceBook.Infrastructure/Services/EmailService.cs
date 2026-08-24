@@ -42,7 +42,11 @@ public class EmailService : IEmailService
         // =====================================================
         var resendApiKey = _configuration["Resend:ApiKey"] 
                            ?? _configuration["Resend__ApiKey"] 
-                           ?? _configuration["RESEND_API_KEY"];
+                           ?? _configuration["RESEND_API_KEY"]
+                           ?? _configuration["Resend_ApiKey"]
+                           ?? Environment.GetEnvironmentVariable("Resend__ApiKey")
+                           ?? Environment.GetEnvironmentVariable("Resend_ApiKey")
+                           ?? Environment.GetEnvironmentVariable("RESEND_API_KEY");
 
         if (!string.IsNullOrWhiteSpace(resendApiKey))
         {
