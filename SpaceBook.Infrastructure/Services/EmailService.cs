@@ -125,18 +125,30 @@ public class EmailService : IEmailService
             client.Timeout = 10000; // 10 second timeout
 
             // =================================================
-            // CONNECT TO GMAIL
+            // CONNECT TO SMTP (Try Port 465 SSL / 587 StartTLS)
             // =================================================
 
-            var secureSocketOption =
-                port == 465
-                    ? SecureSocketOptions.SslOnConnect
-                    : SecureSocketOptions.StartTls;
+            try
+            {
+                var secureSocketOption =
+                    port == 465
+                        ? SecureSocketOptions.SslOnConnect
+                        : SecureSocketOptions.StartTls;
 
-            await client.ConnectAsync(
-                host,
-                port,
-                secureSocketOption);
+                await client.ConnectAsync(
+                    host,
+                    port,
+                    secureSocketOption);
+            }
+            catch (Exception ex) when (port == 587)
+            {
+                _logger.LogWarning(ex, "Port 587 timed out. Attempting fallback to Port 465 SSL.");
+
+                await client.ConnectAsync(
+                    host,
+                    465,
+                    SecureSocketOptions.SslOnConnect);
+            }
 
             _logger.LogInformation(
                 "Connected successfully to SMTP server.");
