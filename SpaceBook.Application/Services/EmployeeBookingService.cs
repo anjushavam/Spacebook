@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SpaceBook.Application.DTOs.Booking;
 using SpaceBook.Application.Interfaces;
@@ -10,6 +11,7 @@ public class EmployeeBookingService : IEmployeeBookingService
     private readonly IEmployeeBookingRepository _bookingRepository;
     private readonly INotificationRepository _notificationRepository;
     private readonly IEmailService _emailService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<EmployeeBookingService> _logger;
 
     // =========================================================
@@ -29,11 +31,13 @@ public class EmployeeBookingService : IEmployeeBookingService
         IEmployeeBookingRepository bookingRepository,
         INotificationRepository notificationRepository,
         IEmailService emailService,
+        IServiceScopeFactory scopeFactory,
         ILogger<EmployeeBookingService> logger)
     {
         _bookingRepository = bookingRepository;
         _notificationRepository = notificationRepository;
         _emailService = emailService;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -319,16 +323,91 @@ public class EmployeeBookingService : IEmployeeBookingService
             await _notificationRepository.SaveChangesAsync();
 
             // -------------------------------------------------
-            // SEND CONFIRMATION & ADMIN ALERT EMAILS
+            // SEND CONFIRMATION & ADMIN ALERT EMAILS IN BACKGROUND
             // -------------------------------------------------
-            try
+            // Dispatched asynchronously in background task so API response
+            // is returned immediately without waiting for SMTP network I/O.
+            var createdBookingId = booking.BookingId;
+            var createdRoomId = booking.RoomId;
+            var createdBookingDate = booking.BookingDate;
+            var createdStartTime = booking.StartTime;
+            var createdEndTime = booking.EndTime;
+            var createdParticipantCount = booking.ParticipantCount;
+
+            _ = Task.Run(async () =>
             {
-                await SendBookingConfirmationAndAdminAlertEmailsAsync(booking, employeeId, resolvedTitle, resolvedPurpose);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Email dispatch failed for booking ID {BookingId}", booking.BookingId);
-            }
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
+                    var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                    var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
+
+                    var employee = await repo.GetEmployeeByIdAsync(employeeId);
+                    var room = await repo.GetRoomByIdAsync(createdRoomId);
+
+                    var employeeName = employee?.Name ?? "Colleague";
+                    var roomName = room != null
+                        ? (!string.IsNullOrWhiteSpace(room.RoomName) ? room.RoomName : room.RoomNumber)
+                        : "Meeting Room";
+
+                    // 1. Employee Confirmation Email
+                    if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+                    {
+                        var empSubject = $"Booking Confirmed: '{resolvedTitle}' in {roomName}";
+                        var empHtml = BuildBookingConfirmedEmailHtml(
+                            employeeName,
+                            resolvedTitle,
+                            resolvedPurpose,
+                            roomName,
+                            room?.RoomNumber ?? string.Empty,
+                            createdBookingDate,
+                            createdStartTime,
+                            createdEndTime,
+                            createdParticipantCount);
+
+                        try
+                        {
+                            await emailService.SendEmailAsync(employee.Email, empSubject, empHtml, isHtml: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Failed to send employee booking confirmation to {Email}", employee.Email);
+                        }
+                    }
+
+                    // 2. Admin Alert Emails (Batch Delivery)
+                    var adminEmails = await repo.GetAdminEmailsAsync();
+                    if (adminEmails != null && adminEmails.Count > 0)
+                    {
+                        var adminSubject = $"[Admin Alert] New Room Booking: '{resolvedTitle}' by {employeeName}";
+                        var adminHtml = BuildAdminBookingAlertEmailHtml(
+                            employeeName,
+                            employee?.Email ?? string.Empty,
+                            employee?.Department ?? string.Empty,
+                            resolvedTitle,
+                            resolvedPurpose,
+                            roomName,
+                            createdBookingDate,
+                            createdStartTime,
+                            createdEndTime,
+                            createdParticipantCount);
+
+                        try
+                        {
+                            await emailService.SendEmailsAsync(adminEmails, adminSubject, adminHtml, isHtml: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Failed to send admin booking alert emails");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Background email dispatch failed for booking ID {BookingId}", createdBookingId);
+                }
+            });
 
             return booking.BookingId;
         }
@@ -462,16 +541,61 @@ public class EmployeeBookingService : IEmployeeBookingService
         await _notificationRepository.SaveChangesAsync();
 
         // -----------------------------------------------------
-        // SEND CANCELLATION EMAILS
+        // SEND CANCELLATION EMAILS IN BACKGROUND (NON-BLOCKING)
         // -----------------------------------------------------
-        try
+        _ = Task.Run(async () =>
         {
-            await SendBookingCancellationEmailsAsync(bookingId, employeeId, employeeName, reason);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Cancellation email dispatch failed for booking ID {BookingId}", bookingId);
-        }
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
+                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
+
+                var employee = await repo.GetEmployeeByIdAsync(employeeId);
+                var booking = await repo.GetBookingByIdAsync(bookingId, employeeId);
+
+                var roomName = booking?.RoomName ?? "Meeting Room";
+                var meetingTitle = booking?.MeetingTitle ?? "Room Booking";
+
+                // 1. Employee Cancellation Email
+                if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+                {
+                    var subject = $"Booking Cancelled: '{meetingTitle}'";
+                    var body = BuildBookingCancelledEmailHtml(employeeName, meetingTitle, roomName, reason);
+
+                    try
+                    {
+                        await emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to send employee cancellation email to {Email}", employee.Email);
+                    }
+                }
+
+                // 2. Admin Cancellation Alert (Batch)
+                var adminEmails = await repo.GetAdminEmailsAsync();
+                if (adminEmails != null && adminEmails.Count > 0)
+                {
+                    var adminSubject = $"[Admin Alert] Booking Cancelled: '{meetingTitle}' by {employeeName}";
+                    var adminBody = BuildAdminBookingCancelledEmailHtml(employeeName, meetingTitle, roomName, reason);
+
+                    try
+                    {
+                        await emailService.SendEmailsAsync(adminEmails, adminSubject, adminBody, isHtml: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to send admin cancellation alert emails");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Background cancellation email dispatch failed for booking ID {BookingId}", bookingId);
+            }
+        });
 
         return true;
     }
@@ -747,16 +871,60 @@ public class EmployeeBookingService : IEmployeeBookingService
         await _notificationRepository.SaveChangesAsync();
 
         // -----------------------------------------------------
-        // SEND RESCHEDULE EMAILS
+        // SEND RESCHEDULE EMAILS IN BACKGROUND (NON-BLOCKING)
         // -----------------------------------------------------
-        try
+        _ = Task.Run(async () =>
         {
-            await SendBookingRescheduleEmailsAsync(bookingId, employeeId, employeeName, request);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Reschedule email dispatch failed for booking ID {BookingId}", bookingId);
-        }
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
+                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
+
+                var employee = await repo.GetEmployeeByIdAsync(employeeId);
+                var room = request.RoomId.HasValue ? await repo.GetRoomByIdAsync(request.RoomId.Value) : null;
+                var roomName = room?.RoomName ?? "Meeting Room";
+                var meetingTitle = !string.IsNullOrWhiteSpace(request.MeetingTitle) ? request.MeetingTitle : "Room Booking";
+
+                // 1. Employee Reschedule Email
+                if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+                {
+                    var subject = $"Booking Rescheduled: '{meetingTitle}'";
+                    var body = BuildBookingRescheduledEmailHtml(employeeName, meetingTitle, roomName, request);
+
+                    try
+                    {
+                        await emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to send employee reschedule email to {Email}", employee.Email);
+                    }
+                }
+
+                // 2. Admin Reschedule Alert (Batch)
+                var adminEmails = await repo.GetAdminEmailsAsync();
+                if (adminEmails != null && adminEmails.Count > 0)
+                {
+                    var adminSubject = $"[Admin Alert] Booking Rescheduled: '{meetingTitle}' by {employeeName}";
+                    var adminBody = BuildAdminBookingRescheduledEmailHtml(employeeName, meetingTitle, roomName, request);
+
+                    try
+                    {
+                        await emailService.SendEmailsAsync(adminEmails, adminSubject, adminBody, isHtml: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Failed to send admin reschedule alert emails");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Background reschedule email dispatch failed for booking ID {BookingId}", bookingId);
+            }
+        });
 
         return true;
     }
@@ -922,89 +1090,16 @@ public class EmployeeBookingService : IEmployeeBookingService
     }
 
     // =========================================================
-    // EMAIL DISPATCH HELPERS
+    // EMAIL HTML BUILDERS
     // =========================================================
 
-    private async Task SendBookingConfirmationAndAdminAlertEmailsAsync(
-        Booking booking,
-        int employeeId,
-        string meetingTitle,
-        string purpose)
-    {
-        var employee = await _bookingRepository.GetEmployeeByIdAsync(employeeId);
-        var room = await _bookingRepository.GetRoomByIdAsync(booking.RoomId);
-
-        var employeeName = employee?.Name ?? "Colleague";
-        var roomName = room != null
-            ? (!string.IsNullOrWhiteSpace(room.RoomName) ? room.RoomName : room.RoomNumber)
-            : "Meeting Room";
-
-        // 1. Employee Confirmation Email
-        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
-        {
-            var empSubject = $"Booking Confirmed: '{meetingTitle}' in {roomName}";
-            var empHtml = BuildBookingConfirmedEmailHtml(
-                employeeName,
-                meetingTitle,
-                purpose,
-                roomName,
-                room?.RoomNumber ?? string.Empty,
-                booking.BookingDate,
-                booking.StartTime,
-                booking.EndTime,
-                booking.ParticipantCount);
-
-            await _emailService.SendEmailAsync(employee.Email, empSubject, empHtml, isHtml: true);
-        }
-
-        // 2. Admin Alert Emails
-        var adminEmails = await _bookingRepository.GetAdminEmailsAsync();
-        if (adminEmails.Count > 0)
-        {
-            var adminSubject = $"[Admin Alert] New Room Booking: '{meetingTitle}' by {employeeName}";
-            var adminHtml = BuildAdminBookingAlertEmailHtml(
-                employeeName,
-                employee?.Email ?? string.Empty,
-                employee?.Department ?? string.Empty,
-                meetingTitle,
-                purpose,
-                roomName,
-                booking.BookingDate,
-                booking.StartTime,
-                booking.EndTime,
-                booking.ParticipantCount);
-
-            foreach (var adminEmail in adminEmails)
-            {
-                try
-                {
-                    await _emailService.SendEmailAsync(adminEmail, adminSubject, adminHtml, isHtml: true);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to send admin booking alert email to {Email}", adminEmail);
-                }
-            }
-        }
-    }
-
-    private async Task SendBookingCancellationEmailsAsync(
-        int bookingId,
-        int employeeId,
+    private static string BuildBookingCancelledEmailHtml(
         string employeeName,
+        string meetingTitle,
+        string roomName,
         string reason)
     {
-        var employee = await _bookingRepository.GetEmployeeByIdAsync(employeeId);
-        var booking = await _bookingRepository.GetBookingByIdAsync(bookingId, employeeId);
-
-        var roomName = booking?.RoomName ?? "Meeting Room";
-        var meetingTitle = booking?.MeetingTitle ?? "Room Booking";
-
-        // 1. Employee Cancellation Email
-        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
-        {
-            var subject = $"Booking Cancelled: '{meetingTitle}'";
-            var body = $@"
+        return $@"
 <!DOCTYPE html>
 <html>
 <head><meta charset=""utf-8""><title>Booking Cancelled</title></head>
@@ -1020,15 +1115,15 @@ public class EmployeeBookingService : IEmployeeBookingService
     </div>
 </body>
 </html>";
-            await _emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
-        }
+    }
 
-        // 2. Admin Cancellation Alert
-        var adminEmails = await _bookingRepository.GetAdminEmailsAsync();
-        if (adminEmails.Count > 0)
-        {
-            var adminSubject = $"[Admin Alert] Booking Cancelled: '{meetingTitle}' by {employeeName}";
-            var adminBody = $@"
+    private static string BuildAdminBookingCancelledEmailHtml(
+        string employeeName,
+        string meetingTitle,
+        string roomName,
+        string reason)
+    {
+        return $@"
 <!DOCTYPE html>
 <html>
 <head><meta charset=""utf-8""><title>Booking Cancelled Alert</title></head>
@@ -1044,37 +1139,15 @@ public class EmployeeBookingService : IEmployeeBookingService
     </div>
 </body>
 </html>";
-
-            foreach (var adminEmail in adminEmails)
-            {
-                try
-                {
-                    await _emailService.SendEmailAsync(adminEmail, adminSubject, adminBody, isHtml: true);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to send admin cancellation alert to {Email}", adminEmail);
-                }
-            }
-        }
     }
 
-    private async Task SendBookingRescheduleEmailsAsync(
-        int bookingId,
-        int employeeId,
+    private static string BuildBookingRescheduledEmailHtml(
         string employeeName,
+        string meetingTitle,
+        string roomName,
         UpdateBookingRequestDto request)
     {
-        var employee = await _bookingRepository.GetEmployeeByIdAsync(employeeId);
-        var room = request.RoomId.HasValue ? await _bookingRepository.GetRoomByIdAsync(request.RoomId.Value) : null;
-        var roomName = room?.RoomName ?? "Meeting Room";
-        var meetingTitle = !string.IsNullOrWhiteSpace(request.MeetingTitle) ? request.MeetingTitle : "Room Booking";
-
-        // 1. Employee Reschedule Email
-        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
-        {
-            var subject = $"Booking Rescheduled: '{meetingTitle}'";
-            var body = $@"
+        return $@"
 <!DOCTYPE html>
 <html>
 <head><meta charset=""utf-8""><title>Booking Rescheduled</title></head>
@@ -1091,15 +1164,15 @@ public class EmployeeBookingService : IEmployeeBookingService
     </div>
 </body>
 </html>";
-            await _emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
-        }
+    }
 
-        // 2. Admin Reschedule Alert
-        var adminEmails = await _bookingRepository.GetAdminEmailsAsync();
-        if (adminEmails.Count > 0)
-        {
-            var adminSubject = $"[Admin Alert] Booking Rescheduled: '{meetingTitle}' by {employeeName}";
-            var adminBody = $@"
+    private static string BuildAdminBookingRescheduledEmailHtml(
+        string employeeName,
+        string meetingTitle,
+        string roomName,
+        UpdateBookingRequestDto request)
+    {
+        return $@"
 <!DOCTYPE html>
 <html>
 <head><meta charset=""utf-8""><title>Booking Rescheduled Alert</title></head>
@@ -1116,20 +1189,8 @@ public class EmployeeBookingService : IEmployeeBookingService
     </div>
 </body>
 </html>";
-
-            foreach (var adminEmail in adminEmails)
-            {
-                try
-                {
-                    await _emailService.SendEmailAsync(adminEmail, adminSubject, adminBody, isHtml: true);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to send admin reschedule alert to {Email}", adminEmail);
-                }
-            }
-        }
     }
+
 
     private static string BuildBookingConfirmedEmailHtml(
         string employeeName,
