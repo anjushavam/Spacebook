@@ -28,40 +28,87 @@ public class EmailService : IEmailService
     {
         if (string.IsNullOrWhiteSpace(toEmail))
         {
-            _logger.LogWarning("Email recipient is null or empty. Skipping email dispatch.");
+            _logger.LogWarning(
+                "Email recipient is empty. Email was not sent.");
+
             return;
         }
 
         var host = _configuration["Smtp:Host"];
-        var portStr = _configuration["Smtp:Port"];
+        var portValue = _configuration["Smtp:Port"];
         var username = _configuration["Smtp:Username"];
         var password = _configuration["Smtp:Password"];
-        var fromEmail = _configuration["Smtp:From"] ?? "no-reply@spacebook.com";
-        var fromName = _configuration["Smtp:SenderName"] ?? "SpaceBook";
+        var fromEmail = _configuration["Smtp:From"];
+        var senderName =
+            _configuration["Smtp:SenderName"] ?? "SpaceBook";
 
-        // If SMTP is not configured, simulate/log sending so developers and non-SMTP environments work out of the box
+        // =====================================================
+        // VALIDATE SMTP CONFIGURATION
+        // =====================================================
+
         if (string.IsNullOrWhiteSpace(host))
         {
-            _logger.LogInformation(
-                "[Email Simulated] To: {To}, Subject: '{Subject}'. (Configure 'Smtp:Host' in appsettings.json for live SMTP delivery)",
-                toEmail, subject);
+            _logger.LogError(
+                "SMTP Host is not configured.");
+
             return;
         }
 
-        int port = 587;
-        if (!string.IsNullOrWhiteSpace(portStr) && int.TryParse(portStr, out var parsedPort))
+        if (string.IsNullOrWhiteSpace(username))
         {
-            port = parsedPort;
+            _logger.LogError(
+                "SMTP Username is not configured.");
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            _logger.LogError(
+                "SMTP Password is not configured.");
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(fromEmail))
+        {
+            fromEmail = username;
+        }
+
+        var port = 587;
+
+        if (!string.IsNullOrWhiteSpace(portValue) &&
+            int.TryParse(portValue, out var configuredPort))
+        {
+            port = configuredPort;
         }
 
         try
         {
+            _logger.LogInformation(
+                "Attempting to send email. To={To}, Host={Host}, Port={Port}",
+                toEmail,
+                host,
+                port);
+
+            // Remove spaces from Gmail App Password
+            var cleanPassword =
+                password.Replace(" ", "").Trim();
+
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(fromName, fromEmail));
-            message.To.Add(new MailboxAddress("", toEmail));
+
+            message.From.Add(
+                new MailboxAddress(
+                    senderName,
+                    fromEmail));
+
+            message.To.Add(
+                MailboxAddress.Parse(toEmail));
+
             message.Subject = subject;
 
             var bodyBuilder = new BodyBuilder();
+
             if (isHtml)
             {
                 bodyBuilder.HtmlBody = body;
@@ -70,35 +117,75 @@ public class EmailService : IEmailService
             {
                 bodyBuilder.TextBody = body;
             }
-            message.Body = bodyBuilder.ToMessageBody();
+
+            message.Body =
+                bodyBuilder.ToMessageBody();
 
             using var client = new SmtpClient();
             client.Timeout = 10000; // 10 second timeout
 
-            // Accept all SSL certificates if needed for cloud containers
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+            // =================================================
+            // CONNECT TO GMAIL
+            // =================================================
 
-            var secureOption = port == 465 
-                ? SecureSocketOptions.SslOnConnect 
-                : SecureSocketOptions.StartTlsWhenAvailable;
+            var secureSocketOption =
+                port == 465
+                    ? SecureSocketOptions.SslOnConnect
+                    : SecureSocketOptions.StartTls;
 
-            await client.ConnectAsync(host, port, secureOption);
+            await client.ConnectAsync(
+                host,
+                port,
+                secureSocketOption);
 
-            if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
-            {
-                // Remove any accidental spaces in app password
-                var cleanPassword = password.Replace(" ", "").Trim();
-                await client.AuthenticateAsync(username.Trim(), cleanPassword);
-            }
+            _logger.LogInformation(
+                "Connected successfully to SMTP server.");
+
+            // =================================================
+            // AUTHENTICATE
+            // =================================================
+
+            await client.AuthenticateAsync(
+                username.Trim(),
+                cleanPassword);
+
+            _logger.LogInformation(
+                "SMTP authentication successful.");
+
+            // =================================================
+            // SEND
+            // =================================================
 
             await client.SendAsync(message);
-            await client.DisconnectAsync(true);
 
-            _logger.LogInformation("Successfully sent email to {To} with Subject: '{Subject}'", toEmail, subject);
+            _logger.LogInformation(
+                "Email successfully sent to {To}. Subject={Subject}",
+                toEmail,
+                subject);
+
+            // =================================================
+            // DISCONNECT
+            // =================================================
+
+            await client.DisconnectAsync(true);
+        }
+        catch (AuthenticationException ex)
+        {
+            _logger.LogError(
+                ex,
+                "SMTP authentication failed. Check Gmail username and App Password.");
+
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send email to {To} via SMTP host {Host}:{Port}", toEmail, host, port);
+            _logger.LogError(
+                ex,
+                "Failed to send email to {To}. SMTP={Host}:{Port}",
+                toEmail,
+                host,
+                port);
+
             throw;
         }
     }
@@ -125,10 +212,10 @@ public class EmailService : IEmailService
         var portStr = _configuration["Smtp:Port"];
         var username = _configuration["Smtp:Username"];
         var password = _configuration["Smtp:Password"];
-        var fromEmail = _configuration["Smtp:From"] ?? "no-reply@spacebook.com";
+        var fromEmail = _configuration["Smtp:From"] ?? username ?? "no-reply@spacebook.com";
         var fromName = _configuration["Smtp:SenderName"] ?? "SpaceBook";
 
-        if (string.IsNullOrWhiteSpace(host))
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
             _logger.LogInformation(
                 "[Email Simulated] Batch To {Count} recipients ({Recipients}), Subject: '{Subject}'.",
@@ -145,7 +232,7 @@ public class EmailService : IEmailService
         try
         {
             using var client = new SmtpClient();
-            client.Timeout = 10000; // 10 second timeout
+            client.Timeout = 10000;
             client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
             var secureOption = port == 465 
@@ -154,11 +241,8 @@ public class EmailService : IEmailService
 
             await client.ConnectAsync(host, port, secureOption);
 
-            if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
-            {
-                var cleanPassword = password.Replace(" ", "").Trim();
-                await client.AuthenticateAsync(username.Trim(), cleanPassword);
-            }
+            var cleanPassword = password.Replace(" ", "").Trim();
+            await client.AuthenticateAsync(username.Trim(), cleanPassword);
 
             var bodyBuilder = new BodyBuilder();
             if (isHtml)
@@ -177,7 +261,7 @@ public class EmailService : IEmailService
                 {
                     var message = new MimeMessage();
                     message.From.Add(new MailboxAddress(fromName, fromEmail));
-                    message.To.Add(new MailboxAddress("", email));
+                    message.To.Add(MailboxAddress.Parse(email));
                     message.Subject = subject;
                     message.Body = messageBody;
 
@@ -199,4 +283,3 @@ public class EmailService : IEmailService
         }
     }
 }
-

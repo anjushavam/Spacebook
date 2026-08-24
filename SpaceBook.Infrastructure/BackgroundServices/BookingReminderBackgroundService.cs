@@ -9,7 +9,9 @@ public class BookingReminderBackgroundService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookingReminderBackgroundService> _logger;
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(60);
+
+    private static readonly TimeSpan Interval =
+        TimeSpan.FromSeconds(60);
 
     public BookingReminderBackgroundService(
         IServiceScopeFactory scopeFactory,
@@ -19,42 +21,72 @@ public class BookingReminderBackgroundService : BackgroundService
         _logger = logger;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
-        _logger.LogInformation("BookingReminderBackgroundService is starting.");
+        _logger.LogInformation(
+            "BookingReminderBackgroundService started.");
 
-        // Initial brief delay before starting background loop
-        await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        try
+        {
+            await Task.Delay(
+                TimeSpan.FromSeconds(5),
+                stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var reminderService = scope.ServiceProvider.GetRequiredService<IBookingReminderService>();
+                _logger.LogInformation(
+                    "Booking reminder background check started at UTC {UtcNow}",
+                    DateTime.UtcNow);
 
-                await reminderService.ProcessBookingRemindersAsync(stoppingToken);
+                using var scope =
+                    _scopeFactory.CreateScope();
+
+                var reminderService =
+                    scope.ServiceProvider
+                        .GetRequiredService<
+                            IBookingReminderService>();
+
+                await reminderService
+                    .ProcessBookingRemindersAsync(
+                        stoppingToken);
+
+                _logger.LogInformation(
+                    "Booking reminder background check completed.");
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
             {
-                // Normal shutdown requested
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while executing BookingReminderBackgroundService.");
+                _logger.LogError(
+                    ex,
+                    "Error while processing booking reminders.");
             }
 
             try
             {
-                await Task.Delay(Interval, stoppingToken);
+                await Task.Delay(
+                    Interval,
+                    stoppingToken);
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
         }
 
-        _logger.LogInformation("BookingReminderBackgroundService is stopping.");
+        _logger.LogInformation(
+            "BookingReminderBackgroundService stopped.");
     }
 }

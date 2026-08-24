@@ -5,32 +5,52 @@ using SpaceBook.Infrastructure.Data;
 
 namespace SpaceBook.Infrastructure.Repositories;
 
-public class BookingReminderRepository : IBookingReminderRepository
+public class BookingReminderRepository
+    : IBookingReminderRepository
 {
     private readonly ApplicationDbContext _context;
 
-    public BookingReminderRepository(ApplicationDbContext context)
+    public BookingReminderRepository(
+        ApplicationDbContext context)
     {
         _context = context;
     }
 
-    public async Task<List<Booking>> GetTodayBookingsNeedingRemindersAsync(
-        DateOnly date,
-        CancellationToken cancellationToken = default)
+    public async Task<List<Booking>>
+        GetTodayBookingsNeedingRemindersAsync(
+            DateOnly date,
+            CancellationToken cancellationToken = default)
     {
         return await _context.Bookings
+
+            // Employee is required for Name and Email
             .Include(b => b.Employee)
+
+            // Room is required for RoomName / RoomNumber
             .Include(b => b.Room)
+
             .Where(b =>
                 b.BookingDate == date &&
+
+                // Only approved bookings should receive reminders
                 b.Status == "Approved" &&
-                (!b.StartReminderSent || !b.EndReminderSent))
+
+                // At least one reminder still needs processing
+                (
+                    !b.StartReminderSent ||
+                    !b.EndReminderSent
+                )
+            )
+
+            .OrderBy(b => b.StartTime)
+
             .ToListAsync(cancellationToken);
     }
 
     public async Task SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
-        await _context.SaveChangesAsync(cancellationToken);
+        await _context.SaveChangesAsync(
+            cancellationToken);
     }
 }
