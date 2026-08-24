@@ -75,12 +75,18 @@ public class EmailService : IEmailService
             fromEmail = username;
         }
 
-        var port = 587;
+        var port = 465;
 
         if (!string.IsNullOrWhiteSpace(portValue) &&
             int.TryParse(portValue, out var configuredPort))
         {
             port = configuredPort;
+        }
+
+        // Render and cloud Linux containers block outbound port 587. Always use 465 SSL for Gmail.
+        if (host.Contains("gmail.com", StringComparison.OrdinalIgnoreCase) && port == 587)
+        {
+            port = 465;
         }
 
         try
@@ -125,33 +131,21 @@ public class EmailService : IEmailService
             client.Timeout = 10000; // 10 second timeout
 
             // =================================================
-            // CONNECT TO SMTP (Try Port 465 SSL / 587 StartTLS)
+            // CONNECT TO SMTP (Port 465 SSL / 587 StartTLS)
             // =================================================
 
-            try
-            {
-                var secureSocketOption =
-                    port == 465
-                        ? SecureSocketOptions.SslOnConnect
-                        : SecureSocketOptions.StartTls;
+            var secureSocketOption =
+                port == 465
+                    ? SecureSocketOptions.SslOnConnect
+                    : SecureSocketOptions.StartTls;
 
-                await client.ConnectAsync(
-                    host,
-                    port,
-                    secureSocketOption);
-            }
-            catch (Exception ex) when (port == 587)
-            {
-                _logger.LogWarning(ex, "Port 587 timed out. Attempting fallback to Port 465 SSL.");
-
-                await client.ConnectAsync(
-                    host,
-                    465,
-                    SecureSocketOptions.SslOnConnect);
-            }
+            await client.ConnectAsync(
+                host,
+                port,
+                secureSocketOption);
 
             _logger.LogInformation(
-                "Connected successfully to SMTP server.");
+                "Connected successfully to SMTP server on port {Port}.", port);
 
             // =================================================
             // AUTHENTICATE
