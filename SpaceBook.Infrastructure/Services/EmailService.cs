@@ -43,25 +43,12 @@ public class EmailService : IEmailService
         // =====================================================
         // 1. TRY RESEND HTTPS API
         // =====================================================
-        //
-        // If Resend is configured, try it first.
-        //
-        // If it succeeds:
-        //      return
-        //
-        // If it fails:
-        //      log error
-        //      continue to SMTP fallback
-        //
-        // =====================================================
 
         var resendApiKey =
             _configuration["Resend:ApiKey"]
+            ?? Environment.GetEnvironmentVariable("Resend__ApiKey")
             ?? _configuration["RESEND_API_KEY"]
-            ?? Environment.GetEnvironmentVariable(
-                "Resend__ApiKey")
-            ?? Environment.GetEnvironmentVariable(
-                "RESEND_API_KEY");
+            ?? Environment.GetEnvironmentVariable("RESEND_API_KEY");
 
         if (!string.IsNullOrWhiteSpace(resendApiKey))
         {
@@ -74,18 +61,15 @@ public class EmailService : IEmailService
 
                 var resendFrom =
                     _configuration["Resend:From"]
+                    ?? Environment.GetEnvironmentVariable("Resend__From")
                     ?? "SpaceBook <onboarding@resend.dev>";
 
-                using var httpClient =
-                    new HttpClient
-                    {
-                        Timeout =
-                            TimeSpan.FromSeconds(15)
-                    };
+                using var httpClient = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(15)
+                };
 
-                httpClient
-                    .DefaultRequestHeaders
-                    .Authorization =
+                httpClient.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue(
                         "Bearer",
                         resendApiKey.Trim());
@@ -93,29 +77,18 @@ public class EmailService : IEmailService
                 var payload = new
                 {
                     from = resendFrom,
-
                     to = new[]
                     {
                         toEmail.Trim()
                     },
-
                     subject,
-
-                    html =
-                        isHtml
-                            ? body
-                            : null,
-
-                    text =
-                        !isHtml
-                            ? body
-                            : null
+                    html = isHtml ? body : null,
+                    text = !isHtml ? body : null
                 };
 
-                var jsonContent =
+                using var jsonContent =
                     new StringContent(
-                        JsonSerializer.Serialize(
-                            payload),
+                        JsonSerializer.Serialize(payload),
                         Encoding.UTF8,
                         "application/json");
 
@@ -125,8 +98,7 @@ public class EmailService : IEmailService
                         jsonContent);
 
                 var responseBody =
-                    await response.Content
-                        .ReadAsStringAsync();
+                    await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -153,37 +125,89 @@ public class EmailService : IEmailService
         }
 
         // =====================================================
-        // 2. SMTP FALLBACK
+        // 2. SMTP CONFIGURATION
+        // =====================================================
+        //
+        // Supports:
+        //
+        // Render:
+        // Smtp__Host
+        // Smtp__Port
+        // Smtp__Username
+        // Smtp__Password
+        // Smtp__From
+        // Smtp__SenderName
+        // Smtp__EnableSsl
+        //
+        // Also supports:
+        // EmailSettings__...
+        //
         // =====================================================
 
         var host =
-            _configuration["EmailSettings:Host"]
-            ?? _configuration["Smtp:Host"];
+            _configuration["Smtp:Host"]
+            ?? Environment.GetEnvironmentVariable("Smtp__Host")
+            ?? _configuration["EmailSettings:Host"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__Host");
 
         var portValue =
-            _configuration["EmailSettings:Port"]
-            ?? _configuration["Smtp:Port"];
+            _configuration["Smtp:Port"]
+            ?? Environment.GetEnvironmentVariable("Smtp__Port")
+            ?? _configuration["EmailSettings:Port"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__Port");
 
         var username =
-            _configuration["EmailSettings:Username"]
-            ?? _configuration["Smtp:Username"];
+            _configuration["Smtp:Username"]
+            ?? Environment.GetEnvironmentVariable("Smtp__Username")
+            ?? _configuration["EmailSettings:Username"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__Username");
 
         var password =
-            _configuration["EmailSettings:Password"]
-            ?? _configuration["Smtp:Password"];
+            _configuration["Smtp:Password"]
+            ?? Environment.GetEnvironmentVariable("Smtp__Password")
+            ?? _configuration["EmailSettings:Password"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__Password");
 
         var fromEmail =
-            _configuration["EmailSettings:FromEmail"]
-            ?? _configuration["Smtp:From"];
+            _configuration["Smtp:From"]
+            ?? Environment.GetEnvironmentVariable("Smtp__From")
+            ?? _configuration["EmailSettings:FromEmail"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__FromEmail");
 
         var senderName =
-            _configuration["EmailSettings:FromName"]
-            ?? _configuration["Smtp:SenderName"]
+            _configuration["Smtp:SenderName"]
+            ?? Environment.GetEnvironmentVariable("Smtp__SenderName")
+            ?? _configuration["EmailSettings:FromName"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__FromName")
             ?? "SpaceBook";
 
         var enableSslValue =
-            _configuration["EmailSettings:EnableSsl"]
-            ?? _configuration["Smtp:EnableSsl"];
+            _configuration["Smtp:EnableSsl"]
+            ?? Environment.GetEnvironmentVariable("Smtp__EnableSsl")
+            ?? _configuration["EmailSettings:EnableSsl"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__EnableSsl");
+
+        // =====================================================
+        // SAFE CONFIGURATION DIAGNOSTIC
+        // =====================================================
+        //
+        // Does NOT print passwords or actual secret values.
+        // =====================================================
+
+        _logger.LogInformation(
+            "SMTP configuration loaded: " +
+            "Host={HostConfigured}, " +
+            "Port={PortConfigured}, " +
+            "Username={UsernameConfigured}, " +
+            "Password={PasswordConfigured}, " +
+            "From={FromConfigured}, " +
+            "SSL={SslConfigured}",
+            !string.IsNullOrWhiteSpace(host),
+            !string.IsNullOrWhiteSpace(portValue),
+            !string.IsNullOrWhiteSpace(username),
+            !string.IsNullOrWhiteSpace(password),
+            !string.IsNullOrWhiteSpace(fromEmail),
+            !string.IsNullOrWhiteSpace(enableSslValue));
 
         // =====================================================
         // VALIDATE SMTP CONFIGURATION
@@ -218,8 +242,7 @@ public class EmailService : IEmailService
 
         var port = 587;
 
-        if (!string.IsNullOrWhiteSpace(
-                portValue) &&
+        if (!string.IsNullOrWhiteSpace(portValue) &&
             int.TryParse(
                 portValue,
                 out var configuredPort))
@@ -233,8 +256,7 @@ public class EmailService : IEmailService
 
         var enableSsl = true;
 
-        if (!string.IsNullOrWhiteSpace(
-                enableSslValue) &&
+        if (!string.IsNullOrWhiteSpace(enableSslValue) &&
             bool.TryParse(
                 enableSslValue,
                 out var configuredSsl))
@@ -243,7 +265,7 @@ public class EmailService : IEmailService
         }
 
         // =====================================================
-        // SEND THROUGH SMTP
+        // SEND USING SMTP
         // =====================================================
 
         try
@@ -254,15 +276,12 @@ public class EmailService : IEmailService
                 host,
                 port);
 
-            // Google App Passwords are sometimes copied
-            // with spaces. Remove them safely.
             var cleanPassword =
                 password
                     .Replace(" ", "")
                     .Trim();
 
-            var message =
-                new MimeMessage();
+            var message = new MimeMessage();
 
             message.From.Add(
                 new MailboxAddress(
@@ -273,38 +292,30 @@ public class EmailService : IEmailService
                 MailboxAddress.Parse(
                     toEmail.Trim()));
 
-            message.Subject =
-                subject;
+            message.Subject = subject;
 
-            var bodyBuilder =
-                new BodyBuilder();
+            var bodyBuilder = new BodyBuilder();
 
             if (isHtml)
             {
-                bodyBuilder.HtmlBody =
-                    body;
+                bodyBuilder.HtmlBody = body;
             }
             else
             {
-                bodyBuilder.TextBody =
-                    body;
+                bodyBuilder.TextBody = body;
             }
 
             message.Body =
-                bodyBuilder
-                    .ToMessageBody();
+                bodyBuilder.ToMessageBody();
 
             using var client =
                 new SmtpClient();
 
-            client.Timeout =
-                15000;
+            client.Timeout = 15000;
 
             // Gmail:
-            //
-            // 587 -> STARTTLS
-            // 465 -> SSL on connect
-            //
+            // Port 587 -> STARTTLS
+            // Port 465 -> SSL on connect
             var secureSocketOption =
                 !enableSsl
                     ? SecureSocketOptions.None
@@ -341,18 +352,12 @@ public class EmailService : IEmailService
                 host,
                 port);
 
-            // IMPORTANT:
-            //
-            // Propagate failure to BookingReminderService.
-            //
-            // That prevents the reminder from being marked
-            // as successfully sent when delivery failed.
             throw;
         }
     }
 
     // =========================================================
-    // SEND TO MULTIPLE RECIPIENTS
+    // SEND EMAIL TO MULTIPLE RECIPIENTS
     // =========================================================
 
     public async Task SendEmailsAsync(
@@ -382,9 +387,8 @@ public class EmailService : IEmailService
 
         foreach (var email in validEmails)
         {
-            // Do not swallow the exception here.
-            //
-            // If delivery fails, the caller must know.
+            // Do not swallow exceptions.
+            // Caller must know if delivery failed.
             await SendEmailAsync(
                 email,
                 subject,
@@ -430,8 +434,7 @@ public class EmailService : IEmailService
         // EMPLOYEE CONFIRMATION
         // =====================================================
 
-        if (string.IsNullOrWhiteSpace(
-                employeeEmail))
+        if (string.IsNullOrWhiteSpace(employeeEmail))
         {
             throw new InvalidOperationException(
                 $"Employee email is missing for BookingId={booking.BookingId}.");
@@ -500,7 +503,7 @@ public class EmailService : IEmailService
 
     // =========================================================
     // NOTIFICATION 2
-    // START REMINDER
+    // 15-MINUTE START REMINDER
     // =========================================================
 
     public async Task SendBookingStartReminderAsync(
@@ -535,8 +538,7 @@ public class EmailService : IEmailService
         // EMPLOYEE START REMINDER
         // =====================================================
 
-        if (string.IsNullOrWhiteSpace(
-                employeeEmail))
+        if (string.IsNullOrWhiteSpace(employeeEmail))
         {
             throw new InvalidOperationException(
                 $"Employee email is missing for BookingId={booking.BookingId}.");
@@ -605,7 +607,7 @@ public class EmailService : IEmailService
 
     // =========================================================
     // NOTIFICATION 3
-    // END REMINDER
+    // 15-MINUTE END REMINDER
     // =========================================================
 
     public async Task SendBookingEndReminderAsync(
@@ -636,8 +638,7 @@ public class EmailService : IEmailService
         // EMPLOYEE END REMINDER
         // =====================================================
 
-        if (string.IsNullOrWhiteSpace(
-                employeeEmail))
+        if (string.IsNullOrWhiteSpace(employeeEmail))
         {
             throw new InvalidOperationException(
                 $"Employee email is missing for BookingId={booking.BookingId}.");
@@ -719,18 +720,16 @@ public class EmailService : IEmailService
         }
 
         var configAdminEmail =
-            _configuration[
-                "EmailSettings:AdminEmail"]
-            ?? _configuration[
-                "Smtp:AdminEmail"]
-            ?? _configuration[
-                "Resend:AdminEmail"];
+            _configuration["Smtp:AdminEmail"]
+            ?? Environment.GetEnvironmentVariable("Smtp__AdminEmail")
+            ?? _configuration["EmailSettings:AdminEmail"]
+            ?? Environment.GetEnvironmentVariable("EmailSettings__AdminEmail")
+            ?? _configuration["Resend:AdminEmail"]
+            ?? Environment.GetEnvironmentVariable("Resend__AdminEmail");
 
         if (!string.IsNullOrWhiteSpace(
                 configAdminEmail))
         {
-            // Allows multiple configured admin addresses,
-            // separated with ; or ,
             var configuredAdmins =
                 configAdminEmail
                     .Split(
@@ -739,8 +738,7 @@ public class EmailService : IEmailService
                             ';',
                             ','
                         },
-                        StringSplitOptions
-                            .RemoveEmptyEntries)
+                        StringSplitOptions.RemoveEmptyEntries)
                     .Select(x =>
                         x.Trim())
                     .Where(x =>
@@ -805,7 +803,7 @@ public class EmailService : IEmailService
     }
 
     // =========================================================
-    // HTML TEMPLATES
+    // EMPLOYEE CONFIRMATION EMAIL
     // =========================================================
 
     private static string BuildConfirmationEmailHtml(
@@ -818,7 +816,17 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $$"""
+        var purposeRow =
+            !string.IsNullOrWhiteSpace(purpose)
+                ? $"""
+                   <tr>
+                       <td><strong>Purpose:</strong></td>
+                       <td>{purpose}</td>
+                   </tr>
+                   """
+                : string.Empty;
+
+        return $"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -852,14 +860,11 @@ public class EmailService : IEmailService
                         text-align:center;
                         color:#ffffff;">
 
-                        <h1 style="
-                            margin:0;
-                            font-size:24px;">
+                        <h1 style="margin:0;font-size:24px;">
                             SpaceBook
                         </h1>
 
-                        <p style="
-                            margin:6px 0 0;">
+                        <p style="margin:6px 0 0;">
                             Room Booking Confirmed
                         </p>
                     </td>
@@ -869,7 +874,7 @@ public class EmailService : IEmailService
                     <td style="padding:28px;">
 
                         <h2 style="margin-top:0;">
-                            Hello {{employeeName}},
+                            Hello {employeeName},
                         </h2>
 
                         <p>
@@ -889,43 +894,34 @@ public class EmailService : IEmailService
 
                             <tr>
                                 <td><strong>Meeting:</strong></td>
-                                <td>{{meetingTitle}}</td>
+                                <td>{meetingTitle}</td>
                             </tr>
 
-                            {{(
-                                !string.IsNullOrWhiteSpace(purpose)
-                                    ? $"""
-                                      <tr>
-                                          <td><strong>Purpose:</strong></td>
-                                          <td>{purpose}</td>
-                                      </tr>
-                                      """
-                                    : string.Empty
-                            )}}
+                            {purposeRow}
 
                             <tr>
                                 <td><strong>Room:</strong></td>
-                                <td>{{roomName}}</td>
+                                <td>{roomName}</td>
                             </tr>
 
                             <tr>
                                 <td><strong>Date:</strong></td>
-                                <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                                <td>{bookingDate:MMMM dd, yyyy}</td>
                             </tr>
 
                             <tr>
                                 <td><strong>Start Time:</strong></td>
-                                <td>{{FormatTime(startTime)}}</td>
+                                <td>{FormatTime(startTime)}</td>
                             </tr>
 
                             <tr>
                                 <td><strong>End Time:</strong></td>
-                                <td>{{FormatTime(endTime)}}</td>
+                                <td>{FormatTime(endTime)}</td>
                             </tr>
 
                             <tr>
                                 <td><strong>Participants:</strong></td>
-                                <td>{{participantCount}}</td>
+                                <td>{participantCount}</td>
                             </tr>
 
                             <tr>
@@ -936,6 +932,7 @@ public class EmailService : IEmailService
                                     Approved
                                 </td>
                             </tr>
+
                         </table>
 
                         <p>
@@ -957,9 +954,7 @@ public class EmailService : IEmailService
                         background:#f1f5f9;
                         color:#64748b;
                         font-size:12px;">
-
-                        This is an automated notification
-                        from SpaceBook.
+                        This is an automated notification from SpaceBook.
                     </td>
                 </tr>
 
@@ -968,6 +963,10 @@ public class EmailService : IEmailService
         </html>
         """;
     }
+
+    // =========================================================
+    // ADMIN CONFIRMATION EMAIL
+    // =========================================================
 
     private static string BuildAdminConfirmationEmailHtml(
         string employeeName,
@@ -981,7 +980,27 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $$"""
+        var departmentRow =
+            !string.IsNullOrWhiteSpace(department)
+                ? $"""
+                   <tr>
+                       <td><strong>Department:</strong></td>
+                       <td>{department}</td>
+                   </tr>
+                   """
+                : string.Empty;
+
+        var purposeRow =
+            !string.IsNullOrWhiteSpace(purpose)
+                ? $"""
+                   <tr>
+                       <td><strong>Purpose:</strong></td>
+                       <td>{purpose}</td>
+                   </tr>
+                   """
+                : string.Empty;
+
+        return $"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -1009,8 +1028,7 @@ public class EmailService : IEmailService
                 </h2>
 
                 <p>
-                    A room booking has been
-                    automatically approved.
+                    A room booking has been automatically approved.
                 </p>
 
                 <table
@@ -1024,67 +1042,50 @@ public class EmailService : IEmailService
                     <tr>
                         <td><strong>Employee:</strong></td>
                         <td>
-                            {{employeeName}}
-                            ({{employeeEmail}})
+                            {employeeName}
+                            ({employeeEmail})
                         </td>
                     </tr>
 
-                    {{(
-                        !string.IsNullOrWhiteSpace(department)
-                            ? $"""
-                              <tr>
-                                  <td><strong>Department:</strong></td>
-                                  <td>{department}</td>
-                              </tr>
-                              """
-                            : string.Empty
-                    )}}
+                    {departmentRow}
 
                     <tr>
                         <td><strong>Meeting:</strong></td>
-                        <td>{{meetingTitle}}</td>
+                        <td>{meetingTitle}</td>
                     </tr>
 
-                    {{(
-                        !string.IsNullOrWhiteSpace(purpose)
-                            ? $"""
-                              <tr>
-                                  <td><strong>Purpose:</strong></td>
-                                  <td>{purpose}</td>
-                              </tr>
-                              """
-                            : string.Empty
-                    )}}
+                    {purposeRow}
 
                     <tr>
                         <td><strong>Room:</strong></td>
-                        <td>{{roomName}}</td>
+                        <td>{roomName}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Date:</strong></td>
-                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                        <td>{bookingDate:MMMM dd, yyyy}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Start:</strong></td>
-                        <td>{{FormatTime(startTime)}}</td>
+                        <td>{FormatTime(startTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>End:</strong></td>
-                        <td>{{FormatTime(endTime)}}</td>
+                        <td>{FormatTime(endTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Participants:</strong></td>
-                        <td>{{participantCount}}</td>
+                        <td>{participantCount}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Status:</strong></td>
                         <td>Approved</td>
                     </tr>
+
                 </table>
 
                 <p>
@@ -1097,6 +1098,10 @@ public class EmailService : IEmailService
         """;
     }
 
+    // =========================================================
+    // EMPLOYEE START REMINDER EMAIL
+    // =========================================================
+
     private static string BuildStartReminderEmailHtml(
         string employeeName,
         string meetingTitle,
@@ -1107,14 +1112,23 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $$"""
+        var purposeRow =
+            !string.IsNullOrWhiteSpace(purpose)
+                ? $"""
+                   <tr>
+                       <td><strong>Purpose:</strong></td>
+                       <td>{purpose}</td>
+                   </tr>
+                   """
+                : string.Empty;
+
+        return $"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <title>
-                SpaceBook Reminder -
-                Booking Starts in 15 Minutes
+                SpaceBook Reminder - Booking Starts in 15 Minutes
             </title>
         </head>
 
@@ -1130,18 +1144,15 @@ public class EmailService : IEmailService
                 padding:28px;
                 border-radius:12px;">
 
-                <h1>
-                    SpaceBook
-                </h1>
+                <h1>SpaceBook</h1>
 
                 <h2>
-                    Hello {{employeeName}},
+                    Hello {employeeName},
                 </h2>
 
                 <p>
-                    This is a reminder that your SpaceBook
-                    room booking will start in
-                    <strong>15 minutes</strong>.
+                    This is a reminder that your SpaceBook room booking
+                    will start in <strong>15 minutes</strong>.
                 </p>
 
                 <table
@@ -1154,44 +1165,36 @@ public class EmailService : IEmailService
 
                     <tr>
                         <td><strong>Meeting:</strong></td>
-                        <td>{{meetingTitle}}</td>
+                        <td>{meetingTitle}</td>
                     </tr>
 
-                    {{(
-                        !string.IsNullOrWhiteSpace(purpose)
-                            ? $"""
-                              <tr>
-                                  <td><strong>Purpose:</strong></td>
-                                  <td>{purpose}</td>
-                              </tr>
-                              """
-                            : string.Empty
-                    )}}
+                    {purposeRow}
 
                     <tr>
                         <td><strong>Room:</strong></td>
-                        <td>{{roomName}}</td>
+                        <td>{roomName}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Date:</strong></td>
-                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                        <td>{bookingDate:MMMM dd, yyyy}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Start:</strong></td>
-                        <td>{{FormatTime(startTime)}}</td>
+                        <td>{FormatTime(startTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>End:</strong></td>
-                        <td>{{FormatTime(endTime)}}</td>
+                        <td>{FormatTime(endTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Participants:</strong></td>
-                        <td>{{participantCount}}</td>
+                        <td>{participantCount}</td>
                     </tr>
+
                 </table>
 
                 <p>
@@ -1208,6 +1211,10 @@ public class EmailService : IEmailService
         """;
     }
 
+    // =========================================================
+    // ADMIN START REMINDER EMAIL
+    // =========================================================
+
     private static string BuildAdminStartReminderEmailHtml(
         string employeeName,
         string employeeEmail,
@@ -1220,7 +1227,27 @@ public class EmailService : IEmailService
         TimeOnly endTime,
         int participantCount)
     {
-        return $$"""
+        var departmentRow =
+            !string.IsNullOrWhiteSpace(department)
+                ? $"""
+                   <tr>
+                       <td><strong>Department:</strong></td>
+                       <td>{department}</td>
+                   </tr>
+                   """
+                : string.Empty;
+
+        var purposeRow =
+            !string.IsNullOrWhiteSpace(purpose)
+                ? $"""
+                   <tr>
+                       <td><strong>Purpose:</strong></td>
+                       <td>{purpose}</td>
+                   </tr>
+                   """
+                : string.Empty;
+
+        return $"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -1251,73 +1278,61 @@ public class EmailService : IEmailService
                     <tr>
                         <td><strong>Employee:</strong></td>
                         <td>
-                            {{employeeName}}
-                            ({{employeeEmail}})
+                            {employeeName}
+                            ({employeeEmail})
                         </td>
                     </tr>
 
-                    {{(
-                        !string.IsNullOrWhiteSpace(department)
-                            ? $"""
-                              <tr>
-                                  <td><strong>Department:</strong></td>
-                                  <td>{department}</td>
-                              </tr>
-                              """
-                            : string.Empty
-                    )}}
+                    {departmentRow}
 
                     <tr>
                         <td><strong>Meeting:</strong></td>
-                        <td>{{meetingTitle}}</td>
+                        <td>{meetingTitle}</td>
                     </tr>
 
-                    {{(
-                        !string.IsNullOrWhiteSpace(purpose)
-                            ? $"""
-                              <tr>
-                                  <td><strong>Purpose:</strong></td>
-                                  <td>{purpose}</td>
-                              </tr>
-                              """
-                            : string.Empty
-                    )}}
+                    {purposeRow}
 
                     <tr>
                         <td><strong>Room:</strong></td>
-                        <td>{{roomName}}</td>
+                        <td>{roomName}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Date:</strong></td>
-                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                        <td>{bookingDate:MMMM dd, yyyy}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Start:</strong></td>
-                        <td>{{FormatTime(startTime)}}</td>
+                        <td>{FormatTime(startTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>End:</strong></td>
-                        <td>{{FormatTime(endTime)}}</td>
+                        <td>{FormatTime(endTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Participants:</strong></td>
-                        <td>{{participantCount}}</td>
+                        <td>{participantCount}</td>
                     </tr>
+
                 </table>
 
                 <p>
                     Regards,<br>
                     <strong>SpaceBook</strong>
                 </p>
+
             </div>
         </body>
         </html>
         """;
     }
+
+    // =========================================================
+    // EMPLOYEE END REMINDER EMAIL
+    // =========================================================
 
     private static string BuildEndReminderEmailHtml(
         string employeeName,
@@ -1327,14 +1342,13 @@ public class EmailService : IEmailService
         TimeOnly startTime,
         TimeOnly endTime)
     {
-        return $$"""
+        return $"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <title>
-                SpaceBook Reminder -
-                Booking Ends in 15 Minutes
+                SpaceBook Reminder - Booking Ends in 15 Minutes
             </title>
         </head>
 
@@ -1350,15 +1364,17 @@ public class EmailService : IEmailService
                 padding:28px;
                 border-radius:12px;">
 
-                <h1>SpaceBook</h1>
+                <h1>
+                    SpaceBook
+                </h1>
 
                 <h2>
-                    Hello {{employeeName}},
+                    Hello {employeeName},
                 </h2>
 
                 <p>
-                    Your SpaceBook room booking will end
-                    in <strong>15 minutes</strong>.
+                    Your SpaceBook room booking will end in
+                    <strong>15 minutes</strong>.
                 </p>
 
                 <table
@@ -1367,28 +1383,29 @@ public class EmailService : IEmailService
 
                     <tr>
                         <td><strong>Meeting:</strong></td>
-                        <td>{{meetingTitle}}</td>
+                        <td>{meetingTitle}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Room:</strong></td>
-                        <td>{{roomName}}</td>
+                        <td>{roomName}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Date:</strong></td>
-                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                        <td>{bookingDate:MMMM dd, yyyy}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Start:</strong></td>
-                        <td>{{FormatTime(startTime)}}</td>
+                        <td>{FormatTime(startTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>End:</strong></td>
-                        <td>{{FormatTime(endTime)}}</td>
+                        <td>{FormatTime(endTime)}</td>
                     </tr>
+
                 </table>
 
                 <p>
@@ -1400,11 +1417,16 @@ public class EmailService : IEmailService
                     Regards,<br>
                     <strong>SpaceBook</strong>
                 </p>
+
             </div>
         </body>
         </html>
         """;
     }
+
+    // =========================================================
+    // ADMIN END REMINDER EMAIL
+    // =========================================================
 
     private static string BuildAdminEndReminderEmailHtml(
         string employeeName,
@@ -1415,7 +1437,7 @@ public class EmailService : IEmailService
         TimeOnly startTime,
         TimeOnly endTime)
     {
-        return $$"""
+        return $"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -1446,41 +1468,43 @@ public class EmailService : IEmailService
                     <tr>
                         <td><strong>Employee:</strong></td>
                         <td>
-                            {{employeeName}}
-                            ({{employeeEmail}})
+                            {employeeName}
+                            ({employeeEmail})
                         </td>
                     </tr>
 
                     <tr>
                         <td><strong>Meeting:</strong></td>
-                        <td>{{meetingTitle}}</td>
+                        <td>{meetingTitle}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Room:</strong></td>
-                        <td>{{roomName}}</td>
+                        <td>{roomName}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Date:</strong></td>
-                        <td>{{bookingDate.ToString("MMMM dd, yyyy")}}</td>
+                        <td>{bookingDate:MMMM dd, yyyy}</td>
                     </tr>
 
                     <tr>
                         <td><strong>Start:</strong></td>
-                        <td>{{FormatTime(startTime)}}</td>
+                        <td>{FormatTime(startTime)}</td>
                     </tr>
 
                     <tr>
                         <td><strong>End:</strong></td>
-                        <td>{{FormatTime(endTime)}}</td>
+                        <td>{FormatTime(endTime)}</td>
                     </tr>
+
                 </table>
 
                 <p>
                     Regards,<br>
                     <strong>SpaceBook</strong>
                 </p>
+
             </div>
         </body>
         </html>
