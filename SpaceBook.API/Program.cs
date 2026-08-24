@@ -185,12 +185,6 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // =====================================================
-// Email Service
-// =====================================================
-
-builder.Services.AddScoped<IEmailService, EmailService>();
-
-// =====================================================
 // Booking Reminders & Background Service
 // =====================================================
 
