@@ -1,7 +1,8 @@
-using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using MimeKit;
 using SpaceBook.Application.Interfaces;
 
 namespace SpaceBook.Infrastructure.Services;
@@ -37,7 +38,6 @@ public class EmailService : IEmailService
         var password = _configuration["Smtp:Password"];
         var fromEmail = _configuration["Smtp:From"] ?? "no-reply@spacebook.com";
         var fromName = _configuration["Smtp:SenderName"] ?? "SpaceBook";
-        var enableSsl = bool.TryParse(_configuration["Smtp:EnableSsl"], out var ssl) ? ssl : true;
 
         // If SMTP is not configured, simulate/log sending so developers and non-SMTP environments work out of the box
         if (string.IsNullOrWhiteSpace(host))
@@ -56,26 +56,43 @@ public class EmailService : IEmailService
 
         try
         {
-            using var mailMessage = new MailMessage
-            {
-                From = new MailAddress(fromEmail, fromName),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = isHtml
-            };
-            mailMessage.To.Add(toEmail);
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(fromName, fromEmail));
+            message.To.Add(new MailboxAddress("", toEmail));
+            message.Subject = subject;
 
-            using var smtpClient = new SmtpClient(host, port)
+            var bodyBuilder = new BodyBuilder();
+            if (isHtml)
             {
-                EnableSsl = enableSsl
-            };
+                bodyBuilder.HtmlBody = body;
+            }
+            else
+            {
+                bodyBuilder.TextBody = body;
+            }
+            message.Body = bodyBuilder.ToMessageBody();
+
+            using var client = new SmtpClient();
+
+            // Accept all SSL certificates if needed for cloud containers
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+            var secureOption = port == 465 
+                ? SecureSocketOptions.SslOnConnect 
+                : SecureSocketOptions.StartTlsWhenAvailable;
+
+            await client.ConnectAsync(host, port, secureOption);
 
             if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
             {
-                smtpClient.Credentials = new NetworkCredential(username, password);
+                // Remove any accidental spaces in app password
+                var cleanPassword = password.Replace(" ", "").Trim();
+                await client.AuthenticateAsync(username.Trim(), cleanPassword);
             }
 
-            await smtpClient.SendMailAsync(mailMessage);
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
+
             _logger.LogInformation("Successfully sent email to {To} with Subject: '{Subject}'", toEmail, subject);
         }
         catch (Exception ex)
