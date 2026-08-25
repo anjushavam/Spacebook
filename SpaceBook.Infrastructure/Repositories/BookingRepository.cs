@@ -54,14 +54,13 @@ public class BookingRepository : IBookingRepository
             .Include(x => x.Employee)
             .AsQueryable();
 
-        // -----------------------------------------------------
+        // =====================================================
         // SEARCH
-        // -----------------------------------------------------
+        // =====================================================
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            var search =
-                filter.Search.Trim();
+            var search = filter.Search.Trim();
 
             query = query.Where(x =>
                 x.MeetingTitle.Contains(search) ||
@@ -71,12 +70,15 @@ public class BookingRepository : IBookingRepository
 
                 (x.Room != null &&
                  x.Room.Module != null &&
-                 x.Room.Module.ModuleName.Contains(search)));
+                 x.Room.Module.ModuleName.Contains(search)) ||
+
+                (x.Employee != null &&
+                 x.Employee.Name.Contains(search)));
         }
 
-        // -----------------------------------------------------
+        // =====================================================
         // STATUS FILTER
-        // -----------------------------------------------------
+        // =====================================================
 
         if (!string.IsNullOrWhiteSpace(filter.Status))
         {
@@ -84,23 +86,43 @@ public class BookingRepository : IBookingRepository
                 x.Status == filter.Status);
         }
 
-        // -----------------------------------------------------
+        // =====================================================
         // RETURN BOOKINGS
-        // -----------------------------------------------------
+        // =====================================================
 
         return await query
             .OrderByDescending(x => x.BookedOn)
             .Select(x => new BookingDto
             {
+                // -------------------------------------------------
+                // BOOKING
+                // -------------------------------------------------
+
                 BookingId =
                     x.BookingId,
 
-                // Purpose field removed; use MeetingTitle instead when needed
+                // IMPORTANT:
+                // Map MeetingTitle explicitly.
+                // Previously this was missing, which caused
+                // meetingTitle to be returned as "".
+                MeetingTitle =
+                    x.MeetingTitle ?? string.Empty,
+
+                // -------------------------------------------------
+                // ROOM
+                // -------------------------------------------------
+
+                RoomId =
+                    x.RoomId,
 
                 RoomName =
                     x.Room != null
                         ? x.Room.RoomName
                         : string.Empty,
+
+                // -------------------------------------------------
+                // MODULE
+                // -------------------------------------------------
 
                 Module =
                     x.Room != null &&
@@ -108,10 +130,18 @@ public class BookingRepository : IBookingRepository
                         ? x.Room.Module.ModuleName
                         : string.Empty,
 
+                // -------------------------------------------------
+                // EMPLOYEE
+                // -------------------------------------------------
+
                 EmployeeName =
                     x.Employee != null
                         ? x.Employee.Name
                         : string.Empty,
+
+                // -------------------------------------------------
+                // DATE / TIME
+                // -------------------------------------------------
 
                 BookingDate =
                     x.BookingDate,
@@ -121,6 +151,10 @@ public class BookingRepository : IBookingRepository
 
                 EndTime =
                     x.EndTime,
+
+                // -------------------------------------------------
+                // STATUS
+                // -------------------------------------------------
 
                 Status =
                     x.Status
@@ -149,6 +183,10 @@ public class BookingRepository : IBookingRepository
 
             .Select(x => new BookingDetailsDto
             {
+                // -------------------------------------------------
+                // BOOKING
+                // -------------------------------------------------
+
                 BookingId =
                     x.BookingId,
 
@@ -156,17 +194,27 @@ public class BookingRepository : IBookingRepository
                     x.EmployeeId,
 
                 MeetingTitle =
-                    x.MeetingTitle,
+                    x.MeetingTitle ?? string.Empty,
 
-                // Purpose field removed; use MeetingTitle instead when needed
+                // -------------------------------------------------
+                // PARTICIPANTS
+                // -------------------------------------------------
 
                 ParticipantCount =
                     x.ParticipantCount,
+
+                // -------------------------------------------------
+                // ROOM
+                // -------------------------------------------------
 
                 RoomName =
                     x.Room != null
                         ? x.Room.RoomName
                         : string.Empty,
+
+                // -------------------------------------------------
+                // MODULE
+                // -------------------------------------------------
 
                 Module =
                     x.Room != null &&
@@ -174,10 +222,18 @@ public class BookingRepository : IBookingRepository
                         ? x.Room.Module.ModuleName
                         : string.Empty,
 
+                // -------------------------------------------------
+                // EMPLOYEE
+                // -------------------------------------------------
+
                 EmployeeName =
                     x.Employee != null
                         ? x.Employee.Name
                         : string.Empty,
+
+                // -------------------------------------------------
+                // DATE / TIME
+                // -------------------------------------------------
 
                 BookingDate =
                     x.BookingDate,
@@ -188,8 +244,16 @@ public class BookingRepository : IBookingRepository
                 EndTime =
                     x.EndTime,
 
+                // -------------------------------------------------
+                // STATUS
+                // -------------------------------------------------
+
                 Status =
                     x.Status,
+
+                // -------------------------------------------------
+                // CREATED DATE
+                // -------------------------------------------------
 
                 BookedOn =
                     x.BookedOn
@@ -215,8 +279,7 @@ public class BookingRepository : IBookingRepository
                 "Booking not found.");
         }
 
-        _context.Bookings.Remove(
-            booking);
+        _context.Bookings.Remove(booking);
 
         await _context.SaveChangesAsync();
     }
@@ -262,8 +325,7 @@ public class BookingRepository : IBookingRepository
     public async Task AddAsync(
         Booking booking)
     {
-        await _context.Bookings
-            .AddAsync(booking);
+        await _context.Bookings.AddAsync(booking);
 
         await _context.SaveChangesAsync();
     }
