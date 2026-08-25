@@ -1385,6 +1385,15 @@ public class EmployeeBookingService : IEmployeeBookingService
     }
 
     // =========================================================
+    // GET ALL MODULES
+    // =========================================================
+
+    public async Task<List<ModuleDropdownDto>> GetModulesAsync()
+    {
+        return await _bookingRepository.GetModulesAsync();
+    }
+
+    // =========================================================
     // EMAIL HTML
     // BOOKING CANCELLED
     // =========================================================

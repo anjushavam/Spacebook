@@ -1378,6 +1378,24 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     }
 
     // =========================================================
+    // GET ALL MODULES
+    // =========================================================
+
+    public async Task<List<ModuleDropdownDto>> GetModulesAsync()
+    {
+        return await _context.Modules
+            .AsNoTracking()
+            .OrderBy(m => m.ModuleId)
+            .Select(m => new ModuleDropdownDto
+            {
+                ModuleId = m.ModuleId,
+                OfficeId = m.OfficeId,
+                ModuleName = m.ModuleName
+            })
+            .ToListAsync();
+    }
+
+    // =========================================================
     // GET ROOM CAPACITY
     // =========================================================
 

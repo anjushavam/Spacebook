@@ -953,6 +953,33 @@ public class EmployeeController : ControllerBase
     }
 
     // =========================================================
+    // GET MODULES FOR DROPDOWN
+    // =========================================================
+
+    [HttpGet("modules")]
+    public async Task<IActionResult> GetModules()
+    {
+        try
+        {
+            var modules =
+                await _employeeBookingService
+                    .GetModulesAsync();
+
+            return Ok(modules);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                Message =
+                    "Unable to retrieve modules.",
+                Error =
+                    ex.Message
+            });
+        }
+    }
+
+    // =========================================================
     // GET ROOMS BY MODULE
     // =========================================================
 

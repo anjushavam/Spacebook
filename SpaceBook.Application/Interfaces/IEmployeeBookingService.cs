@@ -51,4 +51,10 @@ public interface IEmployeeBookingService
 
     Task<List<AvailableRoomDto>> GetRoomsByModuleAsync(
         string module);
+
+    // =========================================================
+    // GET ALL MODULES
+    // =========================================================
+
+    Task<List<ModuleDropdownDto>> GetModulesAsync();
 }

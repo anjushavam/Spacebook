@@ -87,6 +87,12 @@ public interface IEmployeeBookingRepository
         string module);
 
     // =========================================================
+    // GET ALL MODULES
+    // =========================================================
+
+    Task<List<ModuleDropdownDto>> GetModulesAsync();
+
+    // =========================================================
     // GET ROOM CAPACITY
     // =========================================================
 
