@@ -23,20 +23,14 @@ public class BookingRepository : IBookingRepository
     {
         return new BookingDashboardDto
         {
-            PendingRequests =
-                await _context.Bookings
-                    .CountAsync(x =>
-                        x.Status == "Pending"),
+            PendingRequests = await _context.Bookings
+                .CountAsync(x => x.Status == "Pending"),
 
-            Confirmed =
-                await _context.Bookings
-                    .CountAsync(x =>
-                        x.Status == "Approved"),
+            Confirmed = await _context.Bookings
+                .CountAsync(x => x.Status == "Approved"),
 
-            Cancelled =
-                await _context.Bookings
-                    .CountAsync(x =>
-                        x.Status == "Cancelled")
+            Cancelled = await _context.Bookings
+                .CountAsync(x => x.Status == "Cancelled")
         };
     }
 
@@ -49,9 +43,6 @@ public class BookingRepository : IBookingRepository
     {
         var query = _context.Bookings
             .AsNoTracking()
-            .Include(x => x.Room)
-                .ThenInclude(r => r!.Module)
-            .Include(x => x.Employee)
             .AsQueryable();
 
         // =====================================================
@@ -63,7 +54,8 @@ public class BookingRepository : IBookingRepository
             var search = filter.Search.Trim();
 
             query = query.Where(x =>
-                x.MeetingTitle.Contains(search) ||
+                (x.MeetingTitle != null &&
+                 x.MeetingTitle.Contains(search)) ||
 
                 (x.Room != null &&
                  x.Room.RoomName.Contains(search)) ||
@@ -94,35 +86,14 @@ public class BookingRepository : IBookingRepository
             .OrderByDescending(x => x.BookedOn)
             .Select(x => new BookingDto
             {
-                // -------------------------------------------------
-                // BOOKING
-                // -------------------------------------------------
+                BookingId = x.BookingId,
 
-                BookingId =
-                    x.BookingId,
-
-                // IMPORTANT:
-                // Map MeetingTitle explicitly.
-                // Previously this was missing, which caused
-                // meetingTitle to be returned as "".
-                MeetingTitle =
-                    x.MeetingTitle ?? string.Empty,
-
-                // -------------------------------------------------
-                // ROOM
-                // -------------------------------------------------
-
-                RoomId =
-                    x.RoomId,
+                RoomId = x.RoomId,
 
                 RoomName =
                     x.Room != null
                         ? x.Room.RoomName
                         : string.Empty,
-
-                // -------------------------------------------------
-                // MODULE
-                // -------------------------------------------------
 
                 Module =
                     x.Room != null &&
@@ -130,34 +101,21 @@ public class BookingRepository : IBookingRepository
                         ? x.Room.Module.ModuleName
                         : string.Empty,
 
-                // -------------------------------------------------
-                // EMPLOYEE
-                // -------------------------------------------------
-
                 EmployeeName =
                     x.Employee != null
                         ? x.Employee.Name
                         : string.Empty,
 
-                // -------------------------------------------------
-                // DATE / TIME
-                // -------------------------------------------------
+                MeetingTitle =
+                    x.MeetingTitle ?? string.Empty,
 
-                BookingDate =
-                    x.BookingDate,
+                BookingDate = x.BookingDate,
 
-                StartTime =
-                    x.StartTime,
+                StartTime = x.StartTime,
 
-                EndTime =
-                    x.EndTime,
+                EndTime = x.EndTime,
 
-                // -------------------------------------------------
-                // STATUS
-                // -------------------------------------------------
-
-                Status =
-                    x.Status
+                Status = x.Status
             })
             .Take(100)
             .ToListAsync();
@@ -172,49 +130,23 @@ public class BookingRepository : IBookingRepository
     {
         return await _context.Bookings
             .AsNoTracking()
-
-            .Include(x => x.Room)
-                .ThenInclude(r => r!.Module)
-
-            .Include(x => x.Employee)
-
-            .Where(x =>
-                x.BookingId == bookingId)
-
+            .Where(x => x.BookingId == bookingId)
             .Select(x => new BookingDetailsDto
             {
-                // -------------------------------------------------
-                // BOOKING
-                // -------------------------------------------------
+                BookingId = x.BookingId,
 
-                BookingId =
-                    x.BookingId,
-
-                EmployeeId =
-                    x.EmployeeId,
+                EmployeeId = x.EmployeeId,
 
                 MeetingTitle =
                     x.MeetingTitle ?? string.Empty,
 
-                // -------------------------------------------------
-                // PARTICIPANTS
-                // -------------------------------------------------
-
                 ParticipantCount =
                     x.ParticipantCount,
-
-                // -------------------------------------------------
-                // ROOM
-                // -------------------------------------------------
 
                 RoomName =
                     x.Room != null
                         ? x.Room.RoomName
                         : string.Empty,
-
-                // -------------------------------------------------
-                // MODULE
-                // -------------------------------------------------
 
                 Module =
                     x.Room != null &&
@@ -222,41 +154,20 @@ public class BookingRepository : IBookingRepository
                         ? x.Room.Module.ModuleName
                         : string.Empty,
 
-                // -------------------------------------------------
-                // EMPLOYEE
-                // -------------------------------------------------
-
                 EmployeeName =
                     x.Employee != null
                         ? x.Employee.Name
                         : string.Empty,
 
-                // -------------------------------------------------
-                // DATE / TIME
-                // -------------------------------------------------
+                BookingDate = x.BookingDate,
 
-                BookingDate =
-                    x.BookingDate,
+                StartTime = x.StartTime,
 
-                StartTime =
-                    x.StartTime,
+                EndTime = x.EndTime,
 
-                EndTime =
-                    x.EndTime,
+                Status = x.Status,
 
-                // -------------------------------------------------
-                // STATUS
-                // -------------------------------------------------
-
-                Status =
-                    x.Status,
-
-                // -------------------------------------------------
-                // CREATED DATE
-                // -------------------------------------------------
-
-                BookedOn =
-                    x.BookedOn
+                BookedOn = x.BookedOn
             })
             .FirstOrDefaultAsync();
     }
@@ -265,13 +176,11 @@ public class BookingRepository : IBookingRepository
     // DELETE BOOKING
     // =========================================================
 
-    public async Task DeleteAsync(
-        int bookingId)
+    public async Task DeleteAsync(int bookingId)
     {
-        var booking =
-            await _context.Bookings
-                .FirstOrDefaultAsync(x =>
-                    x.BookingId == bookingId);
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(x =>
+                x.BookingId == bookingId);
 
         if (booking == null)
         {
@@ -288,8 +197,7 @@ public class BookingRepository : IBookingRepository
     // CHECK BOOKING EXISTS
     // =========================================================
 
-    public async Task<bool> ExistsAsync(
-        int bookingId)
+    public async Task<bool> ExistsAsync(int bookingId)
     {
         return await _context.Bookings
             .AnyAsync(x =>
@@ -310,10 +218,8 @@ public class BookingRepository : IBookingRepository
             .AnyAsync(b =>
                 b.RoomId == roomId &&
                 b.BookingDate == bookingDate &&
-
                 b.Status != "Cancelled" &&
                 b.Status != "Rejected" &&
-
                 startTime < b.EndTime &&
                 endTime > b.StartTime);
     }
@@ -322,8 +228,7 @@ public class BookingRepository : IBookingRepository
     // CREATE BOOKING
     // =========================================================
 
-    public async Task AddAsync(
-        Booking booking)
+    public async Task AddAsync(Booking booking)
     {
         await _context.Bookings.AddAsync(booking);
 
