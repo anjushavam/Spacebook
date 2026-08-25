@@ -357,19 +357,19 @@ public class HotseatController : ControllerBase
                 expectedCheckInTime = expectedTimeOnly.HasValue ? expectedTimeOnly.Value.ToString("HH:mm") : null,
                 expectedCheckInTimeFormatted = expectedTimeOnly.HasValue ? expectedTimeOnly.Value.ToString("hh:mm tt") : null,
 
-                expectedCheckIn = b.CheckInDeadline,
-                checkInDeadline = b.CheckInDeadline,
+                expectedCheckIn = localDeadline.HasValue ? localDeadline.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
+                checkInDeadline = localDeadline.HasValue ? localDeadline.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
                 expectedCheckInLocal = localDeadline,
                 checkInDeadlineLocal = localDeadline,
 
                 status = b.BookingStatus,
                 bookingStatus = b.BookingStatus,
 
-                bookedOn = b.BookedOn,
-                bookedTime = b.BookedOn,
+                bookedOn = localBookedOn.HasValue ? localBookedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
+                bookedTime = localBookedOn.HasValue ? localBookedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
                 bookedOnLocal = localBookedOn,
 
-                checkInTime = b.CheckInTime,
+                checkInTime = localCheckInTime.HasValue ? localCheckInTime.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
                 checkInTimeLocal = localCheckInTime,
 
                 releasedOn = b.ReleasedOn
@@ -688,13 +688,13 @@ public class HotseatController : ControllerBase
                 expectedCheckInTime.ToString("hh:mm tt"),
 
             expectedCheckIn =
-                booking.CheckInDeadline,
+                localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
 
             expectedCheckInLocal =
                 localCheckInDateTime,
 
             checkInDeadline =
-                booking.CheckInDeadline,
+                localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
 
             checkInDeadlineLocal =
                 localCheckInDateTime,
@@ -703,7 +703,7 @@ public class HotseatController : ControllerBase
                 booking.BookingStatus,
 
             bookedOn =
-                booking.BookedOn
+                GetIndiaNow().ToString("yyyy-MM-ddTHH:mm:ss")
         });
     }
 
@@ -984,12 +984,12 @@ public class HotseatController : ControllerBase
             bookingDate = booking.BookingDate,
             expectedCheckInTime = newCheckInTime.ToString("HH:mm"),
             expectedCheckInTimeFormatted = newCheckInTime.ToString("hh:mm tt"),
-            expectedCheckIn = booking.CheckInDeadline,
+            expectedCheckIn = localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
             expectedCheckInLocal = localCheckInDateTime,
-            checkInDeadline = booking.CheckInDeadline,
+            checkInDeadline = localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
             checkInDeadlineLocal = localCheckInDateTime,
             bookingStatus = booking.BookingStatus,
-            modifiedOn = booking.RecordModifiedOn
+            modifiedOn = GetIndiaNow().ToString("yyyy-MM-ddTHH:mm:ss")
         });
     }
 
@@ -1167,7 +1167,7 @@ public class HotseatController : ControllerBase
                 booking.BookingStatus,
 
             checkInTime =
-                booking.CheckInTime
+                GetIndiaNow().ToString("yyyy-MM-ddTHH:mm:ss")
         });
     }
 
@@ -1307,7 +1307,7 @@ public class HotseatController : ControllerBase
                 booking.BookingStatus,
 
             modifiedOn =
-                booking.RecordModifiedOn
+                GetIndiaNow().ToString("yyyy-MM-ddTHH:mm:ss")
         });
     }
 
