@@ -21,13 +21,18 @@ public class HotseatRepository : IHotseatRepository
         string? module)
     {
         var query = _context.Seats
+            .AsNoTracking()
             .Include(s => s.Module)
-            .ThenInclude(m => m!.Office)
-            .ThenInclude(o => o!.Location)
+                .ThenInclude(m => m!.Office)
+                    .ThenInclude(o => o!.Location)
             .Where(s => s.IsActive)
             .AsQueryable();
 
-        // Filter by module
+        // =========================================================
+        // MODULE FILTER
+        // Works for ELCOT, TIDEL OIS, and future modules.
+        // =========================================================
+
         if (!string.IsNullOrWhiteSpace(module))
         {
             query = query.Where(s =>
@@ -35,7 +40,10 @@ public class HotseatRepository : IHotseatRepository
                 s.Module.ModuleName == module);
         }
 
-        // Filter by building
+        // =========================================================
+        // BUILDING FILTER
+        // =========================================================
+
         if (!string.IsNullOrWhiteSpace(building))
         {
             query = query.Where(s =>
@@ -44,7 +52,10 @@ public class HotseatRepository : IHotseatRepository
                 s.Module.Office.OfficeName == building);
         }
 
-        // Filter by city
+        // =========================================================
+        // CITY FILTER
+        // =========================================================
+
         if (!string.IsNullOrWhiteSpace(city))
         {
             query = query.Where(s =>
@@ -53,6 +64,10 @@ public class HotseatRepository : IHotseatRepository
                 s.Module.Office.Location != null &&
                 s.Module.Office.Location.LocationName == city);
         }
+
+        // =========================================================
+        // GET SEATS
+        // =========================================================
 
         var seats = await query
             .OrderBy(s => s.ModuleId)
@@ -66,11 +81,13 @@ public class HotseatRepository : IHotseatRepository
                 Row = s.RowNumber,
 
                 Status = date.HasValue
-                    ? _context.HotseatBookings.Any(h =>
-                        h.SeatId == s.SeatId &&
+                    ? s.HotseatBookings.Any(h =>
                         h.BookingDate == date.Value &&
-                        h.BookingStatus == "Confirmed")
-                        ? "Reserved"
+                        (
+                            h.BookingStatus == "Confirmed" ||
+                            h.BookingStatus == "CheckedIn"
+                        ))
+                        ? "Booked"
                         : "Vacant"
                     : "Vacant"
             })
