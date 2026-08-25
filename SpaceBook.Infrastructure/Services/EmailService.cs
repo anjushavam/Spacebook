@@ -1,8 +1,9 @@
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using MailKit.Net.Smtp;
-using MailKit.Security;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
+using Google.Apis.Auth.OAuth2.Responses;
+using Google.Apis.Gmail.v1;
+using Google.Apis.Gmail.v1.Data;
+using Google.Apis.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MimeKit;
@@ -25,7 +26,7 @@ public class EmailService : IEmailService
     }
 
     // =========================================================
-    // GENERIC EMAIL SENDER
+    // GENERIC EMAIL SENDER - GMAIL API
     // =========================================================
 
     public async Task SendEmailAsync(
@@ -41,316 +42,226 @@ public class EmailService : IEmailService
         }
 
         // =====================================================
-        // 1. TRY RESEND HTTPS API
+        // GMAIL API CONFIGURATION
         // =====================================================
 
-        var resendApiKey =
-            _configuration["Resend:ApiKey"]
-            ?? Environment.GetEnvironmentVariable("Resend__ApiKey")
-            ?? _configuration["RESEND_API_KEY"]
-            ?? Environment.GetEnvironmentVariable("RESEND_API_KEY");
+        var clientId =
+            _configuration["Gmail:ClientId"]
+            ?? Environment.GetEnvironmentVariable(
+                "Gmail__ClientId");
 
-        if (!string.IsNullOrWhiteSpace(resendApiKey))
-        {
-            try
-            {
-                _logger.LogInformation(
-                    "Attempting email through Resend API. To={To}, Subject={Subject}",
-                    toEmail,
-                    subject);
+        var clientSecret =
+            _configuration["Gmail:ClientSecret"]
+            ?? Environment.GetEnvironmentVariable(
+                "Gmail__ClientSecret");
 
-                var resendFrom =
-                    _configuration["Resend:From"]
-                    ?? Environment.GetEnvironmentVariable("Resend__From")
-                    ?? "SpaceBook <onboarding@resend.dev>";
+        var refreshToken =
+            _configuration["Gmail:RefreshToken"]
+            ?? Environment.GetEnvironmentVariable(
+                "Gmail__RefreshToken");
 
-                using var httpClient = new HttpClient
-                {
-                    Timeout = TimeSpan.FromSeconds(15)
-                };
-
-                httpClient.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue(
-                        "Bearer",
-                        resendApiKey.Trim());
-
-                var payload = new
-                {
-                    from = resendFrom,
-                    to = new[]
-                    {
-                        toEmail.Trim()
-                    },
-                    subject,
-                    html = isHtml ? body : null,
-                    text = !isHtml ? body : null
-                };
-
-                using var jsonContent =
-                    new StringContent(
-                        JsonSerializer.Serialize(payload),
-                        Encoding.UTF8,
-                        "application/json");
-
-                var response =
-                    await httpClient.PostAsync(
-                        "https://api.resend.com/emails",
-                        jsonContent);
-
-                var responseBody =
-                    await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
-                {
-                    _logger.LogInformation(
-                        "Email successfully sent to {To} via Resend. Response={Response}",
-                        toEmail,
-                        responseBody);
-
-                    return;
-                }
-
-                _logger.LogWarning(
-                    "Resend failed. Status={StatusCode}, Response={Response}. Falling back to SMTP.",
-                    response.StatusCode,
-                    responseBody);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Resend email failed for {To}. Falling back to SMTP.",
-                    toEmail);
-            }
-        }
+        var senderEmail =
+            _configuration["Gmail:SenderEmail"]
+            ?? Environment.GetEnvironmentVariable(
+                "Gmail__SenderEmail");
 
         // =====================================================
-        // 2. SMTP CONFIGURATION
-        // =====================================================
-        //
-        // Supports:
-        //
-        // Render:
-        // Smtp__Host
-        // Smtp__Port
-        // Smtp__Username
-        // Smtp__Password
-        // Smtp__From
-        // Smtp__SenderName
-        // Smtp__EnableSsl
-        //
-        // Also supports:
-        // EmailSettings__...
-        //
-        // =====================================================
-
-        var host =
-            _configuration["Smtp:Host"]
-            ?? Environment.GetEnvironmentVariable("Smtp__Host")
-            ?? _configuration["EmailSettings:Host"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__Host");
-
-        var portValue =
-            _configuration["Smtp:Port"]
-            ?? Environment.GetEnvironmentVariable("Smtp__Port")
-            ?? _configuration["EmailSettings:Port"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__Port");
-
-        var username =
-            _configuration["Smtp:Username"]
-            ?? Environment.GetEnvironmentVariable("Smtp__Username")
-            ?? _configuration["EmailSettings:Username"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__Username");
-
-        var password =
-            _configuration["Smtp:Password"]
-            ?? Environment.GetEnvironmentVariable("Smtp__Password")
-            ?? _configuration["EmailSettings:Password"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__Password");
-
-        var fromEmail =
-            _configuration["Smtp:From"]
-            ?? Environment.GetEnvironmentVariable("Smtp__From")
-            ?? _configuration["EmailSettings:FromEmail"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__FromEmail");
-
-        var senderName =
-            _configuration["Smtp:SenderName"]
-            ?? Environment.GetEnvironmentVariable("Smtp__SenderName")
-            ?? _configuration["EmailSettings:FromName"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__FromName")
-            ?? "SpaceBook";
-
-        var enableSslValue =
-            _configuration["Smtp:EnableSsl"]
-            ?? Environment.GetEnvironmentVariable("Smtp__EnableSsl")
-            ?? _configuration["EmailSettings:EnableSsl"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__EnableSsl");
-
-        // =====================================================
-        // SAFE CONFIGURATION DIAGNOSTIC
-        // =====================================================
-        //
-        // Does NOT print passwords or actual secret values.
+        // SAFE CONFIGURATION LOG
         // =====================================================
 
         _logger.LogInformation(
-            "SMTP configuration loaded: " +
-            "Host={HostConfigured}, " +
-            "Port={PortConfigured}, " +
-            "Username={UsernameConfigured}, " +
-            "Password={PasswordConfigured}, " +
-            "From={FromConfigured}, " +
-            "SSL={SslConfigured}",
-            !string.IsNullOrWhiteSpace(host),
-            !string.IsNullOrWhiteSpace(portValue),
-            !string.IsNullOrWhiteSpace(username),
-            !string.IsNullOrWhiteSpace(password),
-            !string.IsNullOrWhiteSpace(fromEmail),
-            !string.IsNullOrWhiteSpace(enableSslValue));
+            "Gmail API configuration loaded: " +
+            "ClientId={ClientIdConfigured}, " +
+            "ClientSecret={ClientSecretConfigured}, " +
+            "RefreshToken={RefreshTokenConfigured}, " +
+            "SenderEmail={SenderConfigured}",
+            !string.IsNullOrWhiteSpace(clientId),
+            !string.IsNullOrWhiteSpace(clientSecret),
+            !string.IsNullOrWhiteSpace(refreshToken),
+            !string.IsNullOrWhiteSpace(senderEmail));
 
         // =====================================================
-        // VALIDATE SMTP CONFIGURATION
+        // VALIDATE CONFIGURATION
         // =====================================================
 
-        if (string.IsNullOrWhiteSpace(host))
+        if (string.IsNullOrWhiteSpace(clientId))
         {
             throw new InvalidOperationException(
-                "SMTP Host is not configured.");
+                "Gmail ClientId is not configured.");
         }
 
-        if (string.IsNullOrWhiteSpace(username))
+        if (string.IsNullOrWhiteSpace(clientSecret))
         {
             throw new InvalidOperationException(
-                "SMTP Username is not configured.");
+                "Gmail ClientSecret is not configured.");
         }
 
-        if (string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(refreshToken))
         {
             throw new InvalidOperationException(
-                "SMTP Password is not configured.");
+                "Gmail RefreshToken is not configured.");
         }
 
-        if (string.IsNullOrWhiteSpace(fromEmail))
+        if (string.IsNullOrWhiteSpace(senderEmail))
         {
-            fromEmail = username;
+            throw new InvalidOperationException(
+                "Gmail SenderEmail is not configured.");
         }
-
-        // =====================================================
-        // PORT
-        // =====================================================
-
-        var port = 587;
-
-        if (!string.IsNullOrWhiteSpace(portValue) &&
-            int.TryParse(
-                portValue,
-                out var configuredPort))
-        {
-            port = configuredPort;
-        }
-
-        // =====================================================
-        // SSL
-        // =====================================================
-
-        var enableSsl = true;
-
-        if (!string.IsNullOrWhiteSpace(enableSslValue) &&
-            bool.TryParse(
-                enableSslValue,
-                out var configuredSsl))
-        {
-            enableSsl = configuredSsl;
-        }
-
-        // =====================================================
-        // SEND USING SMTP
-        // =====================================================
 
         try
         {
             _logger.LogInformation(
-                "Attempting SMTP email. To={To}, Host={Host}, Port={Port}",
+                "Attempting Gmail API email. " +
+                "From={From}, To={To}, Subject={Subject}",
+                senderEmail,
                 toEmail,
-                host,
-                port);
+                subject);
 
-            var cleanPassword =
-                password
-                    .Replace(" ", "")
-                    .Trim();
+            // =================================================
+            // CREATE GOOGLE OAUTH FLOW
+            // =================================================
 
-            var message = new MimeMessage();
+            var flow =
+                new GoogleAuthorizationCodeFlow(
+                    new GoogleAuthorizationCodeFlow.Initializer
+                    {
+                        ClientSecrets =
+                            new ClientSecrets
+                            {
+                                ClientId =
+                                    clientId.Trim(),
 
-            message.From.Add(
+                                ClientSecret =
+                                    clientSecret.Trim()
+                            }
+                    });
+
+            // =================================================
+            // LOAD REFRESH TOKEN
+            // =================================================
+
+            var tokenResponse =
+                new TokenResponse
+                {
+                    RefreshToken =
+                        refreshToken.Trim()
+                };
+
+            var credential =
+                new UserCredential(
+                    flow,
+                    senderEmail.Trim(),
+                    tokenResponse);
+
+            // =================================================
+            // CREATE GMAIL SERVICE
+            // =================================================
+
+            using var gmailService =
+                new GmailService(
+                    new BaseClientService.Initializer
+                    {
+                        HttpClientInitializer =
+                            credential,
+
+                        ApplicationName =
+                            "SpaceBook"
+                    });
+
+            // =================================================
+            // BUILD EMAIL
+            // =================================================
+
+            var email =
+                new MimeMessage();
+
+            email.From.Add(
                 new MailboxAddress(
-                    senderName,
-                    fromEmail));
+                    "SpaceBook",
+                    senderEmail.Trim()));
 
-            message.To.Add(
+            email.To.Add(
                 MailboxAddress.Parse(
                     toEmail.Trim()));
 
-            message.Subject = subject;
+            email.Subject =
+                subject;
 
-            var bodyBuilder = new BodyBuilder();
+            var bodyBuilder =
+                new BodyBuilder();
 
             if (isHtml)
             {
-                bodyBuilder.HtmlBody = body;
+                bodyBuilder.HtmlBody =
+                    body;
             }
             else
             {
-                bodyBuilder.TextBody = body;
+                bodyBuilder.TextBody =
+                    body;
             }
 
-            message.Body =
+            email.Body =
                 bodyBuilder.ToMessageBody();
 
-            using var client =
-                new SmtpClient();
+            // =================================================
+            // CONVERT MIME MESSAGE TO BASE64URL
+            // =================================================
 
-            client.Timeout = 15000;
+            using var stream =
+                new MemoryStream();
 
-            // Gmail:
-            // Port 587 -> STARTTLS
-            // Port 465 -> SSL on connect
-            var secureSocketOption =
-                !enableSsl
-                    ? SecureSocketOptions.None
-                    : port == 465
-                        ? SecureSocketOptions.SslOnConnect
-                        : SecureSocketOptions.StartTls;
+            await email.WriteToAsync(
+                stream);
 
-            await client.ConnectAsync(
-                host,
-                port,
-                secureSocketOption);
+            var rawMessage =
+                Convert
+                    .ToBase64String(
+                        stream.ToArray())
+                    .Replace(
+                        '+',
+                        '-')
+                    .Replace(
+                        '/',
+                        '_')
+                    .TrimEnd('=');
 
-            await client.AuthenticateAsync(
-                username.Trim(),
-                cleanPassword);
+            var gmailMessage =
+                new Message
+                {
+                    Raw =
+                        rawMessage
+                };
 
-            await client.SendAsync(
-                message);
+            // =================================================
+            // SEND THROUGH GMAIL API
+            // =================================================
 
-            await client.DisconnectAsync(
-                true);
+            var request =
+                gmailService
+                    .Users
+                    .Messages
+                    .Send(
+                        gmailMessage,
+                        "me");
+
+            var result =
+                await request.ExecuteAsync();
 
             _logger.LogInformation(
-                "Email successfully sent to {To}. Subject={Subject}",
+                "Gmail API email sent successfully. " +
+                "To={To}, MessageId={MessageId}",
                 toEmail,
-                subject);
+                result.Id);
         }
         catch (Exception ex)
         {
             _logger.LogError(
                 ex,
-                "SMTP email failed. To={To}, Host={Host}, Port={Port}",
+                "Gmail API email failed. " +
+                "To={To}, Subject={Subject}",
                 toEmail,
-                host,
-                port);
+                subject);
 
             throw;
         }
@@ -387,8 +298,6 @@ public class EmailService : IEmailService
 
         foreach (var email in validEmails)
         {
-            // Do not swallow exceptions.
-            // Caller must know if delivery failed.
             await SendEmailAsync(
                 email,
                 subject,
@@ -430,15 +339,15 @@ public class EmailService : IEmailService
             booking.Purpose
             ?? string.Empty;
 
-        // =====================================================
-        // EMPLOYEE CONFIRMATION
-        // =====================================================
-
         if (string.IsNullOrWhiteSpace(employeeEmail))
         {
             throw new InvalidOperationException(
                 $"Employee email is missing for BookingId={booking.BookingId}.");
         }
+
+        // =====================================================
+        // EMPLOYEE CONFIRMATION
+        // =====================================================
 
         var employeeSubject =
             $"SpaceBook Booking Confirmed - {meetingTitle}";
@@ -534,15 +443,15 @@ public class EmailService : IEmailService
             booking.Purpose
             ?? string.Empty;
 
-        // =====================================================
-        // EMPLOYEE START REMINDER
-        // =====================================================
-
         if (string.IsNullOrWhiteSpace(employeeEmail))
         {
             throw new InvalidOperationException(
                 $"Employee email is missing for BookingId={booking.BookingId}.");
         }
+
+        // =====================================================
+        // EMPLOYEE START REMINDER
+        // =====================================================
 
         const string employeeSubject =
             "SpaceBook Reminder - Booking Starts in 15 Minutes";
@@ -634,15 +543,15 @@ public class EmailService : IEmailService
                 ? booking.MeetingTitle
                 : "Room Booking";
 
-        // =====================================================
-        // EMPLOYEE END REMINDER
-        // =====================================================
-
         if (string.IsNullOrWhiteSpace(employeeEmail))
         {
             throw new InvalidOperationException(
                 $"Employee email is missing for BookingId={booking.BookingId}.");
         }
+
+        // =====================================================
+        // EMPLOYEE END REMINDER
+        // =====================================================
 
         const string employeeSubject =
             "SpaceBook Reminder - Booking Ends in 15 Minutes";
@@ -720,12 +629,9 @@ public class EmailService : IEmailService
         }
 
         var configAdminEmail =
-            _configuration["Smtp:AdminEmail"]
-            ?? Environment.GetEnvironmentVariable("Smtp__AdminEmail")
-            ?? _configuration["EmailSettings:AdminEmail"]
-            ?? Environment.GetEnvironmentVariable("EmailSettings__AdminEmail")
-            ?? _configuration["Resend:AdminEmail"]
-            ?? Environment.GetEnvironmentVariable("Resend__AdminEmail");
+            _configuration["Gmail:AdminEmail"]
+            ?? Environment.GetEnvironmentVariable(
+                "Gmail__AdminEmail");
 
         if (!string.IsNullOrWhiteSpace(
                 configAdminEmail))
