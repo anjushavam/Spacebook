@@ -29,6 +29,56 @@ public class EmployeeController : ControllerBase
     private static readonly TimeOnly OfficeEndTime =
         new TimeOnly(22, 0);
 
+    private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
+    {
+        try
+        {
+            // Linux / Render
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                // Windows
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            try
+            {
+                // Windows fallback
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
+    private static DateTime GetIndiaNow()
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, IndiaTimeZone);
+    }
+
+    private static DateOnly GetIndiaToday()
+    {
+        return DateOnly.FromDateTime(GetIndiaNow());
+    }
+
+    private static TimeOnly GetIndiaCurrentTime()
+    {
+        return TimeOnly.FromDateTime(GetIndiaNow());
+    }
+
     public EmployeeController(
         IEmployeeDashboardService dashboardService,
         IEmployeeBookingService employeeBookingService,
@@ -67,8 +117,7 @@ public class EmployeeController : ControllerBase
     private IActionResult? ValidateBookingDate(
         DateOnly bookingDate)
     {
-        var today =
-            DateOnly.FromDateTime(DateTime.Now);
+        var today = GetIndiaToday();
 
         // -----------------------------------------------------
         // PAST DATE
@@ -169,11 +218,9 @@ public class EmployeeController : ControllerBase
 
         if (checkCurrentTime &&
             bookingDate.HasValue &&
-            bookingDate.Value ==
-            DateOnly.FromDateTime(DateTime.Now))
+            bookingDate.Value == GetIndiaToday())
         {
-            var currentTime =
-                TimeOnly.FromDateTime(DateTime.Now);
+            var currentTime = GetIndiaCurrentTime();
 
             if (startTime <= currentTime)
             {

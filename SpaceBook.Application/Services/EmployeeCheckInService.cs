@@ -18,6 +18,43 @@ public class EmployeeCheckInService
 
 
 
+    private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
+    private static DateTime GetIndiaNow()
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, IndiaTimeZone);
+    }
+
     public async Task<CheckInDto> CheckInAsync(
         int bookingId,
         int employeeId)
@@ -45,7 +82,7 @@ public class EmployeeCheckInService
 
 
         var currentTime =
-            DateTime.Now;
+            GetIndiaNow();
 
 
 
