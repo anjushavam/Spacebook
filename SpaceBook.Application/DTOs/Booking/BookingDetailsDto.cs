@@ -8,8 +8,6 @@ public class BookingDetailsDto
 
     public string MeetingTitle { get; set; } = string.Empty;
 
-    public string Purpose { get; set; } = string.Empty;
-
     public int ParticipantCount { get; set; }
 
     public string RoomName { get; set; } = string.Empty;

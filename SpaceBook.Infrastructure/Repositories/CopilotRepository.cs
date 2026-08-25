@@ -396,10 +396,6 @@ public class CopilotRepository : ICopilotRepository
                             ? null
                             : new CopilotCurrentBookingDto
                             {
-                                Purpose =
-                                    currentBooking.Purpose
-                                    ?? string.Empty,
-
                                 StartTime =
                                     currentBooking.StartTime,
 

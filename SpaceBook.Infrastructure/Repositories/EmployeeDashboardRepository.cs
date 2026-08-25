@@ -106,15 +106,6 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                 {
                     BookingId = x.BookingId,
 
-                    Purpose =
-                        !string.IsNullOrWhiteSpace(x.Purpose)
-                            ? x.Purpose
-                            : (
-                                !string.IsNullOrWhiteSpace(x.MeetingTitle)
-                                    ? x.MeetingTitle
-                                    : "Reserved Workspace"
-                              ),
-
                     RoomName =
                         x.Room != null
                             ? x.Room.RoomName
@@ -457,16 +448,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                             ? null
                             : new BookingPreviewDto
                             {
-                                Purpose =
-                                    !string.IsNullOrWhiteSpace(
-                                        currentBooking.Purpose)
-                                        ? currentBooking.Purpose
-                                        : (
-                                            !string.IsNullOrWhiteSpace(
-                                                currentBooking.MeetingTitle)
-                                                ? currentBooking.MeetingTitle
-                                                : "Reserved Workspace"
-                                          ),
+                
 
                                 StartTime =
                                     currentBooking.StartTime,
@@ -639,16 +621,7 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                             ? x.Room.Module.ModuleName
                             : string.Empty,
 
-                    Purpose =
-                        !string.IsNullOrWhiteSpace(
-                            x.Purpose)
-                            ? x.Purpose
-                            : (
-                                !string.IsNullOrWhiteSpace(
-                                    x.MeetingTitle)
-                                    ? x.MeetingTitle
-                                    : "Reserved Workspace"
-                              ),
+                    // Purpose removed; UI uses MeetingTitle where needed
 
                     BookingDate =
                         x.BookingDate,

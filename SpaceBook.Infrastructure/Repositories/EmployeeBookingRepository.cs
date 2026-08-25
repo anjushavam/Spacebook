@@ -543,9 +543,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 MeetingTitle =
                     b.MeetingTitle,
 
-                Purpose =
-                    b.Purpose,
-
                 Status =
                     b.Status,
 
@@ -901,23 +898,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 request.MeetingTitle.Trim();
         }
 
-        // -----------------------------------------------------
-        // UPDATE PURPOSE
-        // -----------------------------------------------------
-        //
-        // Kept for backward compatibility with existing
-        // Booking / DTO structure.
-        //
-        // If Purpose has been completely removed from your
-        // UpdateBookingRequestDto, this block can be removed.
-        // -----------------------------------------------------
-
-        if (!string.IsNullOrWhiteSpace(
-            request.Purpose))
-        {
-            booking.Purpose =
-                request.Purpose.Trim();
-        }
+        // Purpose field removed from DTOs; no update required
 
         // -----------------------------------------------------
         // UPDATE PARTICIPANT COUNT

@@ -4,7 +4,6 @@ public class TodayMeetingDto
 {
     public int BookingId { get; set; }
 
-    public string Purpose { get; set; } = string.Empty;
 
     public string RoomName { get; set; } = string.Empty;
 

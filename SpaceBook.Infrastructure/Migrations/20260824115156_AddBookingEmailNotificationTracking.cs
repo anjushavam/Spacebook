@@ -197,7 +197,6 @@ namespace SpaceBook.Infrastructure.Migrations
                     roomid = table.Column<int>(type: "integer", nullable: false),
                     employeeid = table.Column<int>(type: "integer", nullable: false),
                     meetingtitle = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    purpose = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     participantcount = table.Column<int>(type: "integer", nullable: false),
                     bookingdate = table.Column<DateOnly>(type: "date", nullable: false),
                     starttime = table.Column<TimeOnly>(type: "time without time zone", nullable: false),

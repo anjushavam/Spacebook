@@ -643,7 +643,7 @@ public class ReportRepository : IReportRepository
                 var timeWindow = $"\"{b.StartTime:HH:mm} - {b.EndTime:HH:mm}\"";
                 var status = EscapeCsv(b.Status);
                 var bookedOn = b.BookedOn.ToString("yyyy-MM-dd HH:mm:ss");
-                var details = EscapeCsv(!string.IsNullOrWhiteSpace(b.MeetingTitle) ? b.MeetingTitle : b.Purpose);
+                var details = EscapeCsv(b.MeetingTitle);
 
                 sb.AppendLine($"\"Room Booking\",{b.BookingId},{empName},{empEmail},{empDept},{resourceName},{moduleName},{type},{bookingDate},{timeWindow},{status},{bookedOn},{details}");
             }
@@ -721,8 +721,8 @@ public class ReportRepository : IReportRepository
                 .ThenByDescending(b => b.StartTime)
                 .ToListAsync();
 
-            // CSV Header with full Employee and Room details
-            sb.AppendLine("Booking ID,Meeting Title,Purpose,Employee Name,Employee Email,Department,Room Name,Room Number,Module,Room Type,Capacity,Participant Count,Booking Date,Start Time,End Time,Status,Booked On,Cancellation Reason");
+            // CSV Header with full Employee and Room details (Purpose removed)
+            sb.AppendLine("Booking ID,Meeting Title,Employee Name,Employee Email,Department,Room Name,Room Number,Module,Room Type,Capacity,Participant Count,Booking Date,Start Time,End Time,Status,Booked On,Cancellation Reason");
 
             foreach (var b in bookings)
             {
@@ -730,7 +730,6 @@ public class ReportRepository : IReportRepository
                 var employeeEmail = EscapeCsv(b.Employee?.Email);
                 var department = EscapeCsv(b.Employee?.Department);
                 var meetingTitle = EscapeCsv(b.MeetingTitle);
-                var purpose = EscapeCsv(b.Purpose);
                 var roomName = EscapeCsv(b.Room?.RoomName);
                 var roomNumber = EscapeCsv(b.Room?.RoomNumber);
                 var moduleName = EscapeCsv(b.Room?.Module?.ModuleName);
@@ -744,7 +743,7 @@ public class ReportRepository : IReportRepository
                 var bookedOn = b.BookedOn.ToString("yyyy-MM-dd HH:mm:ss");
                 var cancellationReason = EscapeCsv(b.CancellationReason);
 
-                sb.AppendLine($"{b.BookingId},{meetingTitle},{purpose},{employeeName},{employeeEmail},{department},{roomName},{roomNumber},{moduleName},{roomType},{capacity},{participantCount},{bookingDate},{startTime},{endTime},{status},{bookedOn},{cancellationReason}");
+                sb.AppendLine($"{b.BookingId},{meetingTitle},{employeeName},{employeeEmail},{department},{roomName},{roomNumber},{moduleName},{roomType},{capacity},{participantCount},{bookingDate},{startTime},{endTime},{status},{bookedOn},{cancellationReason}");
             }
         }
 

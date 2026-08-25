@@ -64,7 +64,7 @@ public class BookingRepository : IBookingRepository
                 filter.Search.Trim();
 
             query = query.Where(x =>
-                x.Purpose.Contains(search) ||
+                x.MeetingTitle.Contains(search) ||
 
                 (x.Room != null &&
                  x.Room.RoomName.Contains(search)) ||
@@ -95,8 +95,7 @@ public class BookingRepository : IBookingRepository
                 BookingId =
                     x.BookingId,
 
-                Purpose =
-                    x.Purpose,
+                // Purpose field removed; use MeetingTitle instead when needed
 
                 RoomName =
                     x.Room != null
@@ -159,8 +158,7 @@ public class BookingRepository : IBookingRepository
                 MeetingTitle =
                     x.MeetingTitle,
 
-                Purpose =
-                    x.Purpose,
+                // Purpose field removed; use MeetingTitle instead when needed
 
                 ParticipantCount =
                     x.ParticipantCount,

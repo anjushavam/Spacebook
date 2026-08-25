@@ -218,12 +218,8 @@ public class EmailService : IEmailService
                 Convert
                     .ToBase64String(
                         stream.ToArray())
-                    .Replace(
-                        '+',
-                        '-')
-                    .Replace(
-                        '/',
-                        '_')
+                    .Replace('+', '-')
+                    .Replace('/', '_')
                     .TrimEnd('=');
 
             var gmailMessage =
@@ -318,8 +314,7 @@ public class EmailService : IEmailService
         IEnumerable<string> adminEmails)
     {
         var employeeName =
-            !string.IsNullOrWhiteSpace(
-                employee?.Name)
+            !string.IsNullOrWhiteSpace(employee?.Name)
                 ? employee.Name
                 : "Colleague";
 
@@ -334,10 +329,6 @@ public class EmailService : IEmailService
                 booking.MeetingTitle)
                 ? booking.MeetingTitle
                 : "Room Booking";
-
-        var purpose =
-            booking.Purpose
-            ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(employeeEmail))
         {
@@ -356,7 +347,6 @@ public class EmailService : IEmailService
             BuildConfirmationEmailHtml(
                 employeeName,
                 meetingTitle,
-                purpose,
                 roomName,
                 booking.BookingDate,
                 booking.StartTime,
@@ -389,7 +379,6 @@ public class EmailService : IEmailService
                     employee?.Department
                         ?? string.Empty,
                     meetingTitle,
-                    purpose,
                     roomName,
                     booking.BookingDate,
                     booking.StartTime,
@@ -422,8 +411,7 @@ public class EmailService : IEmailService
         IEnumerable<string> adminEmails)
     {
         var employeeName =
-            !string.IsNullOrWhiteSpace(
-                employee?.Name)
+            !string.IsNullOrWhiteSpace(employee?.Name)
                 ? employee.Name
                 : "Colleague";
 
@@ -438,10 +426,6 @@ public class EmailService : IEmailService
                 booking.MeetingTitle)
                 ? booking.MeetingTitle
                 : "Room Booking";
-
-        var purpose =
-            booking.Purpose
-            ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(employeeEmail))
         {
@@ -460,7 +444,6 @@ public class EmailService : IEmailService
             BuildStartReminderEmailHtml(
                 employeeName,
                 meetingTitle,
-                purpose,
                 roomName,
                 booking.BookingDate,
                 booking.StartTime,
@@ -493,7 +476,6 @@ public class EmailService : IEmailService
                     employee?.Department
                         ?? string.Empty,
                     meetingTitle,
-                    purpose,
                     roomName,
                     booking.BookingDate,
                     booking.StartTime,
@@ -526,8 +508,7 @@ public class EmailService : IEmailService
         IEnumerable<string> adminEmails)
     {
         var employeeName =
-            !string.IsNullOrWhiteSpace(
-                employee?.Name)
+            !string.IsNullOrWhiteSpace(employee?.Name)
                 ? employee.Name
                 : "Colleague";
 
@@ -715,23 +696,12 @@ public class EmailService : IEmailService
     private static string BuildConfirmationEmailHtml(
         string employeeName,
         string meetingTitle,
-        string purpose,
         string roomName,
         DateOnly bookingDate,
         TimeOnly startTime,
         TimeOnly endTime,
         int participantCount)
     {
-        var purposeRow =
-            !string.IsNullOrWhiteSpace(purpose)
-                ? $"""
-                   <tr>
-                       <td><strong>Purpose:</strong></td>
-                       <td>{purpose}</td>
-                   </tr>
-                   """
-                : string.Empty;
-
         return $"""
         <!DOCTYPE html>
         <html>
@@ -803,8 +773,6 @@ public class EmailService : IEmailService
                                 <td>{meetingTitle}</td>
                             </tr>
 
-                            {purposeRow}
-
                             <tr>
                                 <td><strong>Room:</strong></td>
                                 <td>{roomName}</td>
@@ -850,6 +818,7 @@ public class EmailService : IEmailService
                             Regards,<br>
                             <strong>SpaceBook</strong>
                         </p>
+
                     </td>
                 </tr>
 
@@ -860,7 +829,9 @@ public class EmailService : IEmailService
                         background:#f1f5f9;
                         color:#64748b;
                         font-size:12px;">
+
                         This is an automated notification from SpaceBook.
+
                     </td>
                 </tr>
 
@@ -879,7 +850,6 @@ public class EmailService : IEmailService
         string employeeEmail,
         string department,
         string meetingTitle,
-        string purpose,
         string roomName,
         DateOnly bookingDate,
         TimeOnly startTime,
@@ -892,16 +862,6 @@ public class EmailService : IEmailService
                    <tr>
                        <td><strong>Department:</strong></td>
                        <td>{department}</td>
-                   </tr>
-                   """
-                : string.Empty;
-
-        var purposeRow =
-            !string.IsNullOrWhiteSpace(purpose)
-                ? $"""
-                   <tr>
-                       <td><strong>Purpose:</strong></td>
-                       <td>{purpose}</td>
                    </tr>
                    """
                 : string.Empty;
@@ -960,8 +920,6 @@ public class EmailService : IEmailService
                         <td>{meetingTitle}</td>
                     </tr>
 
-                    {purposeRow}
-
                     <tr>
                         <td><strong>Room:</strong></td>
                         <td>{roomName}</td>
@@ -998,6 +956,7 @@ public class EmailService : IEmailService
                     Regards,<br>
                     <strong>SpaceBook</strong>
                 </p>
+
             </div>
         </body>
         </html>
@@ -1011,23 +970,12 @@ public class EmailService : IEmailService
     private static string BuildStartReminderEmailHtml(
         string employeeName,
         string meetingTitle,
-        string purpose,
         string roomName,
         DateOnly bookingDate,
         TimeOnly startTime,
         TimeOnly endTime,
         int participantCount)
     {
-        var purposeRow =
-            !string.IsNullOrWhiteSpace(purpose)
-                ? $"""
-                   <tr>
-                       <td><strong>Purpose:</strong></td>
-                       <td>{purpose}</td>
-                   </tr>
-                   """
-                : string.Empty;
-
         return $"""
         <!DOCTYPE html>
         <html>
@@ -1050,7 +998,9 @@ public class EmailService : IEmailService
                 padding:28px;
                 border-radius:12px;">
 
-                <h1>SpaceBook</h1>
+                <h1>
+                    SpaceBook
+                </h1>
 
                 <h2>
                     Hello {employeeName},
@@ -1073,8 +1023,6 @@ public class EmailService : IEmailService
                         <td><strong>Meeting:</strong></td>
                         <td>{meetingTitle}</td>
                     </tr>
-
-                    {purposeRow}
 
                     <tr>
                         <td><strong>Room:</strong></td>
@@ -1111,6 +1059,7 @@ public class EmailService : IEmailService
                     Regards,<br>
                     <strong>SpaceBook</strong>
                 </p>
+
             </div>
         </body>
         </html>
@@ -1126,7 +1075,6 @@ public class EmailService : IEmailService
         string employeeEmail,
         string department,
         string meetingTitle,
-        string purpose,
         string roomName,
         DateOnly bookingDate,
         TimeOnly startTime,
@@ -1139,16 +1087,6 @@ public class EmailService : IEmailService
                    <tr>
                        <td><strong>Department:</strong></td>
                        <td>{department}</td>
-                   </tr>
-                   """
-                : string.Empty;
-
-        var purposeRow =
-            !string.IsNullOrWhiteSpace(purpose)
-                ? $"""
-                   <tr>
-                       <td><strong>Purpose:</strong></td>
-                       <td>{purpose}</td>
                    </tr>
                    """
                 : string.Empty;
@@ -1195,8 +1133,6 @@ public class EmailService : IEmailService
                         <td><strong>Meeting:</strong></td>
                         <td>{meetingTitle}</td>
                     </tr>
-
-                    {purposeRow}
 
                     <tr>
                         <td><strong>Room:</strong></td>

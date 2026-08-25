@@ -26,10 +26,6 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
                .HasMaxLength(200)
                .IsRequired();
 
-        builder.Property(x => x.Purpose)
-               .HasColumnName("purpose")
-               .HasMaxLength(255)
-               .IsRequired();
 
         builder.Property(x => x.ParticipantCount)
                .HasColumnName("participantcount")

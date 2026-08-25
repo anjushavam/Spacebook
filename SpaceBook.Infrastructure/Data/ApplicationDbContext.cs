@@ -450,10 +450,6 @@ public class ApplicationDbContext : DbContext
                 .HasMaxLength(200)
                 .IsRequired();
 
-            entity.Property(x => x.Purpose)
-                .HasColumnName("purpose")
-                .HasMaxLength(500)
-                .IsRequired();
 
             entity.Property(x => x.ParticipantCount)
                 .HasColumnName("participantcount")

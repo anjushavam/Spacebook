@@ -2,7 +2,6 @@ namespace SpaceBook.Application.DTOs.Copilot;
 
 public class CopilotCurrentBookingDto
 {
-    public string Purpose { get; set; } = string.Empty;
 
     public TimeOnly StartTime { get; set; }
 

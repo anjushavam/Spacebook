@@ -4,7 +4,6 @@ public class UpdateBookingRequestDto
 {
     public string MeetingTitle { get; set; } = string.Empty;
 
-    public string Purpose { get; set; } = string.Empty;
 
     // Nullable because the Edit screen does not select a room.
     // If RoomId is not sent, backend will keep the existing room.

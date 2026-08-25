@@ -11,7 +11,6 @@ public class MyBookingDto
     public string RoomName { get; set; } = string.Empty;
     
  public string Module { get; set; } = string.Empty;
-    public string Purpose { get; set; } = string.Empty;
  
     public DateOnly BookingDate { get; set; }
  

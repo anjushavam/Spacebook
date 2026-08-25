@@ -11,9 +11,6 @@ public class Booking
     public string MeetingTitle { get; set; } =
         string.Empty;
 
-    public string Purpose { get; set; } =
-        string.Empty;
-
     public int ParticipantCount { get; set; }
 
     public DateOnly BookingDate { get; set; }

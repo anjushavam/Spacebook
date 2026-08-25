@@ -6,7 +6,6 @@ public class BookingDto
 
     public int RoomId { get; set; }
 
-    public string Purpose { get; set; } = string.Empty;
 
     public string RoomName { get; set; } = string.Empty;
 

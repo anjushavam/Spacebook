@@ -68,12 +68,6 @@ namespace SpaceBook.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("participantcount");
 
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("purpose");
-
                     b.Property<int>("RoomId")
                         .HasColumnType("integer")
                         .HasColumnName("roomid");
