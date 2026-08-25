@@ -6,12 +6,13 @@ public class BookingDto
 
     public int RoomId { get; set; }
 
-
     public string RoomName { get; set; } = string.Empty;
 
     public string Module { get; set; } = string.Empty;
 
     public string EmployeeName { get; set; } = string.Empty;
+
+    public string MeetingTitle { get; set; } = string.Empty;
 
     public DateOnly BookingDate { get; set; }
 
