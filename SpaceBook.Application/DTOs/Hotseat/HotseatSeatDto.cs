@@ -1,5 +1,9 @@
+namespace SpaceBook.Application.DTOs.Hotseat;
+
 public class HotseatSeatDto
 {
+    public int SeatId { get; set; }
+
     public string SeatNumber { get; set; } = string.Empty;
 
     public string Section { get; set; } = string.Empty;

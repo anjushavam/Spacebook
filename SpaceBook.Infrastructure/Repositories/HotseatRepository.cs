@@ -35,9 +35,10 @@ public class HotseatRepository : IHotseatRepository
 
         if (!string.IsNullOrWhiteSpace(module))
         {
+            var trimmedModule = module.Trim().ToLower();
             query = query.Where(s =>
                 s.Module != null &&
-                s.Module.ModuleName == module);
+                s.Module.ModuleName.ToLower() == trimmedModule);
         }
 
         // =========================================================
@@ -46,10 +47,11 @@ public class HotseatRepository : IHotseatRepository
 
         if (!string.IsNullOrWhiteSpace(building))
         {
+            var trimmedBuilding = building.Trim().ToLower();
             query = query.Where(s =>
                 s.Module != null &&
                 s.Module.Office != null &&
-                s.Module.Office.OfficeName == building);
+                s.Module.Office.OfficeName.ToLower() == trimmedBuilding);
         }
 
         // =========================================================
@@ -58,11 +60,12 @@ public class HotseatRepository : IHotseatRepository
 
         if (!string.IsNullOrWhiteSpace(city))
         {
+            var trimmedCity = city.Trim().ToLower();
             query = query.Where(s =>
                 s.Module != null &&
                 s.Module.Office != null &&
                 s.Module.Office.Location != null &&
-                s.Module.Office.Location.LocationName == city);
+                s.Module.Office.Location.LocationName.ToLower() == trimmedCity);
         }
 
         // =========================================================
@@ -76,6 +79,7 @@ public class HotseatRepository : IHotseatRepository
             .ThenBy(s => s.ColumnNumber)
             .Select(s => new HotseatSeatDto
             {
+                SeatId = s.SeatId,
                 SeatNumber = s.SeatNumber,
                 Section = s.Section ?? "",
                 Row = s.RowNumber,

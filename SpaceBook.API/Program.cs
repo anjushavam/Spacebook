@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using SpaceBook.Application.Common.JsonConverters;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Application.Services;
 using SpaceBook.Infrastructure.Authentication;
@@ -32,10 +33,17 @@ Environment.SetEnvironmentVariable(
 var builder = WebApplication.CreateBuilder(args);
 
 // =====================================================
-// Controllers
+// Controllers & JSON Serialization
 // =====================================================
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new DateOnlyJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new NullableDateOnlyJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new NullableTimeOnlyJsonConverter());
+    });
 
 // =====================================================
 // PostgreSQL / Entity Framework Core

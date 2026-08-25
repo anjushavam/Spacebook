@@ -17,6 +17,53 @@ public class HotseatController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly INotificationRepository _notificationRepository;
 
+    private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
+    {
+        try
+        {
+            // Linux / Render
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                // Windows
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            try
+            {
+                // Windows fallback
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
+    private static DateTime GetIndiaNow()
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.UtcNow,
+            IndiaTimeZone);
+    }
+
+    private static DateOnly GetIndiaToday()
+    {
+        return DateOnly.FromDateTime(GetIndiaNow());
+    }
+
     public HotseatController(
         ApplicationDbContext context,
         INotificationRepository notificationRepository)
@@ -73,13 +120,11 @@ public class HotseatController : ControllerBase
     // GET: api/Hotseat
     //
     // Examples:
-    //
     // /api/Hotseat
     // /api/Hotseat?date=2026-08-25
     // /api/Hotseat?module=Tidel OIS Module 1
     // /api/Hotseat?building=Tidel Park
     // /api/Hotseat?city=Chennai
-    //
     // ============================================================
 
     [HttpGet]
@@ -97,15 +142,21 @@ public class HotseatController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(date))
         {
-            if (!DateOnly.TryParse(date, out var parsedDate))
+            if (DateOnly.TryParse(date, out var parsedDate))
+            {
+                bookingDate = parsedDate;
+            }
+            else if (DateTime.TryParse(date, out var parsedDateTime))
+            {
+                bookingDate = DateOnly.FromDateTime(parsedDateTime);
+            }
+            else
             {
                 return BadRequest(new
                 {
                     message = "Invalid date format. Use yyyy-MM-dd."
                 });
             }
-
-            bookingDate = parsedDate;
         }
 
         // --------------------------------------------------------
@@ -122,15 +173,15 @@ public class HotseatController : ControllerBase
 
         // --------------------------------------------------------
         // 3. MODULE FILTER
-        //
-        // Generic - works for ELCOT and Tidel OIS.
+        // Generic - works for ELCOT, Tidel OIS, etc.
         // --------------------------------------------------------
 
         if (!string.IsNullOrWhiteSpace(module))
         {
+            var trimmedModule = module.Trim().ToLower();
             seatsQuery = seatsQuery.Where(s =>
                 s.Module != null &&
-                s.Module.ModuleName == module);
+                s.Module.ModuleName.ToLower() == trimmedModule);
         }
 
         // --------------------------------------------------------
@@ -139,10 +190,11 @@ public class HotseatController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(building))
         {
+            var trimmedBuilding = building.Trim().ToLower();
             seatsQuery = seatsQuery.Where(s =>
                 s.Module != null &&
                 s.Module.Office != null &&
-                s.Module.Office.OfficeName == building);
+                s.Module.Office.OfficeName.ToLower() == trimmedBuilding);
         }
 
         // --------------------------------------------------------
@@ -151,11 +203,12 @@ public class HotseatController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(city))
         {
+            var trimmedCity = city.Trim().ToLower();
             seatsQuery = seatsQuery.Where(s =>
                 s.Module != null &&
                 s.Module.Office != null &&
                 s.Module.Office.Location != null &&
-                s.Module.Office.Location.LocationName == city);
+                s.Module.Office.Location.LocationName.ToLower() == trimmedCity);
         }
 
         // --------------------------------------------------------
@@ -195,6 +248,8 @@ public class HotseatController : ControllerBase
         var result = seats
             .Select(s => new HotseatSeatDto
             {
+                SeatId = s.SeatId,
+
                 SeatNumber = s.SeatNumber,
 
                 Section = s.Section,
@@ -234,11 +289,14 @@ public class HotseatController : ControllerBase
             .Where(b => b.EmployeeId == employeeId)
             .Include(b => b.Seat)
                 .ThenInclude(s => s!.Module)
+                    .ThenInclude(m => m!.Office)
+                        .ThenInclude(o => o!.Location)
             .OrderByDescending(b => b.BookingDate)
             .ThenByDescending(b => b.BookedOn)
             .Select(b => new
             {
                 bookingId = b.HotseatBookingId,
+                hotseatBookingId = b.HotseatBookingId,
 
                 seatId = b.SeatId,
 
@@ -253,15 +311,40 @@ public class HotseatController : ControllerBase
                         ? b.Seat.Module.ModuleName
                         : "",
 
+                moduleName =
+                    b.Seat != null &&
+                    b.Seat.Module != null
+                        ? b.Seat.Module.ModuleName
+                        : "",
+
+                building =
+                    b.Seat != null &&
+                    b.Seat.Module != null &&
+                    b.Seat.Module.Office != null
+                        ? b.Seat.Module.Office.OfficeName
+                        : "",
+
+                city =
+                    b.Seat != null &&
+                    b.Seat.Module != null &&
+                    b.Seat.Module.Office != null &&
+                    b.Seat.Module.Office.Location != null
+                        ? b.Seat.Module.Office.Location.LocationName
+                        : "",
+
                 type = "Hot Seat",
 
                 date = b.BookingDate,
+                bookingDate = b.BookingDate,
 
                 expectedCheckIn = b.CheckInDeadline,
+                checkInDeadline = b.CheckInDeadline,
 
                 status = b.BookingStatus,
+                bookingStatus = b.BookingStatus,
 
                 bookedOn = b.BookedOn,
+                bookedTime = b.BookedOn,
 
                 checkInTime = b.CheckInTime,
 
@@ -293,10 +376,17 @@ public class HotseatController : ControllerBase
         // VALIDATE DATE
         // --------------------------------------------------------
 
-        var todayUtc =
-            DateOnly.FromDateTime(DateTime.UtcNow);
+        if (request.BookingDate == default)
+        {
+            return BadRequest(new
+            {
+                message = "Booking date is required."
+            });
+        }
 
-        if (request.BookingDate < todayUtc)
+        var today = GetIndiaToday();
+
+        if (request.BookingDate < today)
         {
             return BadRequest(new
             {
@@ -335,6 +425,36 @@ public class HotseatController : ControllerBase
             {
                 message = "Employee not found or inactive."
             });
+        }
+
+        // --------------------------------------------------------
+        // RESOLVE SEAT IF SEAT NUMBER WAS PROVIDED
+        // --------------------------------------------------------
+
+        if (request.SeatId <= 0 && !string.IsNullOrWhiteSpace(request.SeatNumber))
+        {
+            var seatQuery = _context.Seats
+                .Include(s => s.Module)
+                    .ThenInclude(m => m!.Office)
+                        .ThenInclude(o => o!.Location)
+                .Where(s =>
+                    s.IsActive &&
+                    s.SeatNumber.ToLower() == request.SeatNumber.Trim().ToLower());
+
+            var moduleFilter = request.ModuleName ?? request.Module;
+            if (!string.IsNullOrWhiteSpace(moduleFilter))
+            {
+                var trimmedModule = moduleFilter.Trim().ToLower();
+                seatQuery = seatQuery.Where(s =>
+                    s.Module != null &&
+                    s.Module.ModuleName.ToLower() == trimmedModule);
+            }
+
+            var matchedSeat = await seatQuery.FirstOrDefaultAsync();
+            if (matchedSeat != null)
+            {
+                request.SeatId = matchedSeat.SeatId;
+            }
         }
 
         // --------------------------------------------------------
@@ -428,11 +548,13 @@ public class HotseatController : ControllerBase
             request.ExpectedCheckInTime ??
             new TimeOnly(9, 0, 0);
 
+        var localCheckInDateTime =
+            request.BookingDate.ToDateTime(expectedCheckInTime);
+
         var checkInDeadlineUtc =
-            DateTime.SpecifyKind(
-                request.BookingDate.ToDateTime(
-                    expectedCheckInTime),
-                DateTimeKind.Utc);
+            TimeZoneInfo.ConvertTimeToUtc(
+                localCheckInDateTime,
+                IndiaTimeZone);
 
         // --------------------------------------------------------
         // CREATE BOOKING
@@ -606,10 +728,17 @@ public class HotseatController : ControllerBase
             });
         }
 
-        var todayUtc =
-            DateOnly.FromDateTime(DateTime.UtcNow);
+        if (request.BookingDate == default)
+        {
+            return BadRequest(new
+            {
+                message = "Booking date is required."
+            });
+        }
 
-        if (request.BookingDate < todayUtc)
+        var today = GetIndiaToday();
+
+        if (request.BookingDate < today)
         {
             return BadRequest(new
             {
@@ -680,10 +809,13 @@ public class HotseatController : ControllerBase
             request.ExpectedCheckInTime ??
             new TimeOnly(9, 0, 0);
 
+        var localCheckInDateTime =
+            request.BookingDate.ToDateTime(checkInTime);
+
         var checkInDeadlineUtc =
-            DateTime.SpecifyKind(
-                request.BookingDate.ToDateTime(checkInTime),
-                DateTimeKind.Utc);
+            TimeZoneInfo.ConvertTimeToUtc(
+                localCheckInDateTime,
+                IndiaTimeZone);
 
         booking.SeatId =
             request.SeatId;
@@ -861,10 +993,9 @@ public class HotseatController : ControllerBase
             });
         }
 
-        var todayUtc =
-            DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetIndiaToday();
 
-        if (booking.BookingDate != todayUtc)
+        if (booking.BookingDate != today)
         {
             return BadRequest(new
             {
@@ -1088,8 +1219,7 @@ public class HotseatController : ControllerBase
     [HttpGet("stats")]
     public async Task<ActionResult<HotseatStatsDto>> GetStats()
     {
-        var today =
-            DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetIndiaToday();
 
         // --------------------------------------------------------
         // TOTAL ACTIVE SEATS
