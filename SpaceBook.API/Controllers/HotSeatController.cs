@@ -284,7 +284,7 @@ public class HotseatController : ControllerBase
             });
         }
 
-        var bookings = await _context.HotseatBookings
+        var rawBookings = await _context.HotseatBookings
             .AsNoTracking()
             .Where(b => b.EmployeeId == employeeId)
             .Include(b => b.Seat)
@@ -293,7 +293,24 @@ public class HotseatController : ControllerBase
                         .ThenInclude(o => o!.Location)
             .OrderByDescending(b => b.BookingDate)
             .ThenByDescending(b => b.BookedOn)
-            .Select(b => new
+            .ToListAsync();
+
+        var bookings = rawBookings.Select(b =>
+        {
+            DateTime? localDeadline = b.CheckInDeadline.HasValue
+                ? TimeZoneInfo.ConvertTimeFromUtc(b.CheckInDeadline.Value, IndiaTimeZone)
+                : null;
+
+            TimeOnly? expectedTimeOnly = localDeadline.HasValue
+                ? TimeOnly.FromDateTime(localDeadline.Value)
+                : null;
+
+            DateTime? localBookedOn = TimeZoneInfo.ConvertTimeFromUtc(b.BookedOn, IndiaTimeZone);
+            DateTime? localCheckInTime = b.CheckInTime.HasValue
+                ? TimeZoneInfo.ConvertTimeFromUtc(b.CheckInTime.Value, IndiaTimeZone)
+                : null;
+
+            return new
             {
                 bookingId = b.HotseatBookingId,
                 hotseatBookingId = b.HotseatBookingId,
@@ -337,20 +354,27 @@ public class HotseatController : ControllerBase
                 date = b.BookingDate,
                 bookingDate = b.BookingDate,
 
+                expectedCheckInTime = expectedTimeOnly.HasValue ? expectedTimeOnly.Value.ToString("HH:mm") : null,
+                expectedCheckInTimeFormatted = expectedTimeOnly.HasValue ? expectedTimeOnly.Value.ToString("hh:mm tt") : null,
+
                 expectedCheckIn = b.CheckInDeadline,
                 checkInDeadline = b.CheckInDeadline,
+                expectedCheckInLocal = localDeadline,
+                checkInDeadlineLocal = localDeadline,
 
                 status = b.BookingStatus,
                 bookingStatus = b.BookingStatus,
 
                 bookedOn = b.BookedOn,
                 bookedTime = b.BookedOn,
+                bookedOnLocal = localBookedOn,
 
                 checkInTime = b.CheckInTime,
+                checkInTimeLocal = localCheckInTime,
 
                 releasedOn = b.ReleasedOn
-            })
-            .ToListAsync();
+            };
+        }).ToList();
 
         return Ok(bookings);
     }
@@ -657,14 +681,29 @@ public class HotseatController : ControllerBase
             bookingDate =
                 booking.BookingDate,
 
+            expectedCheckInTime =
+                expectedCheckInTime.ToString("HH:mm"),
+
+            expectedCheckInTimeFormatted =
+                expectedCheckInTime.ToString("hh:mm tt"),
+
+            expectedCheckIn =
+                booking.CheckInDeadline,
+
+            expectedCheckInLocal =
+                localCheckInDateTime,
+
+            checkInDeadline =
+                booking.CheckInDeadline,
+
+            checkInDeadlineLocal =
+                localCheckInDateTime,
+
             bookingStatus =
                 booking.BookingStatus,
 
             bookedOn =
-                booking.BookedOn,
-
-            checkInDeadline =
-                booking.CheckInDeadline
+                booking.BookedOn
         });
     }
 
@@ -943,8 +982,12 @@ public class HotseatController : ControllerBase
             building = seat.Module?.Office?.OfficeName,
             city = seat.Module?.Office?.Location?.LocationName,
             bookingDate = booking.BookingDate,
+            expectedCheckInTime = newCheckInTime.ToString("HH:mm"),
+            expectedCheckInTimeFormatted = newCheckInTime.ToString("hh:mm tt"),
             expectedCheckIn = booking.CheckInDeadline,
+            expectedCheckInLocal = localCheckInDateTime,
             checkInDeadline = booking.CheckInDeadline,
+            checkInDeadlineLocal = localCheckInDateTime,
             bookingStatus = booking.BookingStatus,
             modifiedOn = booking.RecordModifiedOn
         });
