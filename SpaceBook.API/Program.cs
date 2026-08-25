@@ -70,6 +70,7 @@ builder.Services.AddCors(options =>
                 "https://spacebook211-fcms-1bpe04jye-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook-frontend-v64o.onrender.com",
                 "https://spacebooks.duckdns.org",
+                "https://spacebook-u1qc.onrender.com",
                 "https://spacebook211-98989-cs4tdldnv-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook211-98989-acn15v4y5-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook211-98989-g6itccmhu-dvikash211-5241s-projects.vercel.app"
