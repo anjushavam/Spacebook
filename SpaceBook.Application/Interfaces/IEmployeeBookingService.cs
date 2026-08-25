@@ -1,9 +1,18 @@
 using SpaceBook.Application.DTOs.Booking;
+using SpaceBook.Application.DTOs.Room;
 
 namespace SpaceBook.Application.Interfaces;
 
 public interface IEmployeeBookingService
 {
+    // =========================================================
+    // GET ROOM TYPES BY MODULE
+    // =========================================================
+
+    Task<List<RoomTypeDto>> GetRoomTypesByModuleAsync(
+        string? module,
+        int? moduleId);
+
     // =========================================================
     // CREATE BOOKING
     // =========================================================

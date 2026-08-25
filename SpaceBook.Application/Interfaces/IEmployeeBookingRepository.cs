@@ -1,4 +1,5 @@
 using SpaceBook.Application.DTOs.Booking;
+using SpaceBook.Application.DTOs.Room;
 using SpaceBook.Domain.Entities;
 
 namespace SpaceBook.Application.Interfaces;
@@ -16,6 +17,14 @@ public interface IEmployeeBookingRepository
     // =========================================================
 
     Task SaveChangesAsync();
+
+    // =========================================================
+    // GET ROOM TYPES BY MODULE
+    // =========================================================
+
+    Task<List<RoomTypeDto>> GetRoomTypesByModuleAsync(
+        string? module,
+        int? moduleId);
 
     // =========================================================
     // CHECK ROOM AVAILABILITY

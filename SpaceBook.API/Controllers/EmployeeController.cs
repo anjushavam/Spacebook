@@ -980,6 +980,41 @@ public class EmployeeController : ControllerBase
     }
 
     // =========================================================
+    // GET ROOM TYPES (CASCADING / DEPENDENT ON MODULE)
+    // Examples:
+    // GET /api/employee/room-types
+    // GET /api/employee/room-types?module=Module 1 - Elcot Park - CMB
+    // GET /api/employee/room-types?moduleId=1
+    // =========================================================
+
+    [HttpGet("room-types")]
+    public async Task<IActionResult> GetRoomTypes(
+        [FromQuery] string? module,
+        [FromQuery] int? moduleId)
+    {
+        try
+        {
+            var roomTypes =
+                await _employeeBookingService
+                    .GetRoomTypesByModuleAsync(
+                        module,
+                        moduleId);
+
+            return Ok(roomTypes);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                Message =
+                    "Unable to retrieve room types.",
+                Error =
+                    ex.Message
+            });
+        }
+    }
+
+    // =========================================================
     // GET ROOMS BY MODULE
     // =========================================================
 

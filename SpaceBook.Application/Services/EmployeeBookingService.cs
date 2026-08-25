@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SpaceBook.Application.DTOs.Booking;
+using SpaceBook.Application.DTOs.Room;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
 using SpaceBook.Domain.Enums;
@@ -1382,6 +1383,20 @@ public class EmployeeBookingService : IEmployeeBookingService
         return await _bookingRepository
             .GetRoomsByModuleAsync(
                 module.Trim());
+    }
+
+    // =========================================================
+    // GET ROOM TYPES BY MODULE
+    // =========================================================
+
+    public async Task<List<RoomTypeDto>> GetRoomTypesByModuleAsync(
+        string? module,
+        int? moduleId)
+    {
+        return await _bookingRepository
+            .GetRoomTypesByModuleAsync(
+                module,
+                moduleId);
     }
 
     // =========================================================

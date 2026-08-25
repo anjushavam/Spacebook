@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SpaceBook.Application.DTOs.Booking;
+using SpaceBook.Application.DTOs.Room;
 using SpaceBook.Application.Interfaces;
 using SpaceBook.Domain.Entities;
 using SpaceBook.Infrastructure.Data;
@@ -1375,6 +1376,62 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             })
 
             .ToListAsync();
+    }
+
+    // =========================================================
+    // GET ROOM TYPES BY MODULE
+    // =========================================================
+
+    public async Task<List<RoomTypeDto>> GetRoomTypesByModuleAsync(
+        string? module,
+        int? moduleId)
+    {
+        var query = _context.Rooms
+            .AsNoTracking()
+            .Include(r => r.RoomType)
+            .Include(r => r.Module)
+            .Where(r =>
+                !r.IsBlocked &&
+                r.Status != "Blocked" &&
+                r.RoomType != null);
+
+        if (!string.IsNullOrWhiteSpace(module))
+        {
+            var trimmedModule = module.Trim().ToLower();
+            query = query.Where(r =>
+                r.Module != null &&
+                r.Module.ModuleName.ToLower() == trimmedModule);
+        }
+        else if (moduleId.HasValue && moduleId.Value > 0)
+        {
+            query = query.Where(r =>
+                r.ModuleId == moduleId.Value);
+        }
+
+        var roomTypes = await query
+            .Select(r => new RoomTypeDto
+            {
+                RoomTypeId = r.RoomType!.RoomTypeId,
+                TypeName = r.RoomType.TypeName
+            })
+            .Distinct()
+            .OrderBy(rt => rt.RoomTypeId)
+            .ToListAsync();
+
+        if (!roomTypes.Any() && string.IsNullOrWhiteSpace(module) && (!moduleId.HasValue || moduleId.Value <= 0))
+        {
+            return await _context.RoomTypes
+                .AsNoTracking()
+                .OrderBy(rt => rt.RoomTypeId)
+                .Select(rt => new RoomTypeDto
+                {
+                    RoomTypeId = rt.RoomTypeId,
+                    TypeName = rt.TypeName
+                })
+                .ToListAsync();
+        }
+
+        return roomTypes;
     }
 
     // =========================================================
