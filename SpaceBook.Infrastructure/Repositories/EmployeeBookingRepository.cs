@@ -27,16 +27,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // =========================================================
     // INDIA TIMEZONE
     // =========================================================
-    //
-    // Windows:
-    // India Standard Time
-    //
-    // Linux / Render:
-    // Asia/Kolkata
-    //
-    // The application runs on Render, so we use
-    // Asia/Kolkata there.
-    // =========================================================
 
     private static readonly TimeZoneInfo IndiaTimeZone =
         GetIndiaTimeZone();
@@ -45,16 +35,19 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     {
         try
         {
+            // Linux / Render
             return TimeZoneInfo.FindSystemTimeZoneById(
                 "Asia/Kolkata");
         }
         catch (TimeZoneNotFoundException)
         {
+            // Windows
             return TimeZoneInfo.FindSystemTimeZoneById(
                 "India Standard Time");
         }
         catch (InvalidTimeZoneException)
         {
+            // Windows fallback
             return TimeZoneInfo.FindSystemTimeZoneById(
                 "India Standard Time");
         }
@@ -90,6 +83,10 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         return TimeOnly.FromDateTime(
             GetIndiaNow());
     }
+
+    // =========================================================
+    // CONSTRUCTOR
+    // =========================================================
 
     public EmployeeBookingRepository(
         ApplicationDbContext context)
@@ -129,6 +126,24 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             throw new Exception(
                 "Employee ID is required.");
         }
+
+        // -----------------------------------------------------
+        // VALIDATE MEETING TITLE
+        // -----------------------------------------------------
+        //
+        // MeetingTitle is now the field used for the booking
+        // title. Do not use Purpose here.
+        // -----------------------------------------------------
+
+        if (string.IsNullOrWhiteSpace(
+            booking.MeetingTitle))
+        {
+            throw new Exception(
+                "Meeting title is required.");
+        }
+
+        booking.MeetingTitle =
+            booking.MeetingTitle.Trim();
 
         // -----------------------------------------------------
         // VALIDATE BOOKING DATE
@@ -207,10 +222,11 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // CHECK ROOM
         // -----------------------------------------------------
 
-        var room = await _context.Rooms
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r =>
-                r.RoomId == booking.RoomId);
+        var room =
+            await _context.Rooms
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r =>
+                    r.RoomId == booking.RoomId);
 
         if (room == null)
         {
@@ -264,10 +280,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
         //
         // PostgreSQL timestamp with time zone requires UTC.
-        //
-        // IMPORTANT:
-        // Business time is IST.
-        // Database timestamp is UTC.
         // -----------------------------------------------------
 
         booking.BookedOn =
@@ -283,7 +295,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // AUTO APPROVE BOOKING
         // -----------------------------------------------------
 
-        booking.Status = "Approved";
+        booking.Status =
+            "Approved";
 
         // -----------------------------------------------------
         // ADD BOOKING
@@ -361,7 +374,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // VALIDATE PAST DATE
         // -----------------------------------------------------
 
-        var today = GetIndiaToday();
+        var today =
+            GetIndiaToday();
 
         if (bookingDate < today)
         {
@@ -373,7 +387,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // CHECK OVERLAPPING BOOKINGS
         // -----------------------------------------------------
         //
-        // Existing:
+        // Existing booking:
+        //
         // Start < Requested End
         // End   > Requested Start
         //
@@ -406,10 +421,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         TimeOnly endTime,
         int excludeBookingId)
     {
-        // -----------------------------------------------------
-        // VALIDATE ROOM ID
-        // -----------------------------------------------------
-
         if (roomId <= 0)
         {
             throw new Exception(
@@ -511,11 +522,19 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
             .Select(b => new BookingDetailsDto
             {
+                // -------------------------------------------------
+                // BOOKING INFORMATION
+                // -------------------------------------------------
+
                 BookingId =
                     b.BookingId,
 
                 EmployeeId =
                     b.EmployeeId,
+
+                // -------------------------------------------------
+                // ROOM INFORMATION
+                // -------------------------------------------------
 
                 RoomName =
                     b.Room != null
@@ -528,6 +547,10 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                         ? b.Room.Module.ModuleName
                         : string.Empty,
 
+                // -------------------------------------------------
+                // DATE / TIME
+                // -------------------------------------------------
+
                 BookingDate =
                     b.BookingDate,
 
@@ -537,14 +560,26 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 EndTime =
                     b.EndTime,
 
+                // -------------------------------------------------
+                // MEETING INFORMATION
+                // -------------------------------------------------
+
+                MeetingTitle =
+                    b.MeetingTitle ?? string.Empty,
+
                 ParticipantCount =
                     b.ParticipantCount,
 
-                MeetingTitle =
-                    b.MeetingTitle,
+                // -------------------------------------------------
+                // STATUS
+                // -------------------------------------------------
 
                 Status =
                     b.Status,
+
+                // -------------------------------------------------
+                // BOOKED ON
+                // -------------------------------------------------
 
                 BookedOn =
                     b.BookedOn
@@ -763,7 +798,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE DATE USING INDIA TIME
+        // VALIDATE DATE
         // -----------------------------------------------------
 
         var today =
@@ -878,17 +913,11 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             request.EndTime;
 
         // -----------------------------------------------------
-        // RESET REMINDER FLAGS
-        // -----------------------------------------------------
-
-        booking.StartReminderSent =
-            false;
-
-        booking.EndReminderSent =
-            false;
-
-        // -----------------------------------------------------
         // UPDATE MEETING TITLE
+        // -----------------------------------------------------
+        //
+        // Only update if a title was supplied.
+        // Existing title is preserved otherwise.
         // -----------------------------------------------------
 
         if (!string.IsNullOrWhiteSpace(
@@ -898,14 +927,22 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 request.MeetingTitle.Trim();
         }
 
-        // Purpose field removed from DTOs; no update required
-
         // -----------------------------------------------------
         // UPDATE PARTICIPANT COUNT
         // -----------------------------------------------------
 
         booking.ParticipantCount =
             request.ParticipantCount;
+
+        // -----------------------------------------------------
+        // RESET REMINDER FLAGS
+        // -----------------------------------------------------
+
+        booking.StartReminderSent =
+            false;
+
+        booking.EndReminderSent =
+            false;
 
         // -----------------------------------------------------
         // CLEAR CANCELLATION DATA

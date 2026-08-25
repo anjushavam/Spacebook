@@ -15,4 +15,5 @@ public class RecentReservationDto
     public TimeOnly EndTime { get; set; }
 
     public string Status { get; set; } = string.Empty;
+    public string? MeetingTitle { get; set; }
 }
