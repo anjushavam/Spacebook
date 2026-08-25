@@ -9,6 +9,44 @@ public class ReportRepository : IReportRepository
 {
     private readonly ApplicationDbContext _context;
 
+    private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
+    private static DateOnly GetIndiaToday()
+    {
+        var indiaNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, IndiaTimeZone);
+        return DateOnly.FromDateTime(indiaNow);
+    }
+
     public ReportRepository(ApplicationDbContext context)
     {
         _context = context;
@@ -333,8 +371,7 @@ public class ReportRepository : IReportRepository
     public async Task<WorkplaceAnalyticsDto> GetWorkplaceAnalyticsAsync(
         ReportFilterDto filter)
     {
-        var now = DateTime.Now;
-        var today = DateOnly.FromDateTime(now);
+        var today = GetIndiaToday();
 
         // Determine Date Range from Timeframe
         DateOnly? startDate = filter.StartDate;

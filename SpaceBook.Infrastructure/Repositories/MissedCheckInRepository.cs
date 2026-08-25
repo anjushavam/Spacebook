@@ -10,6 +10,43 @@ public class MissedCheckInRepository
 {
     private readonly ApplicationDbContext _context;
 
+    private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
+    private static DateOnly GetIndiaToday()
+    {
+        var indiaNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, IndiaTimeZone);
+        return DateOnly.FromDateTime(indiaNow);
+    }
 
     public MissedCheckInRepository(
         ApplicationDbContext context)
@@ -20,9 +57,7 @@ public class MissedCheckInRepository
 
     public async Task<List<Booking>> GetTodayApprovedBookingsAsync()
     {
-        var today = DateOnly.FromDateTime(
-            DateTime.Now);
-
+        var today = GetIndiaToday();
 
         return await _context.Bookings
             .Where(b =>

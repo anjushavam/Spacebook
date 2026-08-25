@@ -8,6 +8,42 @@ public class MissedCheckInService
     private readonly IMissedCheckInRepository _repository;
     private readonly INotificationRepository _notificationRepository;
 
+    private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+            catch
+            {
+                return TimeZoneInfo.Utc;
+            }
+        }
+    }
+
+    private static DateTime GetIndiaNow()
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, IndiaTimeZone);
+    }
 
     public MissedCheckInService(
         IMissedCheckInRepository repository,
@@ -37,7 +73,7 @@ public class MissedCheckInService
 
 
             if(!checkedIn &&
-               DateTime.Now >
+               GetIndiaNow() >
                bookingStartTime.AddMinutes(10))
             {
 
