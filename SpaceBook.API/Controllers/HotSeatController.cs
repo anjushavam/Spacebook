@@ -670,19 +670,19 @@ public class HotseatController : ControllerBase
 
     // ============================================================
     // PUT: api/Hotseat/{id}
-    // UPDATE HOTSEAT BOOKING
+    // UPDATE HOTSEAT BOOKING (EDIT SEAT, DATE, OR CHECK-IN TIME)
     // ============================================================
 
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateBooking(
         int id,
-        [FromBody] CreateHotseatBookingDto request)
+        [FromBody] UpdateHotseatBookingDto request)
     {
         if (request == null)
         {
             return BadRequest(new
             {
-                message = "Booking request is required."
+                message = "Booking update request is required."
             });
         }
 
@@ -700,6 +700,10 @@ public class HotseatController : ControllerBase
 
         var booking =
             await _context.HotseatBookings
+                .Include(b => b.Seat)
+                    .ThenInclude(s => s!.Module)
+                        .ThenInclude(m => m!.Office)
+                            .ThenInclude(o => o!.Location)
                 .FirstOrDefaultAsync(b =>
                     b.HotseatBookingId == id);
 
@@ -724,21 +728,34 @@ public class HotseatController : ControllerBase
             return BadRequest(new
             {
                 message =
-                    "Only confirmed bookings can be edited."
+                    $"Only confirmed bookings can be edited. Current status is '{booking.BookingStatus}'."
             });
         }
 
-        if (request.BookingDate == default)
+        // --------------------------------------------------------
+        // CHECK-IN DEADLINE VALIDATION
+        // Check-in time / booking can only be edited BEFORE the deadline
+        // --------------------------------------------------------
+
+        if (booking.CheckInDeadline.HasValue && DateTime.UtcNow > booking.CheckInDeadline.Value)
         {
             return BadRequest(new
             {
-                message = "Booking date is required."
+                message = "Check-in time cannot be edited after the check-in deadline has passed."
             });
         }
 
+        // --------------------------------------------------------
+        // TARGET BOOKING DATE
+        // --------------------------------------------------------
+
+        var targetBookingDate = request.BookingDate.HasValue && request.BookingDate.Value != default
+            ? request.BookingDate.Value
+            : booking.BookingDate;
+
         var today = GetIndiaToday();
 
-        if (request.BookingDate < today)
+        if (targetBookingDate < today)
         {
             return BadRequest(new
             {
@@ -746,14 +763,48 @@ public class HotseatController : ControllerBase
             });
         }
 
-        var seat =
-            await _context.Seats
+        // --------------------------------------------------------
+        // TARGET SEAT RESOLUTION
+        // --------------------------------------------------------
+
+        int targetSeatId = request.SeatId.HasValue && request.SeatId.Value > 0
+            ? request.SeatId.Value
+            : booking.SeatId;
+
+        if (!string.IsNullOrWhiteSpace(request.SeatNumber) && (!request.SeatId.HasValue || request.SeatId.Value <= 0))
+        {
+            var seatQuery = _context.Seats
                 .Include(s => s.Module)
-                    .ThenInclude(m => m!.Office)
-                        .ThenInclude(o => o!.Location)
-                .FirstOrDefaultAsync(s =>
-                    s.SeatId == request.SeatId &&
-                    s.IsActive);
+                .Where(s =>
+                    s.IsActive &&
+                    s.SeatNumber.ToLower() == request.SeatNumber.Trim().ToLower());
+
+            var moduleFilter = !string.IsNullOrWhiteSpace(request.ModuleName)
+                ? request.ModuleName
+                : request.Module;
+
+            if (!string.IsNullOrWhiteSpace(moduleFilter))
+            {
+                var trimmedModule = moduleFilter.Trim().ToLower();
+                seatQuery = seatQuery.Where(s =>
+                    s.Module != null &&
+                    s.Module.ModuleName.ToLower() == trimmedModule);
+            }
+
+            var matchedSeat = await seatQuery.FirstOrDefaultAsync();
+            if (matchedSeat != null)
+            {
+                targetSeatId = matchedSeat.SeatId;
+            }
+        }
+
+        var seat = await _context.Seats
+            .Include(s => s.Module)
+                .ThenInclude(m => m!.Office)
+                    .ThenInclude(o => o!.Location)
+            .FirstOrDefaultAsync(s =>
+                s.SeatId == targetSeatId &&
+                s.IsActive);
 
         if (seat == null)
         {
@@ -763,13 +814,17 @@ public class HotseatController : ControllerBase
             });
         }
 
+        // --------------------------------------------------------
+        // PREVENT SEAT OVERLAP (IF SEAT OR DATE CHANGED)
+        // --------------------------------------------------------
+
         var seatAlreadyBooked =
             await _context.HotseatBookings
                 .AsNoTracking()
                 .AnyAsync(b =>
                     b.HotseatBookingId != id &&
-                    b.SeatId == request.SeatId &&
-                    b.BookingDate == request.BookingDate &&
+                    b.SeatId == targetSeatId &&
+                    b.BookingDate == targetBookingDate &&
                     (
                         b.BookingStatus == "Confirmed" ||
                         b.BookingStatus == "CheckedIn"
@@ -784,13 +839,17 @@ public class HotseatController : ControllerBase
             });
         }
 
+        // --------------------------------------------------------
+        // PREVENT EMPLOYEE DUPLICATE (IF DATE CHANGED)
+        // --------------------------------------------------------
+
         var employeeAlreadyBooked =
             await _context.HotseatBookings
                 .AsNoTracking()
                 .AnyAsync(b =>
                     b.HotseatBookingId != id &&
                     b.EmployeeId == employeeId &&
-                    b.BookingDate == request.BookingDate &&
+                    b.BookingDate == targetBookingDate &&
                     (
                         b.BookingStatus == "Confirmed" ||
                         b.BookingStatus == "CheckedIn"
@@ -805,32 +864,52 @@ public class HotseatController : ControllerBase
             });
         }
 
-        var checkInTime =
-            request.ExpectedCheckInTime ??
-            new TimeOnly(9, 0, 0);
+        // --------------------------------------------------------
+        // CALCULATE NEW CHECK-IN DEADLINE
+        // --------------------------------------------------------
 
-        var localCheckInDateTime =
-            request.BookingDate.ToDateTime(checkInTime);
+        TimeOnly newCheckInTime;
 
-        var checkInDeadlineUtc =
-            TimeZoneInfo.ConvertTimeToUtc(
-                localCheckInDateTime,
+        if (request.ExpectedCheckInTime.HasValue)
+        {
+            newCheckInTime = request.ExpectedCheckInTime.Value;
+        }
+        else if (booking.CheckInDeadline.HasValue)
+        {
+            var existingLocalDeadline = TimeZoneInfo.ConvertTimeFromUtc(
+                booking.CheckInDeadline.Value,
                 IndiaTimeZone);
+            newCheckInTime = TimeOnly.FromDateTime(existingLocalDeadline);
+        }
+        else
+        {
+            newCheckInTime = new TimeOnly(9, 0, 0);
+        }
 
-        booking.SeatId =
-            request.SeatId;
+        var localCheckInDateTime = targetBookingDate.ToDateTime(newCheckInTime);
 
-        booking.BookingDate =
-            request.BookingDate;
+        var checkInDeadlineUtc = TimeZoneInfo.ConvertTimeToUtc(
+            localCheckInDateTime,
+            IndiaTimeZone);
 
-        booking.CheckInDeadline =
-            checkInDeadlineUtc;
+        // If updating for today, new check-in deadline must not be in the past
+        if (targetBookingDate == today && checkInDeadlineUtc < DateTime.UtcNow)
+        {
+            return BadRequest(new
+            {
+                message = "New expected check-in time cannot be in the past."
+            });
+        }
 
-        booking.RecordModifiedBy =
-            employeeId.ToString();
+        // --------------------------------------------------------
+        // SAVE CHANGES
+        // --------------------------------------------------------
 
-        booking.RecordModifiedOn =
-            DateTime.UtcNow;
+        booking.SeatId = targetSeatId;
+        booking.BookingDate = targetBookingDate;
+        booking.CheckInDeadline = checkInDeadlineUtc;
+        booking.RecordModifiedBy = employeeId.ToString();
+        booking.RecordModifiedOn = DateTime.UtcNow;
 
         try
         {
@@ -842,7 +921,6 @@ public class HotseatController : ControllerBase
             {
                 message =
                     "An error occurred while updating the hotseat booking.",
-
                 detail =
                     ex.InnerException?.Message ??
                     ex.Message
@@ -852,45 +930,23 @@ public class HotseatController : ControllerBase
         await CreateHotseatNotificationAsync(
             employeeId,
             booking.HotseatBookingId,
-
-            $"Your hotseat booking has been updated to " +
-            $"{seat.SeatNumber} on " +
-            $"{booking.BookingDate:dd-MMM-yyyy}.");
+            $"Your hotseat booking has been updated for {seat.SeatNumber} " +
+            $"on {booking.BookingDate:dd-MMM-yyyy} (Check-in time: {newCheckInTime:HH:mm}).");
 
         return Ok(new
         {
-            message =
-                "Hotseat booking updated successfully.",
-
-            bookingId =
-                booking.HotseatBookingId,
-
-            seatId =
-                booking.SeatId,
-
-            seatNumber =
-                seat.SeatNumber,
-
-            module =
-                seat.Module?.ModuleName,
-
-            building =
-                seat.Module?.Office?.OfficeName,
-
-            city =
-                seat.Module?.Office?.Location?.LocationName,
-
-            bookingDate =
-                booking.BookingDate,
-
-            bookingStatus =
-                booking.BookingStatus,
-
-            checkInDeadline =
-                booking.CheckInDeadline,
-
-            modifiedOn =
-                booking.RecordModifiedOn
+            message = "Hotseat booking updated successfully.",
+            bookingId = booking.HotseatBookingId,
+            seatId = booking.SeatId,
+            seatNumber = seat.SeatNumber,
+            module = seat.Module?.ModuleName,
+            building = seat.Module?.Office?.OfficeName,
+            city = seat.Module?.Office?.Location?.LocationName,
+            bookingDate = booking.BookingDate,
+            expectedCheckIn = booking.CheckInDeadline,
+            checkInDeadline = booking.CheckInDeadline,
+            bookingStatus = booking.BookingStatus,
+            modifiedOn = booking.RecordModifiedOn
         });
     }
 
