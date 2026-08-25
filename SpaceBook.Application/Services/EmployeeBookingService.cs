@@ -18,8 +18,11 @@ public class EmployeeBookingService : IEmployeeBookingService
     // =========================================================
     // OFFICE HOURS
     // =========================================================
-    // Booking/Search Hours:
-    // 10:00 AM to 10:00 PM
+    //
+    // SpaceBook business hours:
+    //
+    // 10:00 AM - 10:00 PM IST
+    //
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
@@ -28,22 +31,71 @@ public class EmployeeBookingService : IEmployeeBookingService
     private static readonly TimeOnly OfficeEndTime =
         new TimeOnly(22, 0);
 
-    public EmployeeBookingService(
-        IEmployeeBookingRepository bookingRepository,
-        INotificationRepository notificationRepository,
-        IEmailService emailService,
-        IServiceScopeFactory scopeFactory,
-        ILogger<EmployeeBookingService> logger)
+    // =========================================================
+    // INDIA TIMEZONE
+    // =========================================================
+
+    private static readonly TimeZoneInfo IndiaTimeZone =
+        GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
     {
-        _bookingRepository = bookingRepository;
-        _notificationRepository = notificationRepository;
-        _emailService = emailService;
-        _scopeFactory = scopeFactory;
-        _logger = logger;
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(
+                "Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(
+                "India Standard Time");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(
+                "India Standard Time");
+        }
+    }
+
+    // =========================================================
+    // GET CURRENT INDIA DATE/TIME
+    // =========================================================
+
+    private static DateTime GetIndiaNow()
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.UtcNow,
+            IndiaTimeZone);
+    }
+
+    // =========================================================
+    // GET CURRENT INDIA DATE
+    // =========================================================
+
+    private static DateOnly GetIndiaToday()
+    {
+        return DateOnly.FromDateTime(
+            GetIndiaNow());
+    }
+
+    // =========================================================
+    // GET CURRENT INDIA TIME
+    // =========================================================
+
+    private static TimeOnly GetIndiaCurrentTime()
+    {
+        return TimeOnly.FromDateTime(
+            GetIndiaNow());
     }
 
     // =========================================================
     // DATABASE DATETIME
+    // =========================================================
+    //
+    // PostgreSQL timestamp with time zone:
+    //
+    // ALWAYS UTC
+    //
     // =========================================================
 
     private static DateTime GetDatabaseDateTime()
@@ -55,23 +107,51 @@ public class EmployeeBookingService : IEmployeeBookingService
     // CHECK WEEKEND
     // =========================================================
 
-    private static bool IsWeekend(DateOnly date)
+    private static bool IsWeekend(
+        DateOnly date)
     {
-        return date.DayOfWeek == DayOfWeek.Saturday ||
-               date.DayOfWeek == DayOfWeek.Sunday;
+        return date.DayOfWeek ==
+                   DayOfWeek.Saturday ||
+
+               date.DayOfWeek ==
+                   DayOfWeek.Sunday;
     }
 
     // =========================================================
     // VALIDATE WEEKDAY
     // =========================================================
 
-    private static void ValidateWeekday(DateOnly date)
+    private static void ValidateWeekday(
+        DateOnly date)
     {
         if (IsWeekend(date))
         {
             throw new Exception(
                 "Bookings and room availability are not allowed on Saturdays and Sundays.");
         }
+    }
+
+    public EmployeeBookingService(
+        IEmployeeBookingRepository bookingRepository,
+        INotificationRepository notificationRepository,
+        IEmailService emailService,
+        IServiceScopeFactory scopeFactory,
+        ILogger<EmployeeBookingService> logger)
+    {
+        _bookingRepository =
+            bookingRepository;
+
+        _notificationRepository =
+            notificationRepository;
+
+        _emailService =
+            emailService;
+
+        _scopeFactory =
+            scopeFactory;
+
+        _logger =
+            logger;
     }
 
     // =========================================================
@@ -103,18 +183,28 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
+        // VALIDATE MEETING TITLE
+        // -----------------------------------------------------
+
+        if (string.IsNullOrWhiteSpace(
+            request.MeetingTitle))
+        {
+            throw new Exception(
+                "Meeting title is required.");
+        }
+
+        // -----------------------------------------------------
         // VALIDATE DATE
         // -----------------------------------------------------
 
-        ValidateWeekday(request.BookingDate);
-
-        var now = DateTime.Now;
+        ValidateWeekday(
+            request.BookingDate);
 
         var today =
-            DateOnly.FromDateTime(now);
+            GetIndiaToday();
 
         var currentTime =
-            TimeOnly.FromDateTime(now);
+            GetIndiaCurrentTime();
 
         if (request.BookingDate < today)
         {
@@ -133,7 +223,8 @@ public class EmployeeBookingService : IEmployeeBookingService
         // VALIDATE TIME ORDER
         // -----------------------------------------------------
 
-        if (request.StartTime >= request.EndTime)
+        if (request.StartTime >=
+            request.EndTime)
         {
             throw new Exception(
                 "End time must be after start time.");
@@ -143,13 +234,15 @@ public class EmployeeBookingService : IEmployeeBookingService
         // VALIDATE OFFICE HOURS
         // -----------------------------------------------------
 
-        if (request.StartTime < OfficeStartTime)
+        if (request.StartTime <
+            OfficeStartTime)
         {
             throw new Exception(
                 "Bookings can only start from 10:00 AM.");
         }
 
-        if (request.EndTime > OfficeEndTime)
+        if (request.EndTime >
+            OfficeEndTime)
         {
             throw new Exception(
                 "Bookings must end by 10:00 PM.");
@@ -180,8 +273,9 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var roomCapacity =
-            await _bookingRepository.GetRoomCapacityAsync(
-                request.RoomId);
+            await _bookingRepository
+                .GetRoomCapacityAsync(
+                    request.RoomId);
 
         if (roomCapacity == null)
         {
@@ -201,11 +295,12 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var isAvailable =
-            await _bookingRepository.IsRoomAvailableAsync(
-                request.RoomId,
-                request.BookingDate,
-                request.StartTime,
-                request.EndTime);
+            await _bookingRepository
+                .IsRoomAvailableAsync(
+                    request.RoomId,
+                    request.BookingDate,
+                    request.StartTime,
+                    request.EndTime);
 
         if (!isAvailable)
         {
@@ -218,34 +313,10 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var resolvedTitle =
-            !string.IsNullOrWhiteSpace(request.MeetingTitle)
-                ? request.MeetingTitle.Trim()
-                : "Reserved Workspace";
-
-        // -----------------------------------------------------
-        // RESOLVE PURPOSE
-        // -----------------------------------------------------
-
-        var resolvedPurpose =
-            !string.IsNullOrWhiteSpace(request.Purpose)
-                ? request.Purpose.Trim()
-                : resolvedTitle;
+            request.MeetingTitle.Trim();
 
         // =====================================================
-        // CREATE BOOKING ENTITY
-        // =====================================================
-        //
-        // IMPORTANT:
-        // New employee bookings are now AUTO-APPROVED.
-        //
-        // Previously:
-        //
-        // Status = "Pending"
-        //
-        // Now:
-        //
-        // Status = "Approved"
-        //
+        // CREATE BOOKING
         // =====================================================
 
         var booking = new Booking
@@ -258,9 +329,6 @@ public class EmployeeBookingService : IEmployeeBookingService
 
             MeetingTitle =
                 resolvedTitle,
-
-            Purpose =
-                resolvedPurpose,
 
             ParticipantCount =
                 request.ParticipantCount,
@@ -287,85 +355,155 @@ public class EmployeeBookingService : IEmployeeBookingService
             // SAVE BOOKING
             // -------------------------------------------------
 
-            await _bookingRepository.CreateBookingAsync(
-                booking);
+            await _bookingRepository
+                .CreateBookingAsync(
+                    booking);
 
-            await _bookingRepository.SaveChangesAsync();
+            await _bookingRepository
+                .SaveChangesAsync();
 
             // -------------------------------------------------
             // CREATE EMPLOYEE NOTIFICATION
             // -------------------------------------------------
-            //
-            // Since the booking is automatically approved,
-            // tell the employee that it is approved.
-            // -------------------------------------------------
 
-            var notification = new Notification
-            {
-                EmployeeId =
-                    employeeId,
+            var notification =
+                new Notification
+                {
+                    EmployeeId =
+                        employeeId,
 
-                BookingId =
-                    booking.BookingId,
+                    BookingId =
+                        booking.BookingId,
 
-                Message =
-                    $"Your booking for {resolvedTitle} has been automatically approved.",
+                    Message =
+                        $"Your booking for {resolvedTitle} has been automatically approved.",
 
-                IsRead =
-                    false,
+                    IsRead =
+                        false,
 
-                CreatedAt =
-                    GetDatabaseDateTime()
-            };
+                    CreatedAt =
+                        GetDatabaseDateTime()
+                };
 
-            await _notificationRepository.AddAsync(
-                notification);
+            await _notificationRepository
+                .AddAsync(notification);
 
-            await _notificationRepository.SaveChangesAsync();
+            await _notificationRepository
+                .SaveChangesAsync();
 
             // -------------------------------------------------
-            // SEND CONFIRMATION & ADMIN ALERT EMAILS IN BACKGROUND
+            // CAPTURE VALUES FOR BACKGROUND TASK
             // -------------------------------------------------
-            // Dispatched asynchronously in background task so API response
-            // is returned immediately without waiting for SMTP network I/O.
-            var createdBookingId = booking.BookingId;
-            var createdRoomId = booking.RoomId;
+
+            var createdBookingId =
+                booking.BookingId;
+
+            var createdRoomId =
+                booking.RoomId;
+
+            // -------------------------------------------------
+            // SEND CONFIRMATION EMAIL IN BACKGROUND
+            // -------------------------------------------------
 
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    using var scope = _scopeFactory.CreateScope();
-                    var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
-                    var reminderRepo = scope.ServiceProvider.GetRequiredService<IBookingReminderRepository>();
-                    var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                    var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
+                    using var scope =
+                        _scopeFactory
+                            .CreateScope();
 
-                    var employee = await repo.GetEmployeeByIdAsync(employeeId);
-                    var room = await repo.GetRoomByIdAsync(createdRoomId);
-                    var adminEmails = await repo.GetAdminEmailsAsync();
+                    var repo =
+                        scope.ServiceProvider
+                            .GetRequiredService<
+                                IEmployeeBookingRepository>();
 
-                    var employeeName = employee?.Name ?? "Colleague";
-                    var roomName = room != null
-                        ? (!string.IsNullOrWhiteSpace(room.RoomName) ? room.RoomName : room.RoomNumber)
-                        : "Meeting Room";
+                    var reminderRepo =
+                        scope.ServiceProvider
+                            .GetRequiredService<
+                                IBookingReminderRepository>();
 
-                    // Dispatches confirmation email to both Employee and Admins
-                    await emailService.SendBookingConfirmationAsync(
-                        booking,
-                        employee ?? new Employee { Name = employeeName, Email = employee?.Email ?? string.Empty },
-                        room ?? new Room { RoomName = roomName },
-                        adminEmails);
+                    var emailService =
+                        scope.ServiceProvider
+                            .GetRequiredService<
+                                IEmailService>();
 
-                    // Record confirmation notification in tracking table for duplicate prevention
-                    await reminderRepo.RecordNotificationSentAsync(
-                        createdBookingId,
-                        BookingNotificationType.BookingConfirmed,
-                        "Sent");
+                    // -----------------------------------------
+                    // GET EMPLOYEE
+                    // -----------------------------------------
+
+                    var employee =
+                        await repo.GetEmployeeByIdAsync(
+                            employeeId);
+
+                    // -----------------------------------------
+                    // GET ROOM
+                    // -----------------------------------------
+
+                    var room =
+                        await repo.GetRoomByIdAsync(
+                            createdRoomId);
+
+                    // -----------------------------------------
+                    // GET ADMIN EMAILS
+                    // -----------------------------------------
+
+                    var adminEmails =
+                        await repo.GetAdminEmailsAsync();
+
+                    var employeeName =
+                        employee?.Name ??
+                        "Colleague";
+
+                    var roomName =
+                        room != null
+                            ? (!string.IsNullOrWhiteSpace(
+                                    room.RoomName)
+                                ? room.RoomName
+                                : room.RoomNumber)
+                            : "Meeting Room";
+
+                    // -----------------------------------------
+                    // SEND BOOKING CONFIRMATION
+                    // -----------------------------------------
+
+                    await emailService
+                        .SendBookingConfirmationAsync(
+                            booking,
+                            employee ??
+                                new Employee
+                                {
+                                    Name =
+                                        employeeName,
+
+                                    Email =
+                                        employee?.Email ??
+                                        string.Empty
+                                },
+                            room ??
+                                new Room
+                                {
+                                    RoomName =
+                                        roomName
+                                },
+                            adminEmails);
+
+                    // -----------------------------------------
+                    // RECORD EMAIL NOTIFICATION
+                    // -----------------------------------------
+
+                    await reminderRepo
+                        .RecordNotificationSentAsync(
+                            createdBookingId,
+                            BookingNotificationType.BookingConfirmed,
+                            "Sent");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Background confirmation email dispatch failed for booking ID {BookingId}", createdBookingId);
+                    _logger.LogError(
+                        ex,
+                        "Background confirmation email dispatch failed for booking ID {BookingId}",
+                        createdBookingId);
                 }
             });
 
@@ -374,7 +512,8 @@ public class EmployeeBookingService : IEmployeeBookingService
         catch (Exception ex)
         {
             throw new Exception(
-                ex.InnerException?.Message ?? ex.Message,
+                ex.InnerException?.Message ??
+                ex.Message,
                 ex);
         }
     }
@@ -383,9 +522,10 @@ public class EmployeeBookingService : IEmployeeBookingService
     // GET BOOKING DETAILS
     // =========================================================
 
-    public async Task<BookingDetailsDto?> GetBookingByIdAsync(
-        int bookingId,
-        int employeeId)
+    public async Task<BookingDetailsDto?>
+        GetBookingByIdAsync(
+            int bookingId,
+            int employeeId)
     {
         if (bookingId <= 0)
         {
@@ -399,9 +539,10 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Invalid employee.");
         }
 
-        return await _bookingRepository.GetBookingByIdAsync(
-            bookingId,
-            employeeId);
+        return await _bookingRepository
+            .GetBookingByIdAsync(
+                bookingId,
+                employeeId);
     }
 
     // =========================================================
@@ -434,7 +575,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // VALIDATE CANCELLATION REASON
+        // VALIDATE REASON
         // -----------------------------------------------------
 
         if (string.IsNullOrWhiteSpace(reason))
@@ -443,19 +584,23 @@ public class EmployeeBookingService : IEmployeeBookingService
                 "Cancellation reason is required.");
         }
 
-        reason = reason.Trim();
+        reason =
+            reason.Trim();
 
         // -----------------------------------------------------
         // GET EMPLOYEE NAME
         // -----------------------------------------------------
 
         var employeeName =
-            await _bookingRepository.GetEmployeeNameAsync(
-                employeeId);
+            await _bookingRepository
+                .GetEmployeeNameAsync(
+                    employeeId);
 
-        if (string.IsNullOrWhiteSpace(employeeName))
+        if (string.IsNullOrWhiteSpace(
+            employeeName))
         {
-            employeeName = "Unknown user";
+            employeeName =
+                "Unknown user";
         }
 
         // -----------------------------------------------------
@@ -463,10 +608,11 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var result =
-            await _bookingRepository.CancelBookingAsync(
-                bookingId,
-                employeeId,
-                reason);
+            await _bookingRepository
+                .CancelBookingAsync(
+                    bookingId,
+                    employeeId,
+                    reason);
 
         if (!result)
         {
@@ -477,83 +623,157 @@ public class EmployeeBookingService : IEmployeeBookingService
         // CREATE ADMIN NOTIFICATION
         // -----------------------------------------------------
 
-        var notification = new Notification
-        {
-            EmployeeId =
-                employeeId,
+        var notification =
+            new Notification
+            {
+                EmployeeId =
+                    employeeId,
 
-            BookingId =
-                bookingId,
+                BookingId =
+                    bookingId,
 
-            Message =
-                $"Booking was cancelled by {employeeName}. Reason: {reason}",
+                Message =
+                    $"Booking was cancelled by {employeeName}. Reason: {reason}",
 
-            IsRead =
-                false,
+                IsRead =
+                    false,
 
-            CreatedAt =
-                GetDatabaseDateTime()
-        };
+                CreatedAt =
+                    GetDatabaseDateTime()
+            };
 
-        await _notificationRepository.AddAsync(
-            notification);
+        await _notificationRepository
+            .AddAsync(notification);
 
-        await _notificationRepository.SaveChangesAsync();
+        await _notificationRepository
+            .SaveChangesAsync();
 
         // -----------------------------------------------------
-        // SEND CANCELLATION EMAILS IN BACKGROUND (NON-BLOCKING)
+        // SEND CANCELLATION EMAILS
         // -----------------------------------------------------
+
         _ = Task.Run(async () =>
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
-                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
+                using var scope =
+                    _scopeFactory
+                        .CreateScope();
 
-                var employee = await repo.GetEmployeeByIdAsync(employeeId);
-                var booking = await repo.GetBookingByIdAsync(bookingId, employeeId);
+                var repo =
+                    scope.ServiceProvider
+                        .GetRequiredService<
+                            IEmployeeBookingRepository>();
 
-                var roomName = booking?.RoomName ?? "Meeting Room";
-                var meetingTitle = booking?.MeetingTitle ?? "Room Booking";
+                var emailService =
+                    scope.ServiceProvider
+                        .GetRequiredService<
+                            IEmailService>();
 
-                // 1. Employee Cancellation Email
-                if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+                // ---------------------------------------------
+                // GET EMPLOYEE
+                // ---------------------------------------------
+
+                var employee =
+                    await repo.GetEmployeeByIdAsync(
+                        employeeId);
+
+                // ---------------------------------------------
+                // GET BOOKING
+                // ---------------------------------------------
+
+                var booking =
+                    await repo.GetBookingByIdAsync(
+                        bookingId,
+                        employeeId);
+
+                var roomName =
+                    booking?.RoomName ??
+                    "Meeting Room";
+
+                var meetingTitle =
+                    booking?.MeetingTitle ??
+                    "Room Booking";
+
+                // ---------------------------------------------
+                // EMPLOYEE EMAIL
+                // ---------------------------------------------
+
+                if (employee != null &&
+                    !string.IsNullOrWhiteSpace(
+                        employee.Email))
                 {
-                    var subject = $"Booking Cancelled: '{meetingTitle}'";
-                    var body = BuildBookingCancelledEmailHtml(employeeName, meetingTitle, roomName, reason);
+                    var subject =
+                        $"Booking Cancelled: '{meetingTitle}'";
+
+                    var body =
+                        BuildBookingCancelledEmailHtml(
+                            employeeName,
+                            meetingTitle,
+                            roomName,
+                            reason);
 
                     try
                     {
-                        await emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
+                        await emailService
+                            .SendEmailAsync(
+                                employee.Email,
+                                subject,
+                                body,
+                                isHtml: true);
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Failed to send employee cancellation email to {Email}", employee.Email);
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to send employee cancellation email to {Email}",
+                            employee.Email);
                     }
                 }
 
-                // 2. Admin Cancellation Alert (Batch)
-                var adminEmails = await repo.GetAdminEmailsAsync();
-                if (adminEmails != null && adminEmails.Count > 0)
+                // ---------------------------------------------
+                // ADMIN EMAIL
+                // ---------------------------------------------
+
+                var adminEmails =
+                    await repo.GetAdminEmailsAsync();
+
+                if (adminEmails != null &&
+                    adminEmails.Count > 0)
                 {
-                    var adminSubject = $"[Admin Alert] Booking Cancelled: '{meetingTitle}' by {employeeName}";
-                    var adminBody = BuildAdminBookingCancelledEmailHtml(employeeName, meetingTitle, roomName, reason);
+                    var adminSubject =
+                        $"[Admin Alert] Booking Cancelled: '{meetingTitle}' by {employeeName}";
+
+                    var adminBody =
+                        BuildAdminBookingCancelledEmailHtml(
+                            employeeName,
+                            meetingTitle,
+                            roomName,
+                            reason);
 
                     try
                     {
-                        await emailService.SendEmailsAsync(adminEmails, adminSubject, adminBody, isHtml: true);
+                        await emailService
+                            .SendEmailsAsync(
+                                adminEmails,
+                                adminSubject,
+                                adminBody,
+                                isHtml: true);
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Failed to send admin cancellation alert emails");
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to send admin cancellation alert emails");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Background cancellation email dispatch failed for booking ID {BookingId}", bookingId);
+                _logger.LogError(
+                    ex,
+                    "Background cancellation email dispatch failed for booking ID {BookingId}",
+                    bookingId);
             }
         });
 
@@ -596,18 +816,28 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
+        // VALIDATE MEETING TITLE
+        // -----------------------------------------------------
+
+        if (string.IsNullOrWhiteSpace(
+            request.MeetingTitle))
+        {
+            throw new Exception(
+                "Meeting title is required.");
+        }
+
+        // -----------------------------------------------------
         // VALIDATE DATE
         // -----------------------------------------------------
 
-        ValidateWeekday(request.BookingDate);
-
-        var now = DateTime.Now;
+        ValidateWeekday(
+            request.BookingDate);
 
         var today =
-            DateOnly.FromDateTime(now);
+            GetIndiaToday();
 
         var currentTime =
-            TimeOnly.FromDateTime(now);
+            GetIndiaCurrentTime();
 
         if (request.BookingDate < today)
         {
@@ -626,7 +856,8 @@ public class EmployeeBookingService : IEmployeeBookingService
         // VALIDATE TIME
         // -----------------------------------------------------
 
-        if (request.StartTime >= request.EndTime)
+        if (request.StartTime >=
+            request.EndTime)
         {
             throw new Exception(
                 "End time must be after start time.");
@@ -636,13 +867,15 @@ public class EmployeeBookingService : IEmployeeBookingService
         // VALIDATE OFFICE HOURS
         // -----------------------------------------------------
 
-        if (request.StartTime < OfficeStartTime)
+        if (request.StartTime <
+            OfficeStartTime)
         {
             throw new Exception(
                 "Bookings can only start from 10:00 AM.");
         }
 
-        if (request.EndTime > OfficeEndTime)
+        if (request.EndTime >
+            OfficeEndTime)
         {
             throw new Exception(
                 "Bookings must end by 10:00 PM.");
@@ -674,9 +907,10 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var existingBooking =
-            await _bookingRepository.GetBookingByIdAsync(
-                bookingId,
-                employeeId);
+            await _bookingRepository
+                .GetBookingByIdAsync(
+                    bookingId,
+                    employeeId);
 
         if (existingBooking == null)
         {
@@ -685,7 +919,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // PREVENT RESCHEDULE OF CANCELLED BOOKING
+        // PREVENT RESCHEDULE OF CANCELLED
         // -----------------------------------------------------
 
         if (string.Equals(
@@ -698,7 +932,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // PREVENT RESCHEDULE OF REJECTED BOOKING
+        // PREVENT RESCHEDULE OF REJECTED
         // -----------------------------------------------------
 
         if (string.Equals(
@@ -713,12 +947,23 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
         // CHECK RESCHEDULE RESTRICTION
         // -----------------------------------------------------
+        //
+        // Employee can reschedule only if more than 1 hour
+        // remains before the ORIGINAL booking start time.
+        //
+        // The original booking DateOnly + TimeOnly are treated
+        // as IST business time.
+        // -----------------------------------------------------
 
         var bookingStartDateTime =
-            existingBooking.BookingDate.ToDateTime(
-                existingBooking.StartTime);
+            existingBooking.BookingDate
+                .ToDateTime(
+                    existingBooking.StartTime);
 
-        if (DateTime.Now >=
+        var indiaNow =
+            GetIndiaNow();
+
+        if (indiaNow >=
             bookingStartDateTime.AddHours(-1))
         {
             throw new Exception(
@@ -730,8 +975,9 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var roomCapacity =
-            await _bookingRepository.GetRoomCapacityAsync(
-                request.RoomId.Value);
+            await _bookingRepository
+                .GetRoomCapacityAsync(
+                    request.RoomId.Value);
 
         if (roomCapacity == null)
         {
@@ -752,12 +998,13 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var isAvailable =
-            await _bookingRepository.IsRoomAvailableAsync(
-                request.RoomId.Value,
-                request.BookingDate,
-                request.StartTime,
-                request.EndTime,
-                bookingId);
+            await _bookingRepository
+                .IsRoomAvailableAsync(
+                    request.RoomId.Value,
+                    request.BookingDate,
+                    request.StartTime,
+                    request.EndTime,
+                    bookingId);
 
         if (!isAvailable)
         {
@@ -770,10 +1017,11 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var updated =
-            await _bookingRepository.UpdateBookingAsync(
-                bookingId,
-                employeeId,
-                request);
+            await _bookingRepository
+                .UpdateBookingAsync(
+                    bookingId,
+                    employeeId,
+                    request);
 
         if (!updated)
         {
@@ -785,108 +1033,183 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         var employeeName =
-            await _bookingRepository.GetEmployeeNameAsync(
-                employeeId);
+            await _bookingRepository
+                .GetEmployeeNameAsync(
+                    employeeId);
 
-        if (string.IsNullOrWhiteSpace(employeeName))
+        if (string.IsNullOrWhiteSpace(
+            employeeName))
         {
-            employeeName = "Unknown user";
+            employeeName =
+                "Unknown user";
         }
 
         // -----------------------------------------------------
         // CREATE ADMIN NOTIFICATION
         // -----------------------------------------------------
-        //
-        // NOTE:
-        // The repository currently sets updated bookings
-        // to Pending. Therefore the notification correctly
-        // says that rescheduling requires approval.
-        //
-        // If you also want RESCHEDULES to be auto-approved,
-        // the repository method UpdateBookingAsync must be
-        // changed from Pending to Approved.
-        // -----------------------------------------------------
 
-        var notification = new Notification
-        {
-            EmployeeId =
-                employeeId,
+        var notification =
+            new Notification
+            {
+                EmployeeId =
+                    employeeId,
 
-            BookingId =
-                bookingId,
+                BookingId =
+                    bookingId,
 
-            Message =
-                $"Booking was rescheduled by {employeeName} and has been approved.",
+                Message =
+                    $"Booking was rescheduled by {employeeName} and has been approved.",
 
-            IsRead =
-                false,
+                IsRead =
+                    false,
 
-            CreatedAt =
-                GetDatabaseDateTime()
-        };
+                CreatedAt =
+                    GetDatabaseDateTime()
+            };
 
-        await _notificationRepository.AddAsync(
-            notification);
+        await _notificationRepository
+            .AddAsync(notification);
 
-        await _notificationRepository.SaveChangesAsync();
+        await _notificationRepository
+            .SaveChangesAsync();
 
         // -----------------------------------------------------
-        // SEND RESCHEDULE EMAILS IN BACKGROUND (NON-BLOCKING)
+        // SEND RESCHEDULE EMAILS
         // -----------------------------------------------------
+
         _ = Task.Run(async () =>
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var repo = scope.ServiceProvider.GetRequiredService<IEmployeeBookingRepository>();
-                var reminderRepo = scope.ServiceProvider.GetRequiredService<IBookingReminderRepository>();
-                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                var logger = scope.ServiceProvider.GetRequiredService<ILogger<EmployeeBookingService>>();
+                using var scope =
+                    _scopeFactory
+                        .CreateScope();
 
-                // Reset reminder tracking for rescheduled booking so new date/time gets reminders
-                await reminderRepo.ResetRemindersForBookingAsync(bookingId);
+                var repo =
+                    scope.ServiceProvider
+                        .GetRequiredService<
+                            IEmployeeBookingRepository>();
 
-                var employee = await repo.GetEmployeeByIdAsync(employeeId);
-                var room = request.RoomId.HasValue ? await repo.GetRoomByIdAsync(request.RoomId.Value) : null;
-                var roomName = room?.RoomName ?? "Meeting Room";
-                var meetingTitle = !string.IsNullOrWhiteSpace(request.MeetingTitle) ? request.MeetingTitle : "Room Booking";
+                var reminderRepo =
+                    scope.ServiceProvider
+                        .GetRequiredService<
+                            IBookingReminderRepository>();
 
-                // 1. Employee Reschedule Email
-                if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+                var emailService =
+                    scope.ServiceProvider
+                        .GetRequiredService<
+                            IEmailService>();
+
+                // ---------------------------------------------
+                // RESET OLD REMINDER STATE
+                // ---------------------------------------------
+
+                await reminderRepo
+                    .ResetRemindersForBookingAsync(
+                        bookingId);
+
+                // ---------------------------------------------
+                // GET EMPLOYEE
+                // ---------------------------------------------
+
+                var employee =
+                    await repo.GetEmployeeByIdAsync(
+                        employeeId);
+
+                // ---------------------------------------------
+                // GET ROOM
+                // ---------------------------------------------
+
+                var room =
+                    await repo.GetRoomByIdAsync(
+                        request.RoomId.Value);
+
+                var roomName =
+                    room?.RoomName ??
+                    "Meeting Room";
+
+                var meetingTitle =
+                    request.MeetingTitle.Trim();
+
+                // ---------------------------------------------
+                // EMPLOYEE RESCHEDULE EMAIL
+                // ---------------------------------------------
+
+                if (employee != null &&
+                    !string.IsNullOrWhiteSpace(
+                        employee.Email))
                 {
-                    var subject = $"Booking Rescheduled: '{meetingTitle}'";
-                    var body = BuildBookingRescheduledEmailHtml(employeeName, meetingTitle, roomName, request);
+                    var subject =
+                        $"Booking Rescheduled: '{meetingTitle}'";
+
+                    var body =
+                        BuildBookingRescheduledEmailHtml(
+                            employeeName,
+                            meetingTitle,
+                            roomName,
+                            request);
 
                     try
                     {
-                        await emailService.SendEmailAsync(employee.Email, subject, body, isHtml: true);
+                        await emailService
+                            .SendEmailAsync(
+                                employee.Email,
+                                subject,
+                                body,
+                                isHtml: true);
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Failed to send employee reschedule email to {Email}", employee.Email);
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to send employee reschedule email to {Email}",
+                            employee.Email);
                     }
                 }
 
-                // 2. Admin Reschedule Alert (Batch)
-                var adminEmails = await repo.GetAdminEmailsAsync();
-                if (adminEmails != null && adminEmails.Count > 0)
+                // ---------------------------------------------
+                // ADMIN RESCHEDULE EMAIL
+                // ---------------------------------------------
+
+                var adminEmails =
+                    await repo.GetAdminEmailsAsync();
+
+                if (adminEmails != null &&
+                    adminEmails.Count > 0)
                 {
-                    var adminSubject = $"[Admin Alert] Booking Rescheduled: '{meetingTitle}' by {employeeName}";
-                    var adminBody = BuildAdminBookingRescheduledEmailHtml(employeeName, meetingTitle, roomName, request);
+                    var adminSubject =
+                        $"[Admin Alert] Booking Rescheduled: '{meetingTitle}' by {employeeName}";
+
+                    var adminBody =
+                        BuildAdminBookingRescheduledEmailHtml(
+                            employeeName,
+                            meetingTitle,
+                            roomName,
+                            request);
 
                     try
                     {
-                        await emailService.SendEmailsAsync(adminEmails, adminSubject, adminBody, isHtml: true);
+                        await emailService
+                            .SendEmailsAsync(
+                                adminEmails,
+                                adminSubject,
+                                adminBody,
+                                isHtml: true);
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Failed to send admin reschedule alert emails");
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to send admin reschedule alert emails");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Background reschedule email dispatch failed for booking ID {BookingId}", bookingId);
+                _logger.LogError(
+                    ex,
+                    "Background reschedule email dispatch failed for booking ID {BookingId}",
+                    bookingId);
             }
         });
 
@@ -908,7 +1231,8 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         var hasModule =
-            !string.IsNullOrWhiteSpace(request.Module);
+            !string.IsNullOrWhiteSpace(
+                request.Module);
 
         var hasRoomType =
             request.RoomTypeId.HasValue &&
@@ -929,7 +1253,8 @@ public class EmployeeBookingService : IEmployeeBookingService
 
         var hasFacilities =
             request.FacilityIds != null &&
-            request.FacilityIds.Any(id => id > 0);
+            request.FacilityIds.Any(
+                id => id > 0);
 
         if (!hasModule &&
             !hasRoomType &&
@@ -958,10 +1283,11 @@ public class EmployeeBookingService : IEmployeeBookingService
             var bookingDate =
                 request.BookingDate!.Value;
 
-            ValidateWeekday(bookingDate);
+            ValidateWeekday(
+                bookingDate);
 
             var today =
-                DateOnly.FromDateTime(DateTime.Now);
+                GetIndiaToday();
 
             if (bookingDate < today)
             {
@@ -974,7 +1300,8 @@ public class EmployeeBookingService : IEmployeeBookingService
         // VALIDATE TIME
         // -----------------------------------------------------
 
-        if (hasStartTime && hasEndTime)
+        if (hasStartTime &&
+            hasEndTime)
         {
             var startTime =
                 request.StartTime!.Value;
@@ -988,13 +1315,15 @@ public class EmployeeBookingService : IEmployeeBookingService
                     "End time must be after start time.");
             }
 
-            if (startTime < OfficeStartTime)
+            if (startTime <
+                OfficeStartTime)
             {
                 throw new Exception(
                     "Rooms can only be searched from 10:00 AM.");
             }
 
-            if (endTime > OfficeEndTime)
+            if (endTime >
+                OfficeEndTime)
             {
                 throw new Exception(
                     "Rooms can only be searched until 10:00 PM.");
@@ -1002,12 +1331,13 @@ public class EmployeeBookingService : IEmployeeBookingService
 
             if (hasBookingDate &&
                 request.BookingDate!.Value ==
-                DateOnly.FromDateTime(DateTime.Now))
+                GetIndiaToday())
             {
                 var currentSearchTime =
-                    TimeOnly.FromDateTime(DateTime.Now);
+                    GetIndiaCurrentTime();
 
-                if (startTime <= currentSearchTime)
+                if (startTime <=
+                    currentSearchTime)
                 {
                     throw new Exception(
                         "Cannot search for a time that has already passed.");
@@ -1016,7 +1346,7 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // PARTICIPANT COUNT VALIDATION
+        // PARTICIPANT COUNT
         // -----------------------------------------------------
 
         if (request.ParticipantCount.HasValue &&
@@ -1031,7 +1361,8 @@ public class EmployeeBookingService : IEmployeeBookingService
         // -----------------------------------------------------
 
         return await _bookingRepository
-            .SearchAvailableRoomsAsync(request);
+            .SearchAvailableRoomsAsync(
+                request);
     }
 
     // =========================================================
@@ -1054,182 +1385,245 @@ public class EmployeeBookingService : IEmployeeBookingService
     }
 
     // =========================================================
-    // EMAIL HTML BUILDERS
+    // EMAIL HTML
+    // BOOKING CANCELLED
     // =========================================================
 
-    private static string BuildBookingCancelledEmailHtml(
-        string employeeName,
-        string meetingTitle,
-        string roomName,
-        string reason)
+    private static string
+        BuildBookingCancelledEmailHtml(
+            string employeeName,
+            string meetingTitle,
+            string roomName,
+            string reason)
     {
         return $@"
 <!DOCTYPE html>
 <html>
-<head><meta charset=""utf-8""><title>Booking Cancelled</title></head>
+<head>
+    <meta charset=""utf-8"">
+    <title>Booking Cancelled</title>
+</head>
+
 <body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+
     <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
-        <h2 style=""color: #dc2626; margin-top: 0;"">Booking Cancelled</h2>
-        <p>Hello {employeeName},</p>
-        <p>Your room booking for <strong>'{meetingTitle}'</strong> in <strong>{roomName}</strong> has been cancelled.</p>
+
+        <h2 style=""color: #dc2626; margin-top: 0;"">
+            Booking Cancelled
+        </h2>
+
+        <p>
+            Hello {employeeName},
+        </p>
+
+        <p>
+            Your room booking for
+            <strong>'{meetingTitle}'</strong>
+            in <strong>{roomName}</strong>
+            has been cancelled.
+        </p>
+
         <div style=""background: #fef2f2; border: 1px solid #fee2e2; border-radius: 6px; padding: 12px 16px; margin: 16px 0;"">
-            <strong>Reason for cancellation:</strong> {reason}
+            <strong>Reason for cancellation:</strong>
+            {reason}
         </div>
-        <p style=""font-size: 13px; color: #64748b;"">If this was a mistake, please make a new booking in SpaceBook.</p>
+
+        <p style=""font-size: 13px; color: #64748b;"">
+            If this was a mistake, please make a new booking in SpaceBook.
+        </p>
+
     </div>
+
 </body>
 </html>";
     }
 
-    private static string BuildAdminBookingCancelledEmailHtml(
-        string employeeName,
-        string meetingTitle,
-        string roomName,
-        string reason)
+    // =========================================================
+    // EMAIL HTML
+    // ADMIN BOOKING CANCELLED
+    // =========================================================
+
+    private static string
+        BuildAdminBookingCancelledEmailHtml(
+            string employeeName,
+            string meetingTitle,
+            string roomName,
+            string reason)
     {
         return $@"
 <!DOCTYPE html>
 <html>
-<head><meta charset=""utf-8""><title>Booking Cancelled Alert</title></head>
+<head>
+    <meta charset=""utf-8"">
+    <title>Booking Cancelled Alert</title>
+</head>
+
 <body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+
     <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
-        <h2 style=""color: #dc2626; margin-top: 0;"">Room Booking Cancelled</h2>
-        <p>The following booking has been cancelled by <strong>{employeeName}</strong>:</p>
+
+        <h2 style=""color: #dc2626; margin-top: 0;"">
+            Room Booking Cancelled
+        </h2>
+
+        <p>
+            The following booking has been cancelled by
+            <strong>{employeeName}</strong>:
+        </p>
+
         <ul>
             <li><strong>Meeting:</strong> {meetingTitle}</li>
             <li><strong>Room:</strong> {roomName}</li>
             <li><strong>Reason:</strong> {reason}</li>
         </ul>
+
     </div>
+
 </body>
 </html>";
     }
 
-    private static string BuildBookingRescheduledEmailHtml(
-        string employeeName,
-        string meetingTitle,
-        string roomName,
-        UpdateBookingRequestDto request)
+    // =========================================================
+    // EMAIL HTML
+    // BOOKING RESCHEDULED
+    // =========================================================
+
+    private static string
+        BuildBookingRescheduledEmailHtml(
+            string employeeName,
+            string meetingTitle,
+            string roomName,
+            UpdateBookingRequestDto request)
     {
         return $@"
 <!DOCTYPE html>
 <html>
-<head><meta charset=""utf-8""><title>Booking Rescheduled</title></head>
+<head>
+    <meta charset=""utf-8"">
+    <title>Booking Rescheduled</title>
+</head>
+
 <body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+
     <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
-        <h2 style=""color: #2563eb; margin-top: 0;"">Booking Rescheduled & Approved</h2>
-        <p>Hello {employeeName},</p>
-        <p>Your booking for <strong>'{meetingTitle}'</strong> has been successfully rescheduled:</p>
-        <table width=""100%"" style=""background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;"">
-            <tr><td><strong>Room:</strong></td><td>{roomName}</td></tr>
-            <tr><td><strong>New Date:</strong></td><td>{request.BookingDate:MMMM dd, yyyy}</td></tr>
-            <tr><td><strong>New Time:</strong></td><td>{request.StartTime:hh\\:mm tt} - {request.EndTime:hh\\:mm tt}</td></tr>
+
+        <h2 style=""color: #2563eb; margin-top: 0;"">
+            Booking Rescheduled & Approved
+        </h2>
+
+        <p>
+            Hello {employeeName},
+        </p>
+
+        <p>
+            Your booking for
+            <strong>'{meetingTitle}'</strong>
+            has been successfully rescheduled:
+        </p>
+
+        <table
+            width=""100%""
+            style=""background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;"">
+
+            <tr>
+                <td>
+                    <strong>Room:</strong>
+                </td>
+
+                <td>
+                    {roomName}
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <strong>New Date:</strong>
+                </td>
+
+                <td>
+                    {request.BookingDate:MMMM dd, yyyy}
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <strong>New Time:</strong>
+                </td>
+
+                <td>
+                    {request.StartTime:hh\:mm tt}
+                    -
+                    {request.EndTime:hh\:mm tt}
+                </td>
+            </tr>
+
         </table>
+
     </div>
+
 </body>
 </html>";
     }
 
-    private static string BuildAdminBookingRescheduledEmailHtml(
-        string employeeName,
-        string meetingTitle,
-        string roomName,
-        UpdateBookingRequestDto request)
+    // =========================================================
+    // EMAIL HTML
+    // ADMIN BOOKING RESCHEDULED
+    // =========================================================
+
+    private static string
+        BuildAdminBookingRescheduledEmailHtml(
+            string employeeName,
+            string meetingTitle,
+            string roomName,
+            UpdateBookingRequestDto request)
     {
         return $@"
 <!DOCTYPE html>
 <html>
-<head><meta charset=""utf-8""><title>Booking Rescheduled Alert</title></head>
+<head>
+    <meta charset=""utf-8"">
+    <title>Booking Rescheduled Alert</title>
+</head>
+
 <body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+
     <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
-        <h2 style=""color: #2563eb; margin-top: 0;"">Booking Rescheduled</h2>
-        <p><strong>{employeeName}</strong> has rescheduled their booking:</p>
+
+        <h2 style=""color: #2563eb; margin-top: 0;"">
+            Booking Rescheduled
+        </h2>
+
+        <p>
+            <strong>{employeeName}</strong>
+            has rescheduled their booking:
+        </p>
+
         <ul>
-            <li><strong>Meeting:</strong> {meetingTitle}</li>
-            <li><strong>Room:</strong> {roomName}</li>
-            <li><strong>Date:</strong> {request.BookingDate:MMMM dd, yyyy}</li>
-            <li><strong>Time:</strong> {request.StartTime:hh\\:mm tt} - {request.EndTime:hh\\:mm tt}</li>
+            <li>
+                <strong>Meeting:</strong>
+                {meetingTitle}
+            </li>
+
+            <li>
+                <strong>Room:</strong>
+                {roomName}
+            </li>
+
+            <li>
+                <strong>Date:</strong>
+                {request.BookingDate:MMMM dd, yyyy}
+            </li>
+
+            <li>
+                <strong>Time:</strong>
+                {request.StartTime:hh\:mm tt}
+                -
+                {request.EndTime:hh\:mm tt}
+            </li>
         </ul>
+
     </div>
-</body>
-</html>";
-    }
 
-
-    private static string BuildBookingConfirmedEmailHtml(
-        string employeeName,
-        string meetingTitle,
-        string purpose,
-        string roomName,
-        string roomNumber,
-        DateOnly bookingDate,
-        TimeOnly startTime,
-        TimeOnly endTime,
-        int participantCount)
-    {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head><meta charset=""utf-8""><title>Booking Confirmed</title></head>
-<body style=""font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f9; margin: 0; padding: 24px; color: #1e293b;"">
-    <table align=""center"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);"">
-        <tr>
-            <td style=""background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px 28px; text-align: center;"">
-                <h1 style=""color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;"">SpaceBook</h1>
-                <p style=""color: #d1fae5; margin: 6px 0 0; font-size: 14px;"">Booking Confirmed & Approved</p>
-            </td>
-        </tr>
-        <tr>
-            <td style=""padding: 28px;"">
-                <h2 style=""color: #0f172a; margin: 0 0 12px; font-size: 18px;"">Hello {employeeName},</h2>
-                <p style=""color: #475569; font-size: 15px; line-height: 1.5; margin: 0 0 20px;"">
-                    Your room booking for <strong>'{meetingTitle}'</strong> has been automatically approved and confirmed.
-                </p>
-                <table width=""100%"" cellpadding=""6"" cellspacing=""0"" style=""background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px;"">
-                    <tr><td width=""35%"" style=""color: #64748b; font-size: 13px;"">Room</td><td style=""color: #0f172a; font-weight: 600; font-size: 14px;"">{roomName} {(string.IsNullOrWhiteSpace(roomNumber) ? "" : $"({roomNumber})")}</td></tr>
-                    <tr><td style=""color: #64748b; font-size: 13px;"">Date</td><td style=""color: #0f172a; font-size: 14px;"">{bookingDate:MMMM dd, yyyy}</td></tr>
-                    <tr><td style=""color: #64748b; font-size: 13px;"">Time</td><td style=""color: #059669; font-weight: 600; font-size: 14px;"">{startTime:hh\\:mm tt} - {endTime:hh\\:mm tt}</td></tr>
-                    {(participantCount > 0 ? $"<tr><td style=\"color: #64748b; font-size: 13px;\">Attendees</td><td style=\"color: #0f172a; font-size: 14px;\">{participantCount} people</td></tr>" : "")}
-                    {(!string.IsNullOrWhiteSpace(purpose) ? $"<tr><td style=\"color: #64748b; font-size: 13px;\">Purpose</td><td style=\"color: #0f172a; font-size: 14px;\">{purpose}</td></tr>" : "")}
-                </table>
-                <p style=""color: #64748b; font-size: 13px; margin: 0;"">You will receive an email reminder 15 minutes before your meeting starts.</p>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>";
-    }
-
-    private static string BuildAdminBookingAlertEmailHtml(
-        string employeeName,
-        string employeeEmail,
-        string department,
-        string meetingTitle,
-        string purpose,
-        string roomName,
-        DateOnly bookingDate,
-        TimeOnly startTime,
-        TimeOnly endTime,
-        int participantCount)
-    {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head><meta charset=""utf-8""><title>New Booking Alert</title></head>
-<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
-    <div style=""max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 24px; border-left: 4px solid #3b82f6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
-        <h2 style=""color: #1e40af; margin-top: 0;"">[Admin Alert] New Room Booking</h2>
-        <p>A new room booking has been automatically approved in SpaceBook:</p>
-        <table width=""100%"" cellpadding=""4"" cellspacing=""0"" style=""background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 16px 0;"">
-            <tr><td><strong>Booked By:</strong></td><td>{employeeName} ({employeeEmail})</td></tr>
-            {(!string.IsNullOrWhiteSpace(department) ? $"<tr><td><strong>Department:</strong></td><td>{department}</td></tr>" : "")}
-            <tr><td><strong>Meeting:</strong></td><td>{meetingTitle}</td></tr>
-            <tr><td><strong>Room:</strong></td><td>{roomName}</td></tr>
-            <tr><td><strong>Date:</strong></td><td>{bookingDate:MMMM dd, yyyy}</td></tr>
-            <tr><td><strong>Time:</strong></td><td>{startTime:hh\\:mm tt} - {endTime:hh\\:mm tt}</td></tr>
-            <tr><td><strong>Attendees:</strong></td><td>{participantCount}</td></tr>
-        </table>
-    </div>
 </body>
 </html>";
     }

@@ -2,17 +2,40 @@ namespace SpaceBook.Application.DTOs.Booking;
 
 public class CreateBookingRequestDto
 {
+    // =========================================================
+    // MEETING TITLE
+    // REQUIRED
+    // =========================================================
+
     public string MeetingTitle { get; set; } = string.Empty;
 
-    public string Purpose { get; set; } = string.Empty;
+    // =========================================================
+    // ROOM
+    // =========================================================
 
     public int RoomId { get; set; }
 
+    // =========================================================
+    // PARTICIPANTS
+    // =========================================================
+
     public int ParticipantCount { get; set; }
+
+    // =========================================================
+    // BOOKING DATE
+    // =========================================================
 
     public DateOnly BookingDate { get; set; }
 
+    // =========================================================
+    // START TIME
+    // =========================================================
+
     public TimeOnly StartTime { get; set; }
+
+    // =========================================================
+    // END TIME
+    // =========================================================
 
     public TimeOnly EndTime { get; set; }
 }

@@ -13,9 +13,9 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
     // =========================================================
     // OFFICE HOURS
     // =========================================================
-    // Rooms can only be searched/booked between:
+    // SpaceBook business hours are based on IST.
     //
-    // 10:00 AM and 10:00 PM
+    // 10:00 AM to 10:00 PM
     // =========================================================
 
     private static readonly TimeOnly OfficeStartTime =
@@ -23,6 +23,73 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
     private static readonly TimeOnly OfficeEndTime =
         new TimeOnly(22, 0);
+
+    // =========================================================
+    // INDIA TIMEZONE
+    // =========================================================
+    //
+    // Windows:
+    // India Standard Time
+    //
+    // Linux / Render:
+    // Asia/Kolkata
+    //
+    // The application runs on Render, so we use
+    // Asia/Kolkata there.
+    // =========================================================
+
+    private static readonly TimeZoneInfo IndiaTimeZone =
+        GetIndiaTimeZone();
+
+    private static TimeZoneInfo GetIndiaTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(
+                "Asia/Kolkata");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(
+                "India Standard Time");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(
+                "India Standard Time");
+        }
+    }
+
+    // =========================================================
+    // GET CURRENT INDIA DATE/TIME
+    // =========================================================
+
+    private static DateTime GetIndiaNow()
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.UtcNow,
+            IndiaTimeZone);
+    }
+
+    // =========================================================
+    // GET CURRENT INDIA DATE
+    // =========================================================
+
+    private static DateOnly GetIndiaToday()
+    {
+        return DateOnly.FromDateTime(
+            GetIndiaNow());
+    }
+
+    // =========================================================
+    // GET CURRENT INDIA TIME
+    // =========================================================
+
+    private static TimeOnly GetIndiaCurrentTime()
+    {
+        return TimeOnly.FromDateTime(
+            GetIndiaNow());
+    }
 
     public EmployeeBookingRepository(
         ApplicationDbContext context)
@@ -74,6 +141,34 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         {
             throw new Exception(
                 "Bookings are not allowed on Saturdays and Sundays.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE PAST DATE
+        // -----------------------------------------------------
+
+        var today = GetIndiaToday();
+
+        if (booking.BookingDate < today)
+        {
+            throw new Exception(
+                "Bookings cannot be created for a past date.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE SAME-DAY TIME
+        // -----------------------------------------------------
+
+        if (booking.BookingDate == today)
+        {
+            var currentTime =
+                GetIndiaCurrentTime();
+
+            if (booking.StartTime <= currentTime)
+            {
+                throw new Exception(
+                    "Bookings cannot start at or before the current time.");
+            }
         }
 
         // -----------------------------------------------------
@@ -167,14 +262,16 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
         // NORMALIZE BOOKED ON
         // -----------------------------------------------------
-        // PostgreSQL column:
         //
-        // timestamp with time zone
+        // PostgreSQL timestamp with time zone requires UTC.
         //
-        // Therefore DateTime MUST be UTC.
+        // IMPORTANT:
+        // Business time is IST.
+        // Database timestamp is UTC.
         // -----------------------------------------------------
 
-        booking.BookedOn = DateTime.UtcNow;
+        booking.BookedOn =
+            DateTime.UtcNow;
 
         // -----------------------------------------------------
         // NEW BOOKING
@@ -185,9 +282,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
         // AUTO APPROVE BOOKING
         // -----------------------------------------------------
-        //
-        // Employee bookings do not require admin approval.
-        //
 
         booking.Status = "Approved";
 
@@ -195,7 +289,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // ADD BOOKING
         // -----------------------------------------------------
 
-        await _context.Bookings.AddAsync(booking);
+        await _context.Bookings.AddAsync(
+            booking);
     }
 
     // =========================================================
@@ -228,6 +323,19 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
+        // VALIDATE DATE
+        // -----------------------------------------------------
+
+        if (bookingDate.DayOfWeek ==
+                DayOfWeek.Saturday ||
+            bookingDate.DayOfWeek ==
+                DayOfWeek.Sunday)
+        {
+            throw new Exception(
+                "Room bookings are not allowed on Saturdays and Sundays.");
+        }
+
+        // -----------------------------------------------------
         // VALIDATE OFFICE HOURS
         // -----------------------------------------------------
 
@@ -250,17 +358,26 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
+        // VALIDATE PAST DATE
+        // -----------------------------------------------------
+
+        var today = GetIndiaToday();
+
+        if (bookingDate < today)
+        {
+            throw new Exception(
+                "Cannot check availability for a past date.");
+        }
+
+        // -----------------------------------------------------
         // CHECK OVERLAPPING BOOKINGS
         // -----------------------------------------------------
         //
-        // Approved bookings block the room.
+        // Existing:
+        // Start < Requested End
+        // End   > Requested Start
         //
-        // Cancelled and Rejected bookings do not block it.
-        //
-        // Overlap:
-        //
-        // Existing Start < Requested End
-        // Existing End   > Requested Start
+        // Cancelled and Rejected bookings do not block rooms.
         // -----------------------------------------------------
 
         return !await _context.Bookings
@@ -297,6 +414,19 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         {
             throw new Exception(
                 "Invalid room ID.");
+        }
+
+        // -----------------------------------------------------
+        // VALIDATE DATE
+        // -----------------------------------------------------
+
+        if (bookingDate.DayOfWeek ==
+                DayOfWeek.Saturday ||
+            bookingDate.DayOfWeek ==
+                DayOfWeek.Sunday)
+        {
+            throw new Exception(
+                "Room bookings are not allowed on Saturdays and Sundays.");
         }
 
         // -----------------------------------------------------
@@ -422,7 +552,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 BookedOn =
                     b.BookedOn
             })
-
             .FirstOrDefaultAsync();
     }
 
@@ -435,29 +564,17 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         int employeeId,
         string reason)
     {
-        // -----------------------------------------------------
-        // VALIDATE BOOKING ID
-        // -----------------------------------------------------
-
         if (bookingId <= 0)
         {
             throw new Exception(
                 "Invalid booking ID.");
         }
 
-        // -----------------------------------------------------
-        // VALIDATE EMPLOYEE ID
-        // -----------------------------------------------------
-
         if (employeeId <= 0)
         {
             throw new Exception(
                 "Invalid employee.");
         }
-
-        // -----------------------------------------------------
-        // VALIDATE REASON
-        // -----------------------------------------------------
 
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -467,10 +584,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
         var cancellationReason =
             reason.Trim();
-
-        // -----------------------------------------------------
-        // MAXIMUM REASON LENGTH
-        // -----------------------------------------------------
 
         if (cancellationReason.Length > 500)
         {
@@ -487,10 +600,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 .FirstOrDefaultAsync(b =>
                     b.BookingId == bookingId &&
                     b.EmployeeId == employeeId);
-
-        // -----------------------------------------------------
-        // BOOKING NOT FOUND
-        // -----------------------------------------------------
 
         if (booking == null)
         {
@@ -527,7 +636,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // CANCEL BOOKING
         // -----------------------------------------------------
 
-        booking.Status = "Cancelled";
+        booking.Status =
+            "Cancelled";
 
         booking.CancellationReason =
             cancellationReason;
@@ -550,10 +660,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         int employeeId,
         UpdateBookingRequestDto request)
     {
-        // -----------------------------------------------------
-        // VALIDATE REQUEST
-        // -----------------------------------------------------
-
         if (request == null)
         {
             throw new Exception(
@@ -660,11 +766,11 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE BOOKING DATE
+        // VALIDATE DATE USING INDIA TIME
         // -----------------------------------------------------
 
         var today =
-            DateOnly.FromDateTime(DateTime.Now);
+            GetIndiaToday();
 
         if (request.BookingDate < today)
         {
@@ -692,7 +798,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         if (request.BookingDate == today)
         {
             var currentTime =
-                TimeOnly.FromDateTime(DateTime.Now);
+                GetIndiaCurrentTime();
 
             if (request.StartTime <= currentTime)
             {
@@ -774,9 +880,15 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         booking.EndTime =
             request.EndTime;
 
-        // Reset reminders for updated time/date
-        booking.StartReminderSent = false;
-        booking.EndReminderSent = false;
+        // -----------------------------------------------------
+        // RESET REMINDER FLAGS
+        // -----------------------------------------------------
+
+        booking.StartReminderSent =
+            false;
+
+        booking.EndReminderSent =
+            false;
 
         // -----------------------------------------------------
         // UPDATE MEETING TITLE
@@ -791,6 +903,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
         // -----------------------------------------------------
         // UPDATE PURPOSE
+        // -----------------------------------------------------
+        //
+        // Kept for backward compatibility with existing
+        // Booking / DTO structure.
+        //
+        // If Purpose has been completely removed from your
+        // UpdateBookingRequestDto, this block can be removed.
         // -----------------------------------------------------
 
         if (!string.IsNullOrWhiteSpace(
@@ -817,10 +936,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         // -----------------------------------------------------
         // AUTO APPROVE RESCHEDULE
         // -----------------------------------------------------
-        //
-        // Rescheduled bookings are automatically approved.
-        // No admin approval is required.
-        //
 
         booking.Status =
             "Approved";
@@ -842,10 +957,6 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         SearchAvailableRoomsAsync(
             SearchRoomsRequestDto request)
     {
-        // -----------------------------------------------------
-        // VALIDATE REQUEST
-        // -----------------------------------------------------
-
         if (request == null)
         {
             throw new Exception(
@@ -910,7 +1021,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             }
 
             var today =
-                DateOnly.FromDateTime(DateTime.Now);
+                GetIndiaToday();
 
             if (bookingDate < today)
             {
@@ -927,7 +1038,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 bookingDate == today)
             {
                 var currentTime =
-                    TimeOnly.FromDateTime(DateTime.Now);
+                    GetIndiaCurrentTime();
 
                 if (request.StartTime.Value <= currentTime)
                 {
@@ -1050,13 +1161,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                     booking.BookingDate ==
                     bookingDate &&
 
-                    // Approved bookings block the room.
-                    // Cancelled and Rejected do not.
-
                     booking.Status != "Cancelled" &&
                     booking.Status != "Rejected" &&
-
-                    // OVERLAP CHECK
 
                     booking.StartTime < endTime &&
                     booking.EndTime > startTime
@@ -1289,6 +1395,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         int employeeId)
     {
         return await _context.Employees
+            .AsNoTracking()
             .Where(e =>
                 e.EmployeeId == employeeId)
             .Select(e =>
@@ -1333,9 +1440,16 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             .Include(e => e.Role)
             .Where(e =>
                 e.Role != null &&
-                (e.Role.RoleName == "Admin" || e.Role.RoleName == "ADMIN" || e.Role.RoleName == "admin") &&
+
+                (e.Role.RoleName == "Admin" ||
+                 e.Role.RoleName == "ADMIN" ||
+                 e.Role.RoleName == "admin") &&
+
                 !string.IsNullOrWhiteSpace(e.Email))
-            .Select(e => e.Email)
+
+            .Select(e =>
+                e.Email)
+
             .ToListAsync();
     }
 }
