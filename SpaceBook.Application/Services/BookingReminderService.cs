@@ -70,24 +70,14 @@ public class BookingReminderService : IBookingReminderService
             return;
         }
 
-        // =========================================================
-        // 3. GET ADMIN EMAILS
-        // =========================================================
-
-        var adminEmails = await _reminderRepository
-            .GetAdminEmailsAsync(cancellationToken);
-
-        adminEmails ??= new List<string>();
-
         _logger.LogInformation(
-            "Found {BookingCount} booking(s). Admin email count={AdminCount}.",
-            bookings.Count,
-            adminEmails.Count);
+            "Found {BookingCount} booking(s) needing reminder evaluation.",
+            bookings.Count);
 
         var stateChanged = false;
 
         // =========================================================
-        // 4. PROCESS BOOKINGS
+        // 3. PROCESS BOOKINGS
         // =========================================================
 
         foreach (var booking in bookings)
@@ -210,7 +200,7 @@ public class BookingReminderService : IBookingReminderService
                 booking.Employee.Email);
 
             // =====================================================
-            // 5. START REMINDER
+            // 4. START REMINDER
             // =====================================================
 
             var startAlreadySent =
@@ -232,7 +222,6 @@ public class BookingReminderService : IBookingReminderService
                         room,
                         roomName,
                         meetingTitle,
-                        adminEmails,
                         cancellationToken);
 
                 if (startSuccess)
@@ -243,7 +232,7 @@ public class BookingReminderService : IBookingReminderService
             }
 
             // =====================================================
-            // 6. END REMINDER
+            // 5. END REMINDER
             // =====================================================
 
             var endAlreadySent =
@@ -265,7 +254,6 @@ public class BookingReminderService : IBookingReminderService
                         room,
                         roomName,
                         meetingTitle,
-                        adminEmails,
                         cancellationToken);
 
                 if (endSuccess)
@@ -277,7 +265,7 @@ public class BookingReminderService : IBookingReminderService
         }
 
         // =========================================================
-        // 7. SAVE BOOKING FLAGS
+        // 6. SAVE BOOKING FLAGS
         // =========================================================
 
         if (stateChanged)
@@ -296,7 +284,7 @@ public class BookingReminderService : IBookingReminderService
     }
 
     // =============================================================
-    // START REMINDER
+    // START REMINDER (EMPLOYEE ONLY)
     // =============================================================
 
     private async Task<bool> ProcessStartReminderAsync(
@@ -305,7 +293,6 @@ public class BookingReminderService : IBookingReminderService
         Room room,
         string roomName,
         string meetingTitle,
-        List<string> adminEmails,
         CancellationToken cancellationToken)
     {
         try
@@ -315,17 +302,16 @@ public class BookingReminderService : IBookingReminderService
                 booking.BookingId);
 
             // =====================================================
-            // SEND EMAIL FIRST
+            // SEND EMAIL TO EMPLOYEE ONLY
             // =====================================================
 
             await _emailService.SendBookingStartReminderAsync(
                 booking,
                 employee,
-                room,
-                adminEmails);
+                room);
 
             _logger.LogInformation(
-                "START reminder email sent successfully for BookingId={BookingId}.",
+                "START reminder email sent successfully to employee for BookingId={BookingId}.",
                 booking.BookingId);
 
             // =====================================================
@@ -380,7 +366,7 @@ public class BookingReminderService : IBookingReminderService
     }
 
     // =============================================================
-    // END REMINDER
+    // END REMINDER (EMPLOYEE ONLY)
     // =============================================================
 
     private async Task<bool> ProcessEndReminderAsync(
@@ -389,7 +375,6 @@ public class BookingReminderService : IBookingReminderService
         Room room,
         string roomName,
         string meetingTitle,
-        List<string> adminEmails,
         CancellationToken cancellationToken)
     {
         try
@@ -399,17 +384,16 @@ public class BookingReminderService : IBookingReminderService
                 booking.BookingId);
 
             // =====================================================
-            // SEND EMAIL FIRST
+            // SEND EMAIL TO EMPLOYEE ONLY
             // =====================================================
 
             await _emailService.SendBookingEndReminderAsync(
                 booking,
                 employee,
-                room,
-                adminEmails);
+                room);
 
             _logger.LogInformation(
-                "END reminder email sent successfully for BookingId={BookingId}.",
+                "END reminder email sent successfully to employee for BookingId={BookingId}.",
                 booking.BookingId);
 
             // =====================================================

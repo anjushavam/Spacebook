@@ -17,12 +17,10 @@ public interface IEmailService
     Task SendBookingStartReminderAsync(
         Booking booking,
         Employee employee,
-        Room room,
-        IEnumerable<string> adminEmails);
+        Room room);
 
     Task SendBookingEndReminderAsync(
         Booking booking,
         Employee employee,
-        Room room,
-        IEnumerable<string> adminEmails);
+        Room room);
 }

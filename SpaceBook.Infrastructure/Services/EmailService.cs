@@ -401,14 +401,13 @@ public class EmailService : IEmailService
 
     // =========================================================
     // NOTIFICATION 2
-    // 15-MINUTE START REMINDER
+    // 15-MINUTE START REMINDER (EMPLOYEE ONLY)
     // =========================================================
 
     public async Task SendBookingStartReminderAsync(
         Booking booking,
         Employee employee,
-        Room room,
-        IEnumerable<string> adminEmails)
+        Room room)
     {
         var employeeName =
             !string.IsNullOrWhiteSpace(employee?.Name)
@@ -455,57 +454,17 @@ public class EmailService : IEmailService
             employeeSubject,
             employeeBody,
             true);
-
-        // =====================================================
-        // ADMIN START REMINDER
-        // =====================================================
-
-        var adminList =
-            ResolveAdminEmails(
-                adminEmails);
-
-        if (adminList.Count > 0)
-        {
-            var adminSubject =
-                $"[Admin Alert] SpaceBook Reminder - Booking Starts in 15 Minutes: {meetingTitle}";
-
-            var adminBody =
-                BuildAdminStartReminderEmailHtml(
-                    employeeName,
-                    employeeEmail,
-                    employee?.Department
-                        ?? string.Empty,
-                    meetingTitle,
-                    roomName,
-                    booking.BookingDate,
-                    booking.StartTime,
-                    booking.EndTime,
-                    booking.ParticipantCount);
-
-            await SendEmailsAsync(
-                adminList,
-                adminSubject,
-                adminBody,
-                true);
-        }
-        else
-        {
-            _logger.LogWarning(
-                "Start reminder sent to employee but no Admin recipient was configured. BookingId={BookingId}",
-                booking.BookingId);
-        }
     }
 
     // =========================================================
     // NOTIFICATION 3
-    // 15-MINUTE END REMINDER
+    // 15-MINUTE END REMINDER (EMPLOYEE ONLY)
     // =========================================================
 
     public async Task SendBookingEndReminderAsync(
         Booking booking,
         Employee employee,
-        Room room,
-        IEnumerable<string> adminEmails)
+        Room room)
     {
         var employeeName =
             !string.IsNullOrWhiteSpace(employee?.Name)
@@ -551,42 +510,6 @@ public class EmailService : IEmailService
             employeeSubject,
             employeeBody,
             true);
-
-        // =====================================================
-        // ADMIN END REMINDER
-        // =====================================================
-
-        var adminList =
-            ResolveAdminEmails(
-                adminEmails);
-
-        if (adminList.Count > 0)
-        {
-            var adminSubject =
-                $"[Admin Alert] SpaceBook Reminder - Booking Ends in 15 Minutes: {meetingTitle}";
-
-            var adminBody =
-                BuildAdminEndReminderEmailHtml(
-                    employeeName,
-                    employeeEmail,
-                    meetingTitle,
-                    roomName,
-                    booking.BookingDate,
-                    booking.StartTime,
-                    booking.EndTime);
-
-            await SendEmailsAsync(
-                adminList,
-                adminSubject,
-                adminBody,
-                true);
-        }
-        else
-        {
-            _logger.LogWarning(
-                "End reminder sent to employee but no Admin recipient was configured. BookingId={BookingId}",
-                booking.BookingId);
-        }
     }
 
     // =========================================================
@@ -1067,112 +990,6 @@ public class EmailService : IEmailService
     }
 
     // =========================================================
-    // ADMIN START REMINDER EMAIL
-    // =========================================================
-
-    private static string BuildAdminStartReminderEmailHtml(
-        string employeeName,
-        string employeeEmail,
-        string department,
-        string meetingTitle,
-        string roomName,
-        DateOnly bookingDate,
-        TimeOnly startTime,
-        TimeOnly endTime,
-        int participantCount)
-    {
-        var departmentRow =
-            !string.IsNullOrWhiteSpace(department)
-                ? $"""
-                   <tr>
-                       <td><strong>Department:</strong></td>
-                       <td>{department}</td>
-                   </tr>
-                   """
-                : string.Empty;
-
-        return $"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>SpaceBook Start Reminder</title>
-        </head>
-
-        <body style="
-            font-family:Arial,sans-serif;
-            background:#f4f6f9;
-            padding:24px;">
-
-            <div style="
-                max-width:580px;
-                margin:auto;
-                background:#ffffff;
-                padding:24px;
-                border-left:4px solid #2563eb;">
-
-                <h2>
-                    Booking Starts in 15 Minutes
-                </h2>
-
-                <table
-                    width="100%"
-                    cellpadding="7">
-
-                    <tr>
-                        <td><strong>Employee:</strong></td>
-                        <td>
-                            {employeeName}
-                            ({employeeEmail})
-                        </td>
-                    </tr>
-
-                    {departmentRow}
-
-                    <tr>
-                        <td><strong>Meeting:</strong></td>
-                        <td>{meetingTitle}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Room:</strong></td>
-                        <td>{roomName}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Date:</strong></td>
-                        <td>{bookingDate:MMMM dd, yyyy}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Start:</strong></td>
-                        <td>{FormatTime(startTime)}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>End:</strong></td>
-                        <td>{FormatTime(endTime)}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Participants:</strong></td>
-                        <td>{participantCount}</td>
-                    </tr>
-
-                </table>
-
-                <p>
-                    Regards,<br>
-                    <strong>SpaceBook</strong>
-                </p>
-
-            </div>
-        </body>
-        </html>
-        """;
-    }
-
-    // =========================================================
     // EMPLOYEE END REMINDER EMAIL
     // =========================================================
 
@@ -1254,93 +1071,6 @@ public class EmailService : IEmailService
                     Please complete your meeting and
                     vacate the room on time.
                 </p>
-
-                <p>
-                    Regards,<br>
-                    <strong>SpaceBook</strong>
-                </p>
-
-            </div>
-        </body>
-        </html>
-        """;
-    }
-
-    // =========================================================
-    // ADMIN END REMINDER EMAIL
-    // =========================================================
-
-    private static string BuildAdminEndReminderEmailHtml(
-        string employeeName,
-        string employeeEmail,
-        string meetingTitle,
-        string roomName,
-        DateOnly bookingDate,
-        TimeOnly startTime,
-        TimeOnly endTime)
-    {
-        return $"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>SpaceBook End Reminder</title>
-        </head>
-
-        <body style="
-            font-family:Arial,sans-serif;
-            background:#f4f6f9;
-            padding:24px;">
-
-            <div style="
-                max-width:580px;
-                margin:auto;
-                background:#ffffff;
-                padding:24px;
-                border-left:4px solid #d97706;">
-
-                <h2>
-                    Booking Ends in 15 Minutes
-                </h2>
-
-                <table
-                    width="100%"
-                    cellpadding="7">
-
-                    <tr>
-                        <td><strong>Employee:</strong></td>
-                        <td>
-                            {employeeName}
-                            ({employeeEmail})
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Meeting:</strong></td>
-                        <td>{meetingTitle}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Room:</strong></td>
-                        <td>{roomName}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Date:</strong></td>
-                        <td>{bookingDate:MMMM dd, yyyy}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>Start:</strong></td>
-                        <td>{FormatTime(startTime)}</td>
-                    </tr>
-
-                    <tr>
-                        <td><strong>End:</strong></td>
-                        <td>{FormatTime(endTime)}</td>
-                    </tr>
-
-                </table>
 
                 <p>
                     Regards,<br>
