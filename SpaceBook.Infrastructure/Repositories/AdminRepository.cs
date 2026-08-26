@@ -89,6 +89,11 @@ public class AdminRepository : IAdminRepository
                 ));
         }
 
+        if (filter?.RoomTypeId.HasValue == true && filter.RoomTypeId.Value > 0)
+        {
+            roomsQuery = roomsQuery.Where(r => r.RoomTypeId == filter.RoomTypeId.Value);
+        }
+
         var totalRoomsInScope = await roomsQuery.CountAsync();
         dashboard.TotalRooms = totalRoomsInScope > 0 ? totalRoomsInScope : await _context.Rooms.CountAsync();
 
@@ -109,6 +114,11 @@ public class AdminRepository : IAdminRepository
         if (endDate.HasValue)
         {
             bookingsQuery = bookingsQuery.Where(b => b.BookingDate <= endDate.Value);
+        }
+
+        if (filter?.RoomTypeId.HasValue == true && filter.RoomTypeId.Value > 0)
+        {
+            bookingsQuery = bookingsQuery.Where(b => b.Room != null && b.Room.RoomTypeId == filter.RoomTypeId.Value);
         }
 
         if (filter != null &&
@@ -268,7 +278,31 @@ public class AdminRepository : IAdminRepository
             return (today, today);
         }
 
-        // If specific Month / Year provided
+        // 1. Explicit StartDate / EndDate takes absolute top priority
+        if (filter.StartDate.HasValue || filter.EndDate.HasValue)
+        {
+            return (filter.StartDate ?? today, filter.EndDate ?? filter.StartDate ?? today);
+        }
+
+        var tf = filter.Timeframe?.Trim().ToLowerInvariant();
+
+        // 2. Named Timeframes
+        if (!string.IsNullOrWhiteSpace(tf) && tf != "all" && tf != "all time")
+        {
+            return tf switch
+            {
+                "daily" or "today" or "day" => (today, today),
+                "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
+                "past 7 days" or "last 7 days" or "7 days" or "weekly" or "week" or "this week" => (today.AddDays(-6), today),
+                "past 30 days" or "last 30 days" or "30 days" => (today.AddDays(-29), today),
+                "this month" or "monthly" or "month" => (new DateOnly(today.Year, today.Month, 1), new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month))),
+                "past dates" or "past" => (null, today.AddDays(-1)),
+                "upcoming" or "future" => (today.AddDays(1), null),
+                _ => (null, null)
+            };
+        }
+
+        // 3. Specific Month / Year provided
         if (filter.Month.HasValue || filter.Year.HasValue)
         {
             int year = filter.Year ?? today.Year;
@@ -284,33 +318,12 @@ public class AdminRepository : IAdminRepository
             }
         }
 
-        if (filter.StartDate.HasValue || filter.EndDate.HasValue)
+        // If module or status filter is passed with "all time", return null
+        if (tf == "all" || tf == "all time")
         {
-            return (filter.StartDate, filter.EndDate);
+            return (null, null);
         }
 
-        var tf = filter.Timeframe?.Trim().ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(tf))
-        {
-            // If module or status filter is passed without timeframe, look across active window
-            if (!string.IsNullOrWhiteSpace(filter.Module) || !string.IsNullOrWhiteSpace(filter.Status))
-            {
-                return (null, null);
-            }
-            return (today, today);
-        }
-
-        return tf switch
-        {
-            "today" => (today, today),
-            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
-            "this week" or "week" => (today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday), today.AddDays(7 - (int)today.DayOfWeek)),
-            "past 7 days" or "last 7 days" or "7 days" => (today.AddDays(-6), today),
-            "past 30 days" or "last 30 days" or "30 days" or "this month" or "month" => (today.AddDays(-29), today),
-            "past dates" or "past" => (null, today.AddDays(-1)),
-            "upcoming" or "future" => (today.AddDays(1), null),
-            "all time" => (null, null),
-            _ => (null, null)
-        };
+        return (today, today);
     }
 }
