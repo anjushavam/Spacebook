@@ -10,6 +10,18 @@ public interface INotificationService
     Task MarkAllAsReadAsync(
         int employeeId);
 
+    Task ClearNotificationsForUserAsync(
+        int employeeId);
+
+    Task DeleteNotificationAsync(
+        int notificationId,
+        int employeeId);
+
+    Task ClearAdminNotificationsAsync();
+
+    Task DeleteAdminNotificationAsync(
+        int notificationId);
+
     Task CreateNotificationAsync(
         int employeeId,
         int? bookingId,

@@ -41,6 +41,54 @@ public class NotificationService : INotificationService
     }
 
     // =========================================================
+    // CLEAR ALL NOTIFICATIONS FOR USER
+    // =========================================================
+
+    public async Task ClearNotificationsForUserAsync(
+        int employeeId)
+    {
+        await _notificationRepository
+            .ClearEmployeeNotificationsAsync(
+                employeeId);
+    }
+
+    // =========================================================
+    // DELETE SINGLE NOTIFICATION FOR USER
+    // =========================================================
+
+    public async Task DeleteNotificationAsync(
+        int notificationId,
+        int employeeId)
+    {
+        await _notificationRepository
+            .DeleteEmployeeNotificationAsync(
+                notificationId,
+                employeeId);
+    }
+
+    // =========================================================
+    // CLEAR ALL ADMIN NOTIFICATIONS
+    // =========================================================
+
+    public async Task ClearAdminNotificationsAsync()
+    {
+        await _notificationRepository
+            .ClearAdminNotificationsAsync();
+    }
+
+    // =========================================================
+    // DELETE SINGLE ADMIN NOTIFICATION
+    // =========================================================
+
+    public async Task DeleteAdminNotificationAsync(
+        int notificationId)
+    {
+        await _notificationRepository
+            .DeleteAdminNotificationAsync(
+                notificationId);
+    }
+
+    // =========================================================
     // CREATE NOTIFICATION
     // =========================================================
 

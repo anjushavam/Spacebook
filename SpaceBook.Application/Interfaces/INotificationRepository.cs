@@ -53,6 +53,38 @@ public interface INotificationRepository
 
 
     // =========================================================
+    // CLEAR ALL EMPLOYEE NOTIFICATIONS
+    // =========================================================
+
+    Task ClearEmployeeNotificationsAsync(
+        int employeeId);
+
+
+    // =========================================================
+    // DELETE SINGLE EMPLOYEE NOTIFICATION
+    // =========================================================
+
+    Task DeleteEmployeeNotificationAsync(
+        int notificationId,
+        int employeeId);
+
+
+    // =========================================================
+    // CLEAR ALL ADMIN NOTIFICATIONS
+    // =========================================================
+
+    Task ClearAdminNotificationsAsync();
+
+
+    // =========================================================
+    // DELETE SINGLE ADMIN NOTIFICATION
+    // =========================================================
+
+    Task DeleteAdminNotificationAsync(
+        int notificationId);
+
+
+    // =========================================================
     // ADD NOTIFICATION
     // =========================================================
 

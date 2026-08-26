@@ -153,6 +153,61 @@ public class AdminNotificationController : ControllerBase
         }
     }
 
+    // =========================================================
+    // DELETE: api/admin/notifications
+    // DELETE: api/admin/notifications/clear-all
+    // =========================================================
+
+    [HttpDelete]
+    [HttpDelete("clear-all")]
+    public async Task<IActionResult> ClearAllNotifications()
+    {
+        try
+        {
+            await _notificationRepository
+                .ClearAdminNotificationsAsync();
+
+            return Ok(new
+            {
+                message = "All admin notifications cleared successfully."
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // DELETE: api/admin/notifications/{id}
+    // =========================================================
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteNotification(int id)
+    {
+        try
+        {
+            await _notificationRepository
+                .DeleteAdminNotificationAsync(id);
+
+            return Ok(new
+            {
+                message = "Notification deleted successfully."
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
 
     // =========================================================
     // Time Ago

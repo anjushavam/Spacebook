@@ -794,93 +794,140 @@ public class EmailService : IEmailService
         <html>
         <head>
             <meta charset="utf-8">
-            <title>SpaceBook Admin Booking Alert</title>
+            <title>SpaceBook Booking Confirmed</title>
         </head>
 
         <body style="
-            font-family:Arial,sans-serif;
-            background:#f4f6f9;
-            padding:24px;">
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
 
-            <div style="
-                max-width:580px;
-                margin:0 auto;
-                background:#ffffff;
-                border-radius:10px;
-                padding:24px;
-                border-left:4px solid #10b981;">
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
 
-                <h2 style="
-                    color:#047857;
-                    margin-top:0;">
-                    Room Booking Confirmed
-                </h2>
+                <tr>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
 
-                <p>
-                    A room booking has been automatically approved.
-                </p>
+                        <h1 style="margin:0;font-size:24px;">
+                            SpaceBook
+                        </h1>
 
-                <table
-                    width="100%"
-                    cellpadding="7"
-                    cellspacing="0"
-                    style="
-                        background:#f8fafc;
-                        border:1px solid #e2e8f0;">
+                        <p style="margin:6px 0 0;">
+                            Room Booking Confirmed
+                        </p>
+                    </td>
+                </tr>
 
-                    <tr>
-                        <td><strong>Employee:</strong></td>
-                        <td>
-                            {employeeName}
-                            ({employeeEmail})
-                        </td>
-                    </tr>
+                <tr>
+                    <td style="padding:28px;">
 
-                    {departmentRow}
+                        <h2 style="margin-top:0;">
+                            Hello Admin,
+                        </h2>
 
-                    <tr>
-                        <td><strong>Meeting:</strong></td>
-                        <td>{meetingTitle}</td>
-                    </tr>
+                        <p>
+                            A room booking has been automatically approved.
+                        </p>
 
-                    <tr>
-                        <td><strong>Room:</strong></td>
-                        <td>{roomName}</td>
-                    </tr>
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
 
-                    <tr>
-                        <td><strong>Date:</strong></td>
-                        <td>{bookingDate:MMMM dd, yyyy}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Employee:</strong></td>
+                                <td>{employeeName} ({employeeEmail})</td>
+                            </tr>
 
-                    <tr>
-                        <td><strong>Start:</strong></td>
-                        <td>{FormatTime(startTime)}</td>
-                    </tr>
+                            {departmentRow}
 
-                    <tr>
-                        <td><strong>End:</strong></td>
-                        <td>{FormatTime(endTime)}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{meetingTitle}</td>
+                            </tr>
 
-                    <tr>
-                        <td><strong>Participants:</strong></td>
-                        <td>{participantCount}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{roomName}</td>
+                            </tr>
 
-                    <tr>
-                        <td><strong>Status:</strong></td>
-                        <td>Approved</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Date:</strong></td>
+                                <td>{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
 
-                </table>
+                            <tr>
+                                <td><strong>Start Time:</strong></td>
+                                <td>{FormatTime(startTime)}</td>
+                            </tr>
 
-                <p>
-                    Regards,<br>
-                    <strong>SpaceBook</strong>
-                </p>
+                            <tr>
+                                <td><strong>End Time:</strong></td>
+                                <td>{FormatTime(endTime)}</td>
+                            </tr>
 
-            </div>
+                            <tr>
+                                <td><strong>Participants:</strong></td>
+                                <td>{participantCount}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td style="
+                                    color:#059669;
+                                    font-weight:bold;">
+                                    Approved
+                                </td>
+                            </tr>
+
+                        </table>
+
+                        <p>
+                            The room has been successfully reserved.
+                        </p>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification from SpaceBook.
+
+                    </td>
+                </tr>
+
+            </table>
         </body>
         </html>
         """;
@@ -904,86 +951,124 @@ public class EmailService : IEmailService
         <html>
         <head>
             <meta charset="utf-8">
-            <title>
-                SpaceBook Reminder - Booking Starts in 15 Minutes
-            </title>
+            <title>SpaceBook Reminder - Booking Starts in 15 Minutes</title>
         </head>
 
         <body style="
-            font-family:Arial,sans-serif;
-            background:#f4f6f9;
-            padding:24px;">
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
 
-            <div style="
-                max-width:580px;
-                margin:0 auto;
-                background:#ffffff;
-                padding:28px;
-                border-radius:12px;">
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
 
-                <h1>
-                    SpaceBook
-                </h1>
+                <tr>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
 
-                <h2>
-                    Hello {employeeName},
-                </h2>
+                        <h1 style="margin:0;font-size:24px;">
+                            SpaceBook
+                        </h1>
 
-                <p>
-                    This is a reminder that your SpaceBook room booking
-                    will start in <strong>15 minutes</strong>.
-                </p>
+                        <p style="margin:6px 0 0;">
+                            Booking Starts in 15 Minutes
+                        </p>
+                    </td>
+                </tr>
 
-                <table
-                    width="100%"
-                    cellpadding="8"
-                    cellspacing="0"
-                    style="
-                        background:#f8fafc;
-                        border:1px solid #e2e8f0;">
+                <tr>
+                    <td style="padding:28px;">
 
-                    <tr>
-                        <td><strong>Meeting:</strong></td>
-                        <td>{meetingTitle}</td>
-                    </tr>
+                        <h2 style="margin-top:0;">
+                            Hello {employeeName},
+                        </h2>
 
-                    <tr>
-                        <td><strong>Room:</strong></td>
-                        <td>{roomName}</td>
-                    </tr>
+                        <p>
+                            This is a reminder that your SpaceBook room booking will start in <strong>15 minutes</strong>.
+                        </p>
 
-                    <tr>
-                        <td><strong>Date:</strong></td>
-                        <td>{bookingDate:MMMM dd, yyyy}</td>
-                    </tr>
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
 
-                    <tr>
-                        <td><strong>Start:</strong></td>
-                        <td>{FormatTime(startTime)}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{meetingTitle}</td>
+                            </tr>
 
-                    <tr>
-                        <td><strong>End:</strong></td>
-                        <td>{FormatTime(endTime)}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{roomName}</td>
+                            </tr>
 
-                    <tr>
-                        <td><strong>Participants:</strong></td>
-                        <td>{participantCount}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Date:</strong></td>
+                                <td>{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
 
-                </table>
+                            <tr>
+                                <td><strong>Start Time:</strong></td>
+                                <td>{FormatTime(startTime)}</td>
+                            </tr>
 
-                <p>
-                    Please be ready for your booking.
-                </p>
+                            <tr>
+                                <td><strong>End Time:</strong></td>
+                                <td>{FormatTime(endTime)}</td>
+                            </tr>
 
-                <p>
-                    Regards,<br>
-                    <strong>SpaceBook</strong>
-                </p>
+                            <tr>
+                                <td><strong>Participants:</strong></td>
+                                <td>{participantCount}</td>
+                            </tr>
 
-            </div>
+                        </table>
+
+                        <p>
+                            Please be ready for your booking.
+                        </p>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification from SpaceBook.
+
+                    </td>
+                </tr>
+
+            </table>
         </body>
         </html>
         """;
@@ -1006,78 +1091,119 @@ public class EmailService : IEmailService
         <html>
         <head>
             <meta charset="utf-8">
-            <title>
-                SpaceBook Reminder - Booking Ends in 15 Minutes
-            </title>
+            <title>SpaceBook Reminder - Booking Ends in 15 Minutes</title>
         </head>
 
         <body style="
-            font-family:Arial,sans-serif;
-            background:#f4f6f9;
-            padding:24px;">
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
 
-            <div style="
-                max-width:580px;
-                margin:auto;
-                background:#ffffff;
-                padding:28px;
-                border-radius:12px;">
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
 
-                <h1>
-                    SpaceBook
-                </h1>
+                <tr>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
 
-                <h2>
-                    Hello {employeeName},
-                </h2>
+                        <h1 style="margin:0;font-size:24px;">
+                            SpaceBook
+                        </h1>
 
-                <p>
-                    Your SpaceBook room booking will end in
-                    <strong>15 minutes</strong>.
-                </p>
+                        <p style="margin:6px 0 0;">
+                            Booking Ends in 15 Minutes
+                        </p>
+                    </td>
+                </tr>
 
-                <table
-                    width="100%"
-                    cellpadding="8">
+                <tr>
+                    <td style="padding:28px;">
 
-                    <tr>
-                        <td><strong>Meeting:</strong></td>
-                        <td>{meetingTitle}</td>
-                    </tr>
+                        <h2 style="margin-top:0;">
+                            Hello {employeeName},
+                        </h2>
 
-                    <tr>
-                        <td><strong>Room:</strong></td>
-                        <td>{roomName}</td>
-                    </tr>
+                        <p>
+                            Your SpaceBook room booking will end in <strong>15 minutes</strong>.
+                        </p>
 
-                    <tr>
-                        <td><strong>Date:</strong></td>
-                        <td>{bookingDate:MMMM dd, yyyy}</td>
-                    </tr>
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
 
-                    <tr>
-                        <td><strong>Start:</strong></td>
-                        <td>{FormatTime(startTime)}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{meetingTitle}</td>
+                            </tr>
 
-                    <tr>
-                        <td><strong>End:</strong></td>
-                        <td>{FormatTime(endTime)}</td>
-                    </tr>
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{roomName}</td>
+                            </tr>
 
-                </table>
+                            <tr>
+                                <td><strong>Date:</strong></td>
+                                <td>{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
 
-                <p>
-                    Please complete your meeting and
-                    vacate the room on time.
-                </p>
+                            <tr>
+                                <td><strong>Start Time:</strong></td>
+                                <td>{FormatTime(startTime)}</td>
+                            </tr>
 
-                <p>
-                    Regards,<br>
-                    <strong>SpaceBook</strong>
-                </p>
+                            <tr>
+                                <td><strong>End Time:</strong></td>
+                                <td>{FormatTime(endTime)}</td>
+                            </tr>
 
-            </div>
+                        </table>
+
+                        <p>
+                            Please complete your meeting and vacate the room on time.
+                        </p>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification from SpaceBook.
+
+                    </td>
+                </tr>
+
+            </table>
         </body>
         </html>
         """;

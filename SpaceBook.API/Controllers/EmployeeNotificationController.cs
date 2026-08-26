@@ -101,4 +101,88 @@ public class EmployeeNotificationController : ControllerBase
             });
         }
     }
+
+    // =========================================================
+    // DELETE: api/employee/notifications
+    // DELETE: api/employee/notifications/clear-all
+    // =========================================================
+
+    [HttpDelete]
+    [HttpDelete("clear-all")]
+    public async Task<IActionResult> ClearAllNotifications()
+    {
+        try
+        {
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
+
+            if (employeeIdClaim == null ||
+                !int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid token."
+                });
+            }
+
+            await _notificationService
+                .ClearNotificationsForUserAsync(employeeId);
+
+            return Ok(new
+            {
+                message = "All notifications cleared successfully."
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // DELETE: api/employee/notifications/{id}
+    // =========================================================
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteNotification(int id)
+    {
+        try
+        {
+            var employeeIdClaim =
+                User.FindFirst(ClaimTypes.NameIdentifier);
+
+            if (employeeIdClaim == null ||
+                !int.TryParse(
+                    employeeIdClaim.Value,
+                    out int employeeId))
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid token."
+                });
+            }
+
+            await _notificationService
+                .DeleteNotificationAsync(id, employeeId);
+
+            return Ok(new
+            {
+                message = "Notification deleted successfully."
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
 }

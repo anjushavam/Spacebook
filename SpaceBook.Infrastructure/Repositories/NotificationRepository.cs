@@ -286,6 +286,87 @@ public class NotificationRepository
     }
 
     // =========================================================
+    // CLEAR ALL EMPLOYEE NOTIFICATIONS
+    // =========================================================
+
+    public async Task ClearEmployeeNotificationsAsync(
+        int employeeId)
+    {
+        if (employeeId <= 0)
+        {
+            return;
+        }
+
+        var notifications =
+            await _context.Notifications
+                .Where(n => n.EmployeeId == employeeId)
+                .ToListAsync();
+
+        if (notifications.Count > 0)
+        {
+            _context.Notifications.RemoveRange(notifications);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    // =========================================================
+    // DELETE SINGLE EMPLOYEE NOTIFICATION
+    // =========================================================
+
+    public async Task DeleteEmployeeNotificationAsync(
+        int notificationId,
+        int employeeId)
+    {
+        var notification =
+            await _context.Notifications
+                .FirstOrDefaultAsync(n =>
+                    n.NotificationId == notificationId &&
+                    n.EmployeeId == employeeId);
+
+        if (notification != null)
+        {
+            _context.Notifications.Remove(notification);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    // =========================================================
+    // CLEAR ALL ADMIN NOTIFICATIONS
+    // =========================================================
+
+    public async Task ClearAdminNotificationsAsync()
+    {
+        var adminNotifications =
+            await _context.Notifications
+                .Where(n => n.BookingId != null)
+                .ToListAsync();
+
+        if (adminNotifications.Count > 0)
+        {
+            _context.Notifications.RemoveRange(adminNotifications);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    // =========================================================
+    // DELETE SINGLE ADMIN NOTIFICATION
+    // =========================================================
+
+    public async Task DeleteAdminNotificationAsync(
+        int notificationId)
+    {
+        var notification =
+            await _context.Notifications
+                .FirstOrDefaultAsync(n => n.NotificationId == notificationId);
+
+        if (notification != null)
+        {
+            _context.Notifications.Remove(notification);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    // =========================================================
     // ADD
     // =========================================================
 
