@@ -1460,7 +1460,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
                 <tr>
                     <td style="
-                        background: #059669;
+                        background: #dc2626;
                         padding: 14px 18px;
                         text-align: center;
                         color: #ffffff;">
@@ -1593,7 +1593,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
                 <tr>
                     <td style="
-                        background: #059669;
+                        background: #dc2626;
                         padding: 14px 18px;
                         text-align: center;
                         color: #ffffff;">
@@ -1727,7 +1727,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
                 <tr>
                     <td style="
-                        background: #059669;
+                        background: #2563eb;
                         padding: 14px 18px;
                         text-align: center;
                         color: #ffffff;">
@@ -1796,8 +1796,8 @@ public class EmployeeBookingService : IEmployeeBookingService
 
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
-                                <td style="padding: 6px 10px; color: #059669; font-weight: bold;">
-                                    Approved
+                                <td style="padding: 6px 10px; color: #2563eb; font-weight: bold;">
+                                    Rescheduled & Approved
                                 </td>
                             </tr>
 
@@ -1875,7 +1875,7 @@ public class EmployeeBookingService : IEmployeeBookingService
 
                 <tr>
                     <td style="
-                        background: #059669;
+                        background: #2563eb;
                         padding: 14px 18px;
                         text-align: center;
                         color: #ffffff;">
@@ -1949,8 +1949,8 @@ public class EmployeeBookingService : IEmployeeBookingService
 
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
-                                <td style="padding: 6px 10px; color: #059669; font-weight: bold;">
-                                    Approved
+                                <td style="padding: 6px 10px; color: #2563eb; font-weight: bold;">
+                                    Rescheduled & Approved
                                 </td>
                             </tr>
 
