@@ -17,6 +17,7 @@ public class HotseatController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly INotificationRepository _notificationRepository;
     private readonly IEmailService _emailService;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
 
@@ -65,11 +66,13 @@ public class HotseatController : ControllerBase
     public HotseatController(
         ApplicationDbContext context,
         INotificationRepository notificationRepository,
-        IEmailService emailService)
+        IEmailService emailService,
+        IServiceScopeFactory scopeFactory)
     {
         _context = context;
         _notificationRepository = notificationRepository;
         _emailService = emailService;
+        _scopeFactory = scopeFactory;
     }
 
     private async Task AutoExpireOverdueHotseatBookingsAsync()
@@ -685,34 +688,53 @@ public class HotseatController : ControllerBase
             booking.HotseatBookingId,
             $"Your hotseat booking for {seat.SeatNumber} in {seat.Module?.ModuleName} on {booking.BookingDate:dd-MMM-yyyy} starting at {startTimeStr} has been confirmed. Booking ID: #{booking.HotseatBookingId}.");
 
-        var employee = await _context.Employees
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+        var createdBookingId = booking.HotseatBookingId;
+        var createdSeatId = booking.SeatId;
 
-        var adminEmails = await _context.Employees
-            .AsNoTracking()
-            .Include(e => e.Role)
-            .Where(e => e.Role != null &&
-                        (e.Role.RoleName == "Admin" || e.Role.RoleName == "ADMIN" || e.Role.RoleName == "admin") &&
-                        !string.IsNullOrWhiteSpace(e.Email))
-            .Select(e => e.Email)
-            .ToListAsync();
-
-        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+        _ = Task.Run(async () =>
         {
             try
             {
-                await _emailService.SendHotseatBookingConfirmationAsync(
-                    booking,
-                    employee,
-                    seat,
-                    adminEmails);
+                using var scope = _scopeFactory.CreateScope();
+                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                var employee = await context.Employees
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+
+                var seatDetails = await context.Seats
+                    .Include(s => s.Module)
+                        .ThenInclude(m => m!.Office)
+                            .ThenInclude(o => o!.Location)
+                    .FirstOrDefaultAsync(s => s.SeatId == createdSeatId);
+
+                var bookingEntity = await context.HotseatBookings
+                    .FirstOrDefaultAsync(b => b.HotseatBookingId == createdBookingId);
+
+                var adminEmails = await context.Employees
+                    .AsNoTracking()
+                    .Include(e => e.Role)
+                    .Where(e => e.Role != null &&
+                                (e.Role.RoleName == "Admin" || e.Role.RoleName == "ADMIN" || e.Role.RoleName == "admin") &&
+                                !string.IsNullOrWhiteSpace(e.Email))
+                    .Select(e => e.Email)
+                    .ToListAsync();
+
+                if (employee != null && !string.IsNullOrWhiteSpace(employee.Email) && bookingEntity != null)
+                {
+                    await emailService.SendHotseatBookingConfirmationAsync(
+                        bookingEntity,
+                        employee,
+                        seatDetails ?? new Seat { SeatId = createdSeatId, SeatNumber = $"Seat {createdSeatId}" },
+                        adminEmails);
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[HotseatController] Confirmation email failed: {ex.Message}");
+                Console.WriteLine($"[HotseatController] Background confirmation email failed: {ex.Message}");
             }
-        }
+        });
 
         // --------------------------------------------------------
         // RESPONSE

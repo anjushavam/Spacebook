@@ -1237,7 +1237,7 @@ public class EmailService : IEmailService
         var startTimeFormatted = localStartTime.ToString("hh:mm tt");
         var checkInOpensFormatted = localStartTime.AddHours(-1).ToString("hh:mm tt");
 
-        var employeeSubject = $"SpaceBook Hotseat Booking Confirmed - Seat {seatNumber}";
+        var employeeSubject = $"SpaceBook Booking Confirmed - Hotseat ({seatNumber})";
         var employeeBody = BuildHotseatConfirmationEmailHtml(
             employeeName,
             booking.HotseatBookingId,
@@ -1416,66 +1416,143 @@ public class EmailService : IEmailService
         return $"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>SpaceBook Hotseat Booking Confirmed</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
-            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Hotseat Booking Confirmed</title>
+        </head>
+
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 12px;
+            color: #1e293b;
+            margin: 0;">
+
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width: 520px;
+                    background: #ffffff;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+
                 <tr>
-                    <td style="background: #059669; padding: 14px 18px; text-align: center; color: #ffffff;">
-                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook</h1>
-                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Booking Confirmed</p>
+                    <td style="
+                        background: #059669;
+                        padding: 14px 18px;
+                        text-align: center;
+                        color: #ffffff;">
+
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">
+                            SpaceBook
+                        </h1>
+
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">
+                            Hotseat Booking Confirmed
+                        </p>
                     </td>
                 </tr>
+
                 <tr>
                     <td style="padding: 16px 20px;">
-                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Hello {employeeName},</h2>
+
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">
+                            Hello {employeeName},
+                        </h2>
+
                         <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
-                            Your hotseat reservation has been confirmed successfully.
+                            Your SpaceBook hotseat booking has been confirmed successfully.
                         </p>
-                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+
+                        <table
+                            width="100%"
+                            cellpadding="0"
+                            cellspacing="0"
+                            style="
+                                background: #f8fafc;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 6px;
+                                margin: 10px 0;
+                                font-size: 13px;">
+
                             <tr>
-                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Space Type:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">Hot Seat</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
                             </tr>
+
                             <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / City:</strong></td>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / Location:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Date:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
                             </tr>
+
                             <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Start Time:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Check-In Window:</strong></td>
                                 <td style="padding: 6px 10px; color: #059669; font-weight: 600;">Opens at {checkInOpensFormatted} (1 hr before start)</td>
                             </tr>
+
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                            </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
-                                <td style="padding: 6px 10px; color: #059669; font-weight: bold;">Confirmed</td>
+                                <td style="padding: 6px 10px; color: #059669; font-weight: bold;">
+                                    Confirmed
+                                </td>
                             </tr>
+
                         </table>
+
                         <p style="margin: 8px 0 6px 0; font-size: 12px; color: #475569;">
-                            <strong>Important Check-In Notice:</strong> Check-in is available only within 1 hour before the booking start time. Please ensure you check in before {startTimeFormatted} to retain your reservation.
+                            Your hotseat has been successfully reserved. Check-in is available within 1 hour before the booking start time.
                         </p>
-                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Team</strong></p>
+
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
                     </td>
                 </tr>
+
                 <tr>
-                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                    <td style="
+                        text-align: center;
+                        padding: 8px 14px;
+                        background: #f1f5f9;
+                        color: #64748b;
+                        font-size: 11px;">
+
                         This is an automated notification from SpaceBook.
+
                     </td>
                 </tr>
+
             </table>
         </body>
         </html>
