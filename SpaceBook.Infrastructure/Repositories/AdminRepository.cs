@@ -221,9 +221,20 @@ public class AdminRepository : IAdminRepository
             ? 0.0
             : (bookedRoomHours / availableRoomHours) * 100.0;
 
-        utilization = Math.Min(utilization, 100.0);
-
+        dashboard.ActiveRoomsCount = dashboard.TotalRooms;
+        dashboard.ActiveRooms = dashboard.TotalRooms;
+        dashboard.TotalReservations = bookings.Count;
+        dashboard.TotalBookings = bookings.Count;
+        dashboard.ConfirmedBookings = approvedBookings.Count;
+        dashboard.ConfirmedRate = bookings.Count > 0 ? Math.Round(approvedBookings.Count * 100.0 / bookings.Count, 1) : 0.0;
+        dashboard.CancelledBookings = bookings.Count(x => x.Status == "Cancelled" || x.Status == "Canceled");
+        dashboard.CancelledRate = bookings.Count > 0 ? Math.Round(dashboard.CancelledBookings * 100.0 / bookings.Count, 1) : 0.0;
         dashboard.Utilization = Math.Round(utilization, 2);
+        dashboard.OccupancyRate = Math.Round(utilization, 2);
+        dashboard.UtilizationRate = Math.Round(utilization, 2);
+        dashboard.UtilizationPercentage = Math.Round(utilization, 2);
+        dashboard.Occupancy = Math.Round(utilization, 2);
+        dashboard.TotalVolumePercentage = 100.0;
 
         // =========================================================
         // PENDING APPROVAL LIST

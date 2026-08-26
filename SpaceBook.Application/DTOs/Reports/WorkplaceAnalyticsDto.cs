@@ -10,6 +10,10 @@ public class WorkplaceAnalyticsDto
 
     public int ActiveRoomsCount { get; set; }
 
+    public int ActiveRooms { get; set; }
+
+    public int TotalBookings { get; set; }
+
     public int ConfirmedBookings { get; set; }
 
     public double ConfirmedRate { get; set; }
@@ -25,6 +29,14 @@ public class WorkplaceAnalyticsDto
     public double Utilization { get; set; }
 
     public double OccupancyRate { get; set; }
+
+    public double UtilizationRate { get; set; }
+
+    public double UtilizationPercentage { get; set; }
+
+    public double Occupancy { get; set; }
+
+    public double TotalVolumePercentage { get; set; } = 100.0;
 
     // =========================================================
     // CHARTS DATA

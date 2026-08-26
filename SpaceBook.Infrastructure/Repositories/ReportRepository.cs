@@ -60,6 +60,9 @@ public class ReportRepository : IReportRepository
     public async Task<BookingTrendDto> GetBookingTrendAsync(
         ReportFilterDto filter)
     {
+        var today = GetIndiaToday();
+        var (startDate, endDate) = ResolveDateRange(filter, today);
+
         var isHotseatsOnly = string.Equals(filter.ReportType, "Hotseats", StringComparison.OrdinalIgnoreCase);
         var isAll = string.Equals(filter.ReportType, "All", StringComparison.OrdinalIgnoreCase);
 
@@ -67,21 +70,53 @@ public class ReportRepository : IReportRepository
         var hotseatQuery = _context.HotseatBookings
             .AsNoTracking()
             .Include(h => h.Seat)
-                .ThenInclude(s => s!.Module)
+                .ThenInclude(s => s!.Module).ThenInclude(m => m!.Office)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(filter.Module))
+        if (startDate.HasValue)
         {
-            var moduleName = filter.Module.Trim();
+            hotseatQuery = hotseatQuery.Where(h => h.BookingDate >= startDate.Value);
+        }
+        if (endDate.HasValue)
+        {
+            hotseatQuery = hotseatQuery.Where(h => h.BookingDate <= endDate.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Module) && !filter.Module.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Module.Equals("All Modules", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetModule = filter.Module.Trim().ToLowerInvariant();
             hotseatQuery = hotseatQuery.Where(h =>
                 h.Seat != null &&
                 h.Seat.Module != null &&
-                h.Seat.Module.ModuleName == moduleName);
+                (
+                    h.Seat.Module.ModuleName.ToLower() == targetModule ||
+                    targetModule.Contains(h.Seat.Module.ModuleName.ToLower()) ||
+                    h.Seat.Module.ModuleName.ToLower().Contains(targetModule) ||
+                    (h.Seat.Module.Office != null &&
+                     (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName).ToLower() == targetModule) ||
+                    (h.Seat.Module.Office != null &&
+                     targetModule.Contains(h.Seat.Module.ModuleName.ToLower()) &&
+                     targetModule.Contains(h.Seat.Module.Office.OfficeName.ToLower()))
+                ));
         }
 
-        if (!string.IsNullOrWhiteSpace(filter.Status))
+        if (!string.IsNullOrWhiteSpace(filter.Status) && !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase))
         {
-            hotseatQuery = hotseatQuery.Where(h => h.BookingStatus == filter.Status);
+            var targetStatus = filter.Status.Trim();
+            if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase))
+            {
+                hotseatQuery = hotseatQuery.Where(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+            }
+            else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                hotseatQuery = hotseatQuery.Where(h => h.BookingStatus == "Cancelled");
+            }
+            else
+            {
+                hotseatQuery = hotseatQuery.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
+            }
         }
 
         // Rooms Query
@@ -90,28 +125,61 @@ public class ReportRepository : IReportRepository
             .Include(b => b.Room)
                 .ThenInclude(r => r!.RoomType)
             .Include(b => b.Room)
-                .ThenInclude(r => r!.Module)
+                .ThenInclude(r => r!.Module).ThenInclude(m => m!.Office)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(filter.Module))
+        if (startDate.HasValue)
         {
-            var moduleName = filter.Module.Trim();
+            roomQuery = roomQuery.Where(b => b.BookingDate >= startDate.Value);
+        }
+        if (endDate.HasValue)
+        {
+            roomQuery = roomQuery.Where(b => b.BookingDate <= endDate.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Module) && !filter.Module.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Module.Equals("All Modules", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetModule = filter.Module.Trim().ToLowerInvariant();
             roomQuery = roomQuery.Where(b =>
                 b.Room != null &&
                 b.Room.Module != null &&
-                b.Room.Module.ModuleName == moduleName);
+                (
+                    b.Room.Module.ModuleName.ToLower() == targetModule ||
+                    targetModule.Contains(b.Room.Module.ModuleName.ToLower()) ||
+                    b.Room.Module.ModuleName.ToLower().Contains(targetModule) ||
+                    (b.Room.Module.Office != null &&
+                     (b.Room.Module.ModuleName + " - " + b.Room.Module.Office.OfficeName).ToLower() == targetModule) ||
+                    (b.Room.Module.Office != null &&
+                     targetModule.Contains(b.Room.Module.ModuleName.ToLower()) &&
+                     targetModule.Contains(b.Room.Module.Office.OfficeName.ToLower()))
+                ));
         }
 
-        if (filter.RoomTypeId.HasValue)
+        if (filter.RoomTypeId.HasValue && filter.RoomTypeId.Value > 0)
         {
             roomQuery = roomQuery.Where(b =>
                 b.Room != null &&
                 b.Room.RoomTypeId == filter.RoomTypeId.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(filter.Status))
+        if (!string.IsNullOrWhiteSpace(filter.Status) && !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase))
         {
-            roomQuery = roomQuery.Where(b => b.Status == filter.Status);
+            var targetStatus = filter.Status.Trim();
+            if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                roomQuery = roomQuery.Where(b => b.Status == "Approved" || b.Status == "Confirmed");
+            }
+            else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                roomQuery = roomQuery.Where(b => b.Status == "Cancelled" || b.Status == "Canceled");
+            }
+            else
+            {
+                roomQuery = roomQuery.Where(b => b.Status.ToLower() == targetStatus.ToLower());
+            }
         }
 
         if (isHotseatsOnly)
@@ -119,41 +187,36 @@ public class ReportRepository : IReportRepository
             var hotseats = await hotseatQuery.ToListAsync();
             int total = hotseats.Count;
             int unique = hotseats.Select(h => h.SeatId).Distinct().Count();
-            double confirmedRate = total == 0 ? 0 : Math.Round(hotseats.Count(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn") * 100.0 / total, 2);
+            int confirmedCount = hotseats.Count(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+            double confirmedRate = total == 0 ? 0 : Math.Round(confirmedCount * 100.0 / total, 1);
+            int cancelledCount = hotseats.Count(h => h.BookingStatus == "Cancelled");
+            double cancelledRate = total == 0 ? 0 : Math.Round(cancelledCount * 100.0 / total, 1);
+
+            int daysCount = startDate.HasValue && endDate.HasValue
+                ? Math.Max(1, endDate.Value.DayNumber - startDate.Value.DayNumber + 1)
+                : Math.Max(1, hotseats.Select(h => h.BookingDate).Distinct().Count());
+            double totalAvail = Math.Max(1, unique * daysCount);
+            double util = Math.Round((confirmedCount / totalAvail) * 100.0, 1);
 
             return new BookingTrendDto
             {
                 TotalBookings = total,
+                TotalReservations = total,
                 UniqueRooms = unique,
+                ActiveRoomsCount = unique,
+                ConfirmedBookings = confirmedCount,
                 ConfirmedRate = confirmedRate,
+                CancelledBookings = cancelledCount,
+                CancelledRate = cancelledRate,
+                Utilization = util,
+                OccupancyRate = util,
+                UtilizationRate = util,
+                UtilizationPercentage = util,
+                Occupancy = util,
                 AverageDuration = "Full Day",
                 Chart = hotseats.GroupBy(h => h.BookingStatus)
                     .Select(g => new BookingTrendChartDto { Label = g.Key, Count = g.Count() })
                     .ToList()
-            };
-        }
-        else if (isAll)
-        {
-            var rooms = await roomQuery.ToListAsync();
-            var hotseats = await hotseatQuery.ToListAsync();
-            int total = rooms.Count + hotseats.Count;
-            int unique = rooms.Select(r => r.RoomId).Distinct().Count() + hotseats.Select(h => h.SeatId).Distinct().Count();
-            int confirmedCount = rooms.Count(r => r.Status == "Approved") + hotseats.Count(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn");
-            double confirmedRate = total == 0 ? 0 : Math.Round(confirmedCount * 100.0 / total, 2);
-
-            var chartList = new List<BookingTrendChartDto>
-            {
-                new BookingTrendChartDto { Label = "Room Bookings", Count = rooms.Count },
-                new BookingTrendChartDto { Label = "Hotseat Bookings", Count = hotseats.Count }
-            };
-
-            return new BookingTrendDto
-            {
-                TotalBookings = total,
-                UniqueRooms = unique,
-                ConfirmedRate = confirmedRate,
-                AverageDuration = "Mixed",
-                Chart = chartList
             };
         }
         else
@@ -161,14 +224,35 @@ public class ReportRepository : IReportRepository
             var bookings = await roomQuery.ToListAsync();
             int total = bookings.Count;
             int unique = bookings.Select(b => b.RoomId).Distinct().Count();
-            double confirmedRate = total == 0 ? 0 : Math.Round(bookings.Count(b => b.Status == "Approved") * 100.0 / total, 2);
+            int confirmedCount = bookings.Count(b => b.Status == "Approved" || b.Status == "Confirmed");
+            double confirmedRate = total == 0 ? 0 : Math.Round(confirmedCount * 100.0 / total, 1);
+            int cancelledCount = bookings.Count(b => b.Status == "Cancelled" || b.Status == "Canceled");
+            double cancelledRate = total == 0 ? 0 : Math.Round(cancelledCount * 100.0 / total, 1);
+
+            int daysCount = startDate.HasValue && endDate.HasValue
+                ? Math.Max(1, endDate.Value.DayNumber - startDate.Value.DayNumber + 1)
+                : Math.Max(1, bookings.Select(b => b.BookingDate).Distinct().Count());
+            double totalAvailHours = Math.Max(1, unique) * daysCount * 12.0;
+            double bookedHours = bookings.Where(b => b.Status == "Approved" || b.Status == "Confirmed")
+                .Sum(b => Math.Max(0.5, (b.EndTime.ToTimeSpan() - b.StartTime.ToTimeSpan()).TotalHours));
+            double util = totalAvailHours > 0 ? Math.Round((bookedHours / totalAvailHours) * 100.0, 1) : 0.0;
 
             return new BookingTrendDto
             {
                 TotalBookings = total,
+                TotalReservations = total,
                 UniqueRooms = unique,
+                ActiveRoomsCount = unique,
+                ConfirmedBookings = confirmedCount,
                 ConfirmedRate = confirmedRate,
-                AverageDuration = "0h 0m",
+                CancelledBookings = cancelledCount,
+                CancelledRate = cancelledRate,
+                Utilization = util,
+                OccupancyRate = util,
+                UtilizationRate = util,
+                UtilizationPercentage = util,
+                Occupancy = util,
+                AverageDuration = "1h 0m",
                 Chart = bookings.GroupBy(b => b.Status)
                     .Select(g => new BookingTrendChartDto { Label = g.Key, Count = g.Count() })
                     .ToList()
@@ -643,7 +727,9 @@ public class ReportRepository : IReportRepository
         return new WorkplaceAnalyticsDto
         {
             TotalReservations = totalReservations,
+            TotalBookings = totalReservations,
             ActiveRoomsCount = activeRoomsCount,
+            ActiveRooms = activeRoomsCount,
             ConfirmedBookings = confirmedBookings,
             ConfirmedRate = confirmedRate,
             CancelledBookings = cancelledBookings,
@@ -652,6 +738,10 @@ public class ReportRepository : IReportRepository
             AvgBookingsPerPerson = avgPerPerson,
             Utilization = utilization,
             OccupancyRate = utilization,
+            UtilizationRate = utilization,
+            UtilizationPercentage = utilization,
+            Occupancy = utilization,
+            TotalVolumePercentage = 100.0,
             EmployeeRatios = employeeRatios,
             OutcomeBreakdown = outcomeBreakdown,
             Trendline = trendline,
