@@ -12,8 +12,8 @@ public class AdminService : IAdminService
         _repository = repository;
     }
  
-    public async Task<AdminDashboardDto> GetDashboardAsync()
+    public async Task<AdminDashboardDto> GetDashboardAsync(AdminDashboardFilterDto? filter = null)
     {
-        return await _repository.GetDashboardAsync();
+        return await _repository.GetDashboardAsync(filter);
     }
 }
