@@ -10,6 +10,8 @@ public class BookingDetailsDto
 
     public int ParticipantCount { get; set; }
 
+    public int RoomId { get; set; }
+
     public string RoomName { get; set; } = string.Empty;
 
    

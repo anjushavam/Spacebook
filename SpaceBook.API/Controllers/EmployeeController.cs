@@ -907,33 +907,6 @@ public class EmployeeController : ControllerBase
             }
 
             // -------------------------------------------------
-            // PARTICIPANT COUNT
-            // -------------------------------------------------
-
-            if (request.ParticipantCount <= 0)
-            {
-                return BadRequest(new
-                {
-                    Message =
-                        "Participant count must be greater than zero."
-                });
-            }
-
-            // -------------------------------------------------
-            // ROOM
-            // -------------------------------------------------
-
-            if (!request.RoomId.HasValue ||
-                request.RoomId.Value <= 0)
-            {
-                return BadRequest(new
-                {
-                    Message =
-                        "Room ID is required."
-                });
-            }
-
-            // -------------------------------------------------
             // UPDATE
             // -------------------------------------------------
 
@@ -988,10 +961,10 @@ public class EmployeeController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new
+            return BadRequest(new
             {
                 Message =
-                    "Unable to update booking.",
+                    ex.Message,
                 Error =
                     ex.InnerException?.Message ??
                     ex.Message

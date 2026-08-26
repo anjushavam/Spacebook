@@ -533,6 +533,9 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 EmployeeId =
                     b.EmployeeId,
 
+                RoomId =
+                    b.RoomId,
+
                 // -------------------------------------------------
                 // ROOM INFORMATION
                 // -------------------------------------------------
@@ -741,14 +744,13 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE ROOM ID
+        // FALLBACK / VALIDATE ROOM ID
         // -----------------------------------------------------
 
         if (!request.RoomId.HasValue ||
             request.RoomId.Value <= 0)
         {
-            throw new Exception(
-                "Room ID is required.");
+            request.RoomId = booking.RoomId;
         }
 
         // -----------------------------------------------------
@@ -782,13 +784,12 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
         }
 
         // -----------------------------------------------------
-        // VALIDATE PARTICIPANT COUNT
+        // FALLBACK / VALIDATE PARTICIPANT COUNT
         // -----------------------------------------------------
 
         if (request.ParticipantCount <= 0)
         {
-            throw new Exception(
-                "Participant count must be greater than zero.");
+            request.ParticipantCount = booking.ParticipantCount;
         }
 
         if (request.ParticipantCount > room.Capacity)

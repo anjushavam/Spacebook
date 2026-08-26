@@ -817,14 +817,77 @@ public class EmployeeBookingService : IEmployeeBookingService
         }
 
         // -----------------------------------------------------
-        // VALIDATE MEETING TITLE
+        // GET EXISTING BOOKING
+        // -----------------------------------------------------
+
+        var existingBooking =
+            await _bookingRepository
+                .GetBookingByIdAsync(
+                    bookingId,
+                    employeeId);
+
+        if (existingBooking == null)
+        {
+            throw new Exception(
+                "Booking not found.");
+        }
+
+        // -----------------------------------------------------
+        // PREVENT RESCHEDULE OF CANCELLED
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                existingBooking.Status,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "Cancelled bookings cannot be rescheduled.");
+        }
+
+        // -----------------------------------------------------
+        // PREVENT RESCHEDULE OF REJECTED
+        // -----------------------------------------------------
+
+        if (string.Equals(
+                existingBooking.Status,
+                "Rejected",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                "Rejected bookings cannot be rescheduled.");
+        }
+
+        // -----------------------------------------------------
+        // FALLBACK FOR MEETING TITLE
         // -----------------------------------------------------
 
         if (string.IsNullOrWhiteSpace(
             request.MeetingTitle))
         {
-            throw new Exception(
-                "Meeting title is required.");
+            request.MeetingTitle =
+                existingBooking.MeetingTitle;
+        }
+
+        // -----------------------------------------------------
+        // FALLBACK FOR ROOM ID
+        // -----------------------------------------------------
+
+        if (!request.RoomId.HasValue ||
+            request.RoomId.Value <= 0)
+        {
+            request.RoomId =
+                existingBooking.RoomId;
+        }
+
+        // -----------------------------------------------------
+        // FALLBACK FOR PARTICIPANT COUNT
+        // -----------------------------------------------------
+
+        if (request.ParticipantCount <= 0)
+        {
+            request.ParticipantCount =
+                existingBooking.ParticipantCount;
         }
 
         // -----------------------------------------------------
@@ -880,69 +943,6 @@ public class EmployeeBookingService : IEmployeeBookingService
         {
             throw new Exception(
                 "Bookings must end by 10:00 PM.");
-        }
-
-        // -----------------------------------------------------
-        // VALIDATE PARTICIPANT COUNT
-        // -----------------------------------------------------
-
-        if (request.ParticipantCount <= 0)
-        {
-            throw new Exception(
-                "Participant count must be at least 1.");
-        }
-
-        // -----------------------------------------------------
-        // VALIDATE ROOM ID
-        // -----------------------------------------------------
-
-        if (!request.RoomId.HasValue ||
-            request.RoomId.Value <= 0)
-        {
-            throw new Exception(
-                "Room ID is required.");
-        }
-
-        // -----------------------------------------------------
-        // GET EXISTING BOOKING
-        // -----------------------------------------------------
-
-        var existingBooking =
-            await _bookingRepository
-                .GetBookingByIdAsync(
-                    bookingId,
-                    employeeId);
-
-        if (existingBooking == null)
-        {
-            throw new Exception(
-                "Booking not found.");
-        }
-
-        // -----------------------------------------------------
-        // PREVENT RESCHEDULE OF CANCELLED
-        // -----------------------------------------------------
-
-        if (string.Equals(
-                existingBooking.Status,
-                "Cancelled",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new Exception(
-                "Cancelled bookings cannot be rescheduled.");
-        }
-
-        // -----------------------------------------------------
-        // PREVENT RESCHEDULE OF REJECTED
-        // -----------------------------------------------------
-
-        if (string.Equals(
-                existingBooking.Status,
-                "Rejected",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new Exception(
-                "Rejected bookings cannot be rescheduled.");
         }
 
         // -----------------------------------------------------
