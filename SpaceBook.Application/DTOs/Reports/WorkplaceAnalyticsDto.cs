@@ -22,6 +22,10 @@ public class WorkplaceAnalyticsDto
 
     public double AvgBookingsPerPerson { get; set; }
 
+    public double Utilization { get; set; }
+
+    public double OccupancyRate { get; set; }
+
     // =========================================================
     // CHARTS DATA
     // =========================================================

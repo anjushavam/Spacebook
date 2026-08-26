@@ -372,36 +372,13 @@ public class ReportRepository : IReportRepository
         ReportFilterDto filter)
     {
         var today = GetIndiaToday();
-
-        // Determine Date Range from Timeframe
-        DateOnly? startDate = filter.StartDate;
-        DateOnly? endDate = filter.EndDate;
-
-        if (!string.IsNullOrWhiteSpace(filter.Timeframe))
-        {
-            var tf = filter.Timeframe.Trim().ToLowerInvariant();
-            if (tf.Contains("7") || tf.Contains("week"))
-            {
-                startDate = today.AddDays(-7);
-                endDate = today;
-            }
-            else if (tf.Contains("30"))
-            {
-                startDate = today.AddDays(-30);
-                endDate = today;
-            }
-            else if (tf.Contains("month"))
-            {
-                startDate = new DateOnly(today.Year, today.Month, 1);
-                endDate = today;
-            }
-        }
+        var (startDate, endDate) = ResolveDateRange(filter, today);
 
         // Room Bookings Query
         var roomQuery = _context.Bookings
             .AsNoTracking()
             .Include(b => b.Employee)
-            .Include(b => b.Room).ThenInclude(r => r!.Module)
+            .Include(b => b.Room).ThenInclude(r => r!.Module).ThenInclude(m => m!.Office)
             .Include(b => b.Room).ThenInclude(r => r!.RoomType)
             .AsQueryable();
 
@@ -413,42 +390,142 @@ public class ReportRepository : IReportRepository
         {
             roomQuery = roomQuery.Where(b => b.BookingDate <= endDate.Value);
         }
-        if (!string.IsNullOrWhiteSpace(filter.Module) && !filter.Module.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Module.Equals("All Modules", StringComparison.OrdinalIgnoreCase))
+
+        if (!string.IsNullOrWhiteSpace(filter.Module) &&
+            !filter.Module.Equals("All", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Module.Equals("All Modules", StringComparison.OrdinalIgnoreCase))
         {
-            var moduleName = filter.Module.Trim();
+            var targetModule = filter.Module.Trim().ToLowerInvariant();
             roomQuery = roomQuery.Where(b =>
                 b.Room != null &&
                 b.Room.Module != null &&
-                (b.Room.Module.ModuleName == moduleName || b.Room.Module.ModuleName.Contains(moduleName)));
+                (
+                    b.Room.Module.ModuleName.ToLower() == targetModule ||
+                    targetModule.Contains(b.Room.Module.ModuleName.ToLower()) ||
+                    b.Room.Module.ModuleName.ToLower().Contains(targetModule) ||
+                    (b.Room.Module.Office != null &&
+                     (b.Room.Module.ModuleName + " - " + b.Room.Module.Office.OfficeName).ToLower() == targetModule) ||
+                    (b.Room.Module.Office != null &&
+                     targetModule.Contains(b.Room.Module.ModuleName.ToLower()) &&
+                     targetModule.Contains(b.Room.Module.Office.OfficeName.ToLower()))
+                ));
         }
+
         if (filter.RoomTypeId.HasValue)
         {
             roomQuery = roomQuery.Where(b => b.Room != null && b.Room.RoomTypeId == filter.RoomTypeId.Value);
         }
-        if (!string.IsNullOrWhiteSpace(filter.Status) && !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) && !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
+
+        if (!string.IsNullOrWhiteSpace(filter.Status) &&
+            !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
         {
-            roomQuery = roomQuery.Where(b => b.Status == filter.Status);
+            var targetStatus = filter.Status.Trim();
+            if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                roomQuery = roomQuery.Where(b => b.Status == "Approved" || b.Status == "Confirmed");
+            }
+            else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                roomQuery = roomQuery.Where(b => b.Status == "Cancelled" || b.Status == "Canceled");
+            }
+            else
+            {
+                roomQuery = roomQuery.Where(b => b.Status.ToLower() == targetStatus.ToLower());
+            }
         }
 
         var bookings = await roomQuery.ToListAsync();
 
+        // -----------------------------------------------------
+        // Active Rooms in Scope Query
+        // -----------------------------------------------------
+        var roomsCapacityQuery = _context.Rooms
+            .AsNoTracking()
+            .Include(r => r.Module).ThenInclude(m => m!.Office)
+            .Where(r => !r.IsBlocked && r.Status != "Blocked")
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filter.Module) &&
+            !filter.Module.Equals("All", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Module.Equals("All Modules", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetModule = filter.Module.Trim().ToLowerInvariant();
+            roomsCapacityQuery = roomsCapacityQuery.Where(r =>
+                r.Module != null &&
+                (
+                    r.Module.ModuleName.ToLower() == targetModule ||
+                    targetModule.Contains(r.Module.ModuleName.ToLower()) ||
+                    r.Module.ModuleName.ToLower().Contains(targetModule) ||
+                    (r.Module.Office != null &&
+                     (r.Module.ModuleName + " - " + r.Module.Office.OfficeName).ToLower() == targetModule) ||
+                    (r.Module.Office != null &&
+                     targetModule.Contains(r.Module.ModuleName.ToLower()) &&
+                     targetModule.Contains(r.Module.Office.OfficeName.ToLower()))
+                ));
+        }
+
+        var totalRoomsInScope = await roomsCapacityQuery.CountAsync();
+        int activeRoomsCount = totalRoomsInScope > 0 ? totalRoomsInScope : bookings.Select(b => b.RoomId).Distinct().Count();
+        if (activeRoomsCount == 0) activeRoomsCount = 1;
+
         // 1. Total Reservations
         int totalReservations = bookings.Count;
 
-        // 2. Active Rooms Count
-        int activeRoomsCount = bookings.Select(b => b.RoomId).Distinct().Count();
-
-        // 3. Confirmed Bookings (Approved)
+        // 2. Confirmed Bookings (Approved)
         int confirmedBookings = bookings.Count(b => b.Status == "Approved" || b.Status == "Confirmed");
         double confirmedRate = totalReservations > 0
             ? Math.Round(confirmedBookings * 100.0 / totalReservations, 1)
             : 0;
 
-        // 4. Cancelled Bookings
-        int cancelledBookings = bookings.Count(b => b.Status == "Cancelled");
+        // 3. Cancelled Bookings
+        int cancelledBookings = bookings.Count(b => b.Status == "Cancelled" || b.Status == "Canceled");
         double cancelledRate = totalReservations > 0
             ? Math.Round(cancelledBookings * 100.0 / totalReservations, 1)
             : 0;
+
+        // 4. Utilization & Occupancy Rate Calculation (Live Filtered)
+        int daysCount;
+        if (startDate.HasValue && endDate.HasValue)
+        {
+            daysCount = Math.Max(1, endDate.Value.DayNumber - startDate.Value.DayNumber + 1);
+        }
+        else if (startDate.HasValue && !endDate.HasValue)
+        {
+            var maxDate = bookings.Any() ? bookings.Max(b => b.BookingDate) : today.AddDays(30);
+            daysCount = Math.Max(1, maxDate.DayNumber - startDate.Value.DayNumber + 1);
+        }
+        else if (!startDate.HasValue && endDate.HasValue)
+        {
+            var minDate = bookings.Any() ? bookings.Min(b => b.BookingDate) : today.AddDays(-30);
+            daysCount = Math.Max(1, endDate.Value.DayNumber - minDate.DayNumber + 1);
+        }
+        else
+        {
+            var distinctDates = bookings.Select(b => b.BookingDate).Distinct().Count();
+            daysCount = Math.Max(1, distinctDates > 0 ? distinctDates : 1);
+        }
+
+        const double officeHoursPerDay = 12.0; // 10:00 AM to 10:00 PM
+        double totalAvailableRoomHours = activeRoomsCount * daysCount * officeHoursPerDay;
+
+        var approvedBookings = bookings
+            .Where(b => b.Status == "Approved" || b.Status == "Confirmed")
+            .ToList();
+
+        double bookedRoomHours = approvedBookings.Sum(b =>
+            Math.Max(0.5, (b.EndTime.ToTimeSpan() - b.StartTime.ToTimeSpan()).TotalHours));
+
+        double utilization = totalAvailableRoomHours > 0
+            ? Math.Round((bookedRoomHours / totalAvailableRoomHours) * 100.0, 1)
+            : 0.0;
+
+        utilization = Math.Min(100.0, utilization);
 
         // 5. Workforce Engagement
         int activeTeamMembers = bookings.Select(b => b.EmployeeId).Distinct().Count();
@@ -463,7 +540,7 @@ public class ReportRepository : IReportRepository
             {
                 EmployeeName = g.Key.Name,
                 ConfirmedCount = g.Count(b => b.Status == "Approved" || b.Status == "Confirmed"),
-                CancelledCount = g.Count(b => b.Status == "Cancelled")
+                CancelledCount = g.Count(b => b.Status == "Cancelled" || b.Status == "Canceled")
             })
             .OrderByDescending(e => e.ConfirmedCount + e.CancelledCount)
             .Take(10)
@@ -537,7 +614,7 @@ public class ReportRepository : IReportRepository
 
         // 10. Top Cancellation Reasons & Drivers
         var cancellationDrivers = bookings
-            .Where(b => b.Status == "Cancelled")
+            .Where(b => b.Status == "Cancelled" || b.Status == "Canceled")
             .GroupBy(b => !string.IsNullOrWhiteSpace(b.CancellationReason) ? b.CancellationReason.Trim() : "General Schedule Conflict")
             .Select(g => new CancellationDriverDto
             {
@@ -573,12 +650,36 @@ public class ReportRepository : IReportRepository
             CancelledRate = cancelledRate,
             ActiveTeamMembersCount = activeTeamMembers,
             AvgBookingsPerPerson = avgPerPerson,
+            Utilization = utilization,
+            OccupancyRate = utilization,
             EmployeeRatios = employeeRatios,
             OutcomeBreakdown = outcomeBreakdown,
             Trendline = trendline,
             MostReservedWorkspaces = mostReserved,
             TopCancellationDrivers = cancellationDrivers,
             PeakDemandByHour = peakDemand
+        };
+    }
+
+    private static (DateOnly? Start, DateOnly? End) ResolveDateRange(ReportFilterDto filter, DateOnly today)
+    {
+        if (filter.StartDate.HasValue || filter.EndDate.HasValue)
+        {
+            return (filter.StartDate, filter.EndDate);
+        }
+
+        var tf = filter.Timeframe?.Trim().ToLowerInvariant() ?? "all time";
+
+        return tf switch
+        {
+            "today" => (today, today),
+            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
+            "this week" or "week" => (today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday), today.AddDays(7 - (int)today.DayOfWeek)),
+            "past 7 days" or "last 7 days" or "7 days" => (today.AddDays(-6), today),
+            "past 30 days" or "last 30 days" or "30 days" or "this month" or "month" => (today.AddDays(-29), today),
+            "past dates" or "past" => (null, today.AddDays(-1)),
+            "upcoming" or "future" => (today.AddDays(1), null),
+            _ => (null, null)
         };
     }
 
