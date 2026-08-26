@@ -1409,6 +1409,17 @@ public class EmployeeBookingService : IEmployeeBookingService
     }
 
     // =========================================================
+    // TIME FORMAT HELPER
+    // =========================================================
+
+    private static string FormatTime(TimeOnly time)
+    {
+        return DateTime.Today
+            .Add(time.ToTimeSpan())
+            .ToString("hh:mm tt");
+    }
+
+    // =========================================================
     // EMAIL HTML
     // BOOKING CANCELLED
     // =========================================================
@@ -1420,46 +1431,126 @@ public class EmployeeBookingService : IEmployeeBookingService
             string roomName,
             string reason)
     {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset=""utf-8"">
-    <title>Booking Cancelled</title>
-</head>
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Booking Cancelled</title>
+        </head>
 
-<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
 
-    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
 
-        <h2 style=""color: #dc2626; margin-top: 0;"">
-            Booking Cancelled
-        </h2>
+                <tr>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
 
-        <p>
-            Hello {employeeName},
-        </p>
+                        <h1 style="margin:0;font-size:24px;">
+                            SpaceBook
+                        </h1>
 
-        <p>
-            Your room booking for
-            <strong>'{meetingTitle}'</strong>
-            in <strong>{roomName}</strong>
-            has been cancelled.
-        </p>
+                        <p style="margin:6px 0 0;">
+                            Room Booking Cancelled
+                        </p>
+                    </td>
+                </tr>
 
-        <div style=""background: #fef2f2; border: 1px solid #fee2e2; border-radius: 6px; padding: 12px 16px; margin: 16px 0;"">
-            <strong>Reason for cancellation:</strong>
-            {reason}
-        </div>
+                <tr>
+                    <td style="padding:28px;">
 
-        <p style=""font-size: 13px; color: #64748b;"">
-            If this was a mistake, please make a new booking in SpaceBook.
-        </p>
+                        <h2 style="margin-top:0;">
+                            Hello {employeeName},
+                        </h2>
 
-    </div>
+                        <p>
+                            Your room booking for <strong>'{meetingTitle}'</strong> in <strong>{roomName}</strong> has been cancelled.
+                        </p>
 
-</body>
-</html>";
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
+
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{meetingTitle}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{roomName}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Reason:</strong></td>
+                                <td>{reason}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td style="
+                                    color:#dc2626;
+                                    font-weight:bold;">
+                                    Cancelled
+                                </td>
+                            </tr>
+
+                        </table>
+
+                        <p style="font-size: 13px; color: #64748b;">
+                            If this was a mistake, please make a new booking in SpaceBook.
+                        </p>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification from SpaceBook.
+
+                    </td>
+                </tr>
+
+            </table>
+        </body>
+        </html>
+        """;
     }
 
     // =========================================================
@@ -1474,37 +1565,127 @@ public class EmployeeBookingService : IEmployeeBookingService
             string roomName,
             string reason)
     {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset=""utf-8"">
-    <title>Booking Cancelled Alert</title>
-</head>
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Booking Cancelled Alert</title>
+        </head>
 
-<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
 
-    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
 
-        <h2 style=""color: #dc2626; margin-top: 0;"">
-            Room Booking Cancelled
-        </h2>
+                <tr>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
 
-        <p>
-            The following booking has been cancelled by
-            <strong>{employeeName}</strong>:
-        </p>
+                        <h1 style="margin:0;font-size:24px;">
+                            SpaceBook
+                        </h1>
 
-        <ul>
-            <li><strong>Meeting:</strong> {meetingTitle}</li>
-            <li><strong>Room:</strong> {roomName}</li>
-            <li><strong>Reason:</strong> {reason}</li>
-        </ul>
+                        <p style="margin:6px 0 0;">
+                            Room Booking Cancelled
+                        </p>
+                    </td>
+                </tr>
 
-    </div>
+                <tr>
+                    <td style="padding:28px;">
 
-</body>
-</html>";
+                        <h2 style="margin-top:0;">
+                            Hello Admin,
+                        </h2>
+
+                        <p>
+                            The following room booking has been cancelled by <strong>{employeeName}</strong>:
+                        </p>
+
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
+
+                            <tr>
+                                <td><strong>Employee:</strong></td>
+                                <td>{employeeName}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{meetingTitle}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{roomName}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Reason:</strong></td>
+                                <td>{reason}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td style="
+                                    color:#dc2626;
+                                    font-weight:bold;">
+                                    Cancelled
+                                </td>
+                            </tr>
+
+                        </table>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification from SpaceBook.
+
+                    </td>
+                </tr>
+
+            </table>
+        </body>
+        </html>
+        """;
     }
 
     // =========================================================
@@ -1519,74 +1700,141 @@ public class EmployeeBookingService : IEmployeeBookingService
             string roomName,
             UpdateBookingRequestDto request)
     {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset=""utf-8"">
-    <title>Booking Rescheduled</title>
-</head>
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Booking Rescheduled</title>
+        </head>
 
-<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
 
-    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
 
-        <h2 style=""color: #2563eb; margin-top: 0;"">
-            Booking Rescheduled & Approved
-        </h2>
+                <tr>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
 
-        <p>
-            Hello {employeeName},
-        </p>
+                        <h1 style="margin:0;font-size:24px;">
+                            SpaceBook
+                        </h1>
 
-        <p>
-            Your booking for
-            <strong>'{meetingTitle}'</strong>
-            has been successfully rescheduled:
-        </p>
+                        <p style="margin:6px 0 0;">
+                            Room Booking Rescheduled
+                        </p>
+                    </td>
+                </tr>
 
-        <table
-            width=""100%""
-            style=""background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;"">
+                <tr>
+                    <td style="padding:28px;">
 
-            <tr>
-                <td>
-                    <strong>Room:</strong>
-                </td>
+                        <h2 style="margin-top:0;">
+                            Hello {employeeName},
+                        </h2>
 
-                <td>
-                    {roomName}
-                </td>
-            </tr>
+                        <p>
+                            Your booking for <strong>'{meetingTitle}'</strong> has been successfully rescheduled:
+                        </p>
 
-            <tr>
-                <td>
-                    <strong>New Date:</strong>
-                </td>
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
 
-                <td>
-                    {request.BookingDate:MMMM dd, yyyy}
-                </td>
-            </tr>
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{meetingTitle}</td>
+                            </tr>
 
-            <tr>
-                <td>
-                    <strong>New Time:</strong>
-                </td>
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{roomName}</td>
+                            </tr>
 
-                <td>
-                    {request.StartTime:hh\:mm tt}
-                    -
-                    {request.EndTime:hh\:mm tt}
-                </td>
-            </tr>
+                            <tr>
+                                <td><strong>New Date:</strong></td>
+                                <td>{request.BookingDate:MMMM dd, yyyy}</td>
+                            </tr>
 
-        </table>
+                            <tr>
+                                <td><strong>New Start Time:</strong></td>
+                                <td>{FormatTime(request.StartTime)}</td>
+                            </tr>
 
-    </div>
+                            <tr>
+                                <td><strong>New End Time:</strong></td>
+                                <td>{FormatTime(request.EndTime)}</td>
+                            </tr>
 
-</body>
-</html>";
+                            <tr>
+                                <td><strong>Participants:</strong></td>
+                                <td>{request.ParticipantCount}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td style="
+                                    color:#059669;
+                                    font-weight:bold;">
+                                    Approved
+                                </td>
+                            </tr>
+
+                        </table>
+
+                        <p>
+                            Your room has been successfully reserved.
+                        </p>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification from SpaceBook.
+
+                    </td>
+                </tr>
+
+            </table>
+        </body>
+        </html>
+        """;
     }
 
     // =========================================================
@@ -1601,54 +1849,141 @@ public class EmployeeBookingService : IEmployeeBookingService
             string roomName,
             UpdateBookingRequestDto request)
     {
-        return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset=""utf-8"">
-    <title>Booking Rescheduled Alert</title>
-</head>
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Booking Rescheduled Alert</title>
+        </head>
 
-<body style=""font-family: sans-serif; background-color: #f4f6f9; padding: 24px; color: #1e293b;"">
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 24px;
+            color: #1e293b;
+            margin: 0;">
 
-    <div style=""max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"">
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width:580px;
+                    background:#ffffff;
+                    border-radius:12px;
+                    overflow:hidden;
+                    box-shadow:0 4px 12px rgba(0,0,0,0.06);">
 
-        <h2 style=""color: #2563eb; margin-top: 0;"">
-            Booking Rescheduled
-        </h2>
+                <tr>
+                    <td style="
+                        background:#059669;
+                        padding:28px;
+                        text-align:center;
+                        color:#ffffff;">
 
-        <p>
-            <strong>{employeeName}</strong>
-            has rescheduled their booking:
-        </p>
+                        <h1 style="margin:0;font-size:24px;">
+                            SpaceBook
+                        </h1>
 
-        <ul>
-            <li>
-                <strong>Meeting:</strong>
-                {meetingTitle}
-            </li>
+                        <p style="margin:6px 0 0;">
+                            Room Booking Rescheduled
+                        </p>
+                    </td>
+                </tr>
 
-            <li>
-                <strong>Room:</strong>
-                {roomName}
-            </li>
+                <tr>
+                    <td style="padding:28px;">
 
-            <li>
-                <strong>Date:</strong>
-                {request.BookingDate:MMMM dd, yyyy}
-            </li>
+                        <h2 style="margin-top:0;">
+                            Hello Admin,
+                        </h2>
 
-            <li>
-                <strong>Time:</strong>
-                {request.StartTime:hh\:mm tt}
-                -
-                {request.EndTime:hh\:mm tt}
-            </li>
-        </ul>
+                        <p>
+                            <strong>{employeeName}</strong> has rescheduled their room booking:
+                        </p>
 
-    </div>
+                        <table
+                            width="100%"
+                            cellpadding="10"
+                            cellspacing="0"
+                            style="
+                                background:#f8fafc;
+                                border:1px solid #e2e8f0;
+                                border-radius:8px;
+                                margin:20px 0;">
 
-</body>
-</html>";
+                            <tr>
+                                <td><strong>Employee:</strong></td>
+                                <td>{employeeName}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Meeting:</strong></td>
+                                <td>{meetingTitle}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Room:</strong></td>
+                                <td>{roomName}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>New Date:</strong></td>
+                                <td>{request.BookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>New Start Time:</strong></td>
+                                <td>{FormatTime(request.StartTime)}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>New End Time:</strong></td>
+                                <td>{FormatTime(request.EndTime)}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Participants:</strong></td>
+                                <td>{request.ParticipantCount}</td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td style="
+                                    color:#059669;
+                                    font-weight:bold;">
+                                    Approved
+                                </td>
+                            </tr>
+
+                        </table>
+
+                        <p>
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="
+                        text-align:center;
+                        padding:16px;
+                        background:#f1f5f9;
+                        color:#64748b;
+                        font-size:12px;">
+
+                        This is an automated notification from SpaceBook.
+
+                    </td>
+                </tr>
+
+            </table>
+        </body>
+        </html>
+        """;
     }
 }
