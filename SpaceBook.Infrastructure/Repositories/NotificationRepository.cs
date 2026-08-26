@@ -437,6 +437,57 @@ public class NotificationRepository
         var isHotseat =
             n.HotseatBookingId.HasValue;
 
+        var message = n.Message ?? string.Empty;
+
+        var isCancelled =
+            message.Contains("cancelled", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("canceled", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("cancel", StringComparison.OrdinalIgnoreCase);
+
+        var isRescheduled =
+            message.Contains("rescheduled", StringComparison.OrdinalIgnoreCase);
+
+        var isRejected =
+            message.Contains("rejected", StringComparison.OrdinalIgnoreCase);
+
+        var isApproved =
+            message.Contains("approved", StringComparison.OrdinalIgnoreCase);
+
+        string actionType;
+        string status;
+        string color;
+
+        if (isCancelled)
+        {
+            actionType = "Cancelled";
+            status = "Cancelled";
+            color = "red";
+        }
+        else if (isRescheduled)
+        {
+            actionType = "Rescheduled";
+            status = "Rescheduled";
+            color = "blue";
+        }
+        else if (isRejected)
+        {
+            actionType = "Rejected";
+            status = "Rejected";
+            color = "red";
+        }
+        else if (isApproved)
+        {
+            actionType = "Approved";
+            status = "Approved";
+            color = "green";
+        }
+        else
+        {
+            actionType = "Booked";
+            status = "Approved";
+            color = "green";
+        }
+
         return new NotificationDto
         {
             NotificationId =
@@ -490,7 +541,19 @@ public class NotificationRepository
             EndTime =
                 isRoomBooking
                     ? n.Booking?.EndTime
-                    : null
+                    : null,
+
+            Type =
+                actionType,
+
+            Action =
+                actionType,
+
+            Status =
+                status,
+
+            Color =
+                color
         };
     }
 
@@ -654,6 +717,41 @@ public class NotificationRepository
                 n.Message;
         }
 
+        string actionType;
+        string status;
+        string color;
+
+        if (isCancelled)
+        {
+            actionType = "Cancelled";
+            status = "Cancelled";
+            color = "red";
+        }
+        else if (isRescheduled)
+        {
+            actionType = "Rescheduled";
+            status = "Rescheduled";
+            color = "blue";
+        }
+        else if (isRejected)
+        {
+            actionType = "Rejected";
+            status = "Rejected";
+            color = "red";
+        }
+        else if (isApproved)
+        {
+            actionType = "Approved";
+            status = "Approved";
+            color = "green";
+        }
+        else
+        {
+            actionType = "Booked";
+            status = "Approved";
+            color = "green";
+        }
+
         return new NotificationDto
         {
             NotificationId =
@@ -691,7 +789,19 @@ public class NotificationRepository
                 booking?.StartTime,
 
             EndTime =
-                booking?.EndTime
+                booking?.EndTime,
+
+            Type =
+                actionType,
+
+            Action =
+                actionType,
+
+            Status =
+                status,
+
+            Color =
+                color
         };
     }
 
@@ -708,21 +818,25 @@ public class NotificationRepository
         }
 
         if (message.Contains(
-                "rescheduled",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return "Rescheduled";
-        }
-
-        if (message.Contains(
                 "cancelled",
                 StringComparison.OrdinalIgnoreCase)
             ||
             message.Contains(
                 "canceled",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            message.Contains(
+                "cancel",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Cancelled";
+        }
+
+        if (message.Contains(
+                "rescheduled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Rescheduled";
         }
 
         if (message.Contains(
@@ -743,7 +857,6 @@ public class NotificationRepository
                 "booked",
                 StringComparison.OrdinalIgnoreCase))
         {
-            // AUTO-APPROVAL FLOW
             return "Booked";
         }
 
@@ -768,29 +881,6 @@ public class NotificationRepository
             return "Expired";
         }
 
-        // -----------------------------------------------------
-        // LEGACY REQUEST NOTIFICATIONS
-        // -----------------------------------------------------
-
-        if (message.Contains(
-                "request",
-                StringComparison.OrdinalIgnoreCase)
-            ||
-            message.Contains(
-                "submitted",
-                StringComparison.OrdinalIgnoreCase)
-            ||
-            message.Contains(
-                "pending",
-                StringComparison.OrdinalIgnoreCase)
-            ||
-            message.Contains(
-                "requires approval",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return "Request";
-        }
-
         return "Notification";
     }
 
@@ -807,6 +897,38 @@ public class NotificationRepository
             return isHotseat
                 ? "Hotseat Notification"
                 : "Notification";
+        }
+
+        // -----------------------------------------------------
+        // CANCELLED
+        // -----------------------------------------------------
+
+        if (message.Contains(
+                "cancelled",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            message.Contains(
+                "canceled",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            message.Contains(
+                "cancel",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return isHotseat
+                ? "Hotseat Booking Cancelled"
+                : "Booking Cancelled";
+        }
+
+        // -----------------------------------------------------
+        // RESCHEDULED
+        // -----------------------------------------------------
+
+        if (message.Contains(
+                "rescheduled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Booking Rescheduled";
         }
 
         // -----------------------------------------------------
@@ -829,43 +951,6 @@ public class NotificationRepository
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Hotseat Booking Expired";
-        }
-
-        // -----------------------------------------------------
-        // BOOKED
-        // -----------------------------------------------------
-
-        if (message.Contains(
-                "booked",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return isHotseat
-                ? "Hotseat Booking Confirmed"
-                : "Booking Confirmed";
-        }
-
-        // -----------------------------------------------------
-        // CONFIRMED
-        // -----------------------------------------------------
-
-        if (message.Contains(
-                "confirmed",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return isHotseat
-                ? "Hotseat Booking Confirmed"
-                : "Booking Confirmed";
-        }
-
-        // -----------------------------------------------------
-        // RESCHEDULED
-        // -----------------------------------------------------
-
-        if (message.Contains(
-                "rescheduled",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return "Booking Rescheduled";
         }
 
         // -----------------------------------------------------
@@ -899,24 +984,20 @@ public class NotificationRepository
         }
 
         // -----------------------------------------------------
-        // CANCELLED
+        // BOOKED / CONFIRMED
         // -----------------------------------------------------
 
         if (message.Contains(
-                "cancelled",
+                "booked",
                 StringComparison.OrdinalIgnoreCase)
             ||
             message.Contains(
-                "canceled",
-                StringComparison.OrdinalIgnoreCase)
-            ||
-            message.Contains(
-                "cancel",
+                "confirmed",
                 StringComparison.OrdinalIgnoreCase))
         {
             return isHotseat
-                ? "Hotseat Booking Cancelled"
-                : "Booking Cancelled";
+                ? "Hotseat Booking Confirmed"
+                : "Booking Confirmed";
         }
 
         // -----------------------------------------------------
