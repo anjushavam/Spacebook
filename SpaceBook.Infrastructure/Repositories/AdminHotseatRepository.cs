@@ -101,6 +101,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     h.Seat.Module.ModuleName.ToLower() == targetModule.ToLower() ||
                     (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName).ToLower() == targetModule.ToLower()) ||
+                    (h.Seat.Module.Office != null && h.Seat.Module.Office.Location != null &&
+                     (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName + " - " + h.Seat.Module.Office.Location.LocationName).ToLower() == targetModule.ToLower()) ||
                     (h.Seat.Module.Office != null && h.Seat.Module.Office.OfficeName.ToLower() == targetModule.ToLower())
                 ));
         }
@@ -112,7 +114,15 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
         {
             var targetStatus = filter.Status.Trim();
-            query = query.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
+            if (targetStatus.Equals("Checked In", StringComparison.OrdinalIgnoreCase) ||
+                targetStatus.Equals("CheckedIn", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+            }
+            else
+            {
+                query = query.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
+            }
         }
 
         // Apply Section filter
@@ -137,6 +147,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             .AsNoTracking()
             .Include(s => s.Module)
                 .ThenInclude(m => m!.Office)
+                    .ThenInclude(o => o!.Location)
             .Where(s => s.IsActive)
             .AsQueryable();
 
@@ -152,6 +163,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     s.Module.ModuleName.ToLower() == targetModule.ToLower() ||
                     (s.Module.Office != null &&
                      (s.Module.ModuleName + " - " + s.Module.Office.OfficeName).ToLower() == targetModule.ToLower()) ||
+                    (s.Module.Office != null && s.Module.Office.Location != null &&
+                     (s.Module.ModuleName + " - " + s.Module.Office.OfficeName + " - " + s.Module.Office.Location.LocationName).ToLower() == targetModule.ToLower()) ||
                     (s.Module.Office != null && s.Module.Office.OfficeName.ToLower() == targetModule.ToLower())
                 ));
         }
@@ -166,7 +179,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
 
         int confirmedBookings = bookings.Count(b =>
             string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase));
+            string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase));
 
         double confirmedRate = totalReservations > 0
             ? Math.Round(confirmedBookings * 100.0 / totalReservations, 1)
@@ -206,15 +220,20 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             {
                 ModuleName = b.Seat!.Module!.ModuleName,
                 OfficeName = b.Seat.Module.Office != null ? b.Seat.Module.Office.OfficeName : "Main Facility",
-                Label = b.Seat.Module.Office != null
-                    ? $"{b.Seat.Module.ModuleName} - {b.Seat.Module.Office.OfficeName}"
-                    : b.Seat.Module.ModuleName
+                LocationName = b.Seat.Module.Office?.Location != null ? b.Seat.Module.Office.Location.LocationName : "",
+                Label = b.Seat.Module.Office != null && b.Seat.Module.Office.Location != null
+                    ? $"{b.Seat.Module.ModuleName} - {b.Seat.Module.Office.OfficeName} - {b.Seat.Module.Office.Location.LocationName}"
+                    : (b.Seat.Module.Office != null
+                        ? $"{b.Seat.Module.ModuleName} - {b.Seat.Module.Office.OfficeName}"
+                        : b.Seat.Module.ModuleName)
             })
             .Select(g => new HotseatVolumeByFacilityZoneDto
             {
                 Label = g.Key.Label,
                 ModuleName = g.Key.ModuleName,
-                FacilityName = g.Key.OfficeName,
+                FacilityName = !string.IsNullOrWhiteSpace(g.Key.LocationName)
+                    ? $"{g.Key.OfficeName} ({g.Key.LocationName})"
+                    : g.Key.OfficeName,
                 BookingCount = g.Count(),
                 Percentage = totalReservations > 0
                     ? Math.Round(g.Count() * 100.0 / totalReservations, 1)
@@ -481,6 +500,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     h.Seat.Module.ModuleName.ToLower() == targetModule.ToLower() ||
                     (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName).ToLower() == targetModule.ToLower()) ||
+                    (h.Seat.Module.Office != null && h.Seat.Module.Office.Location != null &&
+                     (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName + " - " + h.Seat.Module.Office.Location.LocationName).ToLower() == targetModule.ToLower()) ||
                     (h.Seat.Module.Office != null && h.Seat.Module.Office.OfficeName.ToLower() == targetModule.ToLower())
                 ));
         }
@@ -492,7 +513,15 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
         {
             var targetStatus = filter.Status.Trim();
-            query = query.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
+            if (targetStatus.Equals("Checked In", StringComparison.OrdinalIgnoreCase) ||
+                targetStatus.Equals("CheckedIn", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+            }
+            else
+            {
+                query = query.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
+            }
         }
 
         // Apply Section filter
@@ -626,6 +655,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     h.Seat.Module.ModuleName.ToLower() == targetModule.ToLower() ||
                     (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName).ToLower() == targetModule.ToLower()) ||
+                    (h.Seat.Module.Office != null && h.Seat.Module.Office.Location != null &&
+                     (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName + " - " + h.Seat.Module.Office.Location.LocationName).ToLower() == targetModule.ToLower()) ||
                     (h.Seat.Module.Office != null && h.Seat.Module.Office.OfficeName.ToLower() == targetModule.ToLower())
                 ));
         }
@@ -637,7 +668,15 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
         {
             var targetStatus = filter.Status.Trim();
-            query = query.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
+            if (targetStatus.Equals("Checked In", StringComparison.OrdinalIgnoreCase) ||
+                targetStatus.Equals("CheckedIn", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+            }
+            else
+            {
+                query = query.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
+            }
         }
 
         // Apply Section filter
@@ -707,12 +746,17 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         var modules = await _context.Modules
             .AsNoTracking()
             .Include(m => m.Office)
+                .ThenInclude(o => o!.Location)
             .OrderBy(m => m.Office != null ? m.Office.OfficeName : "")
             .ThenBy(m => m.ModuleName)
             .Select(m => new FilterOptionItemDto
             {
-                Value = m.Office != null ? $"{m.ModuleName} - {m.Office.OfficeName}" : m.ModuleName,
-                Label = m.Office != null ? $"{m.ModuleName} - {m.Office.OfficeName}" : m.ModuleName,
+                Value = m.Office != null && m.Office.Location != null
+                    ? $"{m.ModuleName} - {m.Office.OfficeName} - {m.Office.Location.LocationName}"
+                    : (m.Office != null ? $"{m.ModuleName} - {m.Office.OfficeName}" : m.ModuleName),
+                Label = m.Office != null && m.Office.Location != null
+                    ? $"{m.ModuleName} - {m.Office.OfficeName} - {m.Office.Location.LocationName}"
+                    : (m.Office != null ? $"{m.ModuleName} - {m.Office.OfficeName}" : m.ModuleName),
                 Group = m.Office != null ? m.Office.OfficeName : "Main Office"
             })
             .Distinct()
@@ -742,17 +786,17 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             {
                 new() { Value = "All Time", Label = "All Time" },
                 new() { Value = "Today", Label = "Today" },
-                new() { Value = "This Week", Label = "This Week" },
-                new() { Value = "This Month", Label = "This Month" },
-                new() { Value = "Last 30 Days", Label = "Last 30 Days" },
-                new() { Value = "Custom", Label = "Custom Range" }
+                new() { Value = "Past 7 Days", Label = "Past 7 Days" },
+                new() { Value = "Past 30 Days", Label = "Past 30 Days" },
+                new() { Value = "Past Dates", Label = "Past Dates" },
+                new() { Value = "Upcoming", Label = "Upcoming" }
             },
             Modules = modules,
             Statuses = new List<FilterOptionItemDto>
             {
                 new() { Value = "All Status", Label = "All Status" },
                 new() { Value = "Confirmed", Label = "Confirmed" },
-                new() { Value = "CheckedIn", Label = "Checked In" },
+                new() { Value = "Checked In", Label = "Checked In" },
                 new() { Value = "Cancelled", Label = "Cancelled" },
                 new() { Value = "Released", Label = "Released" },
                 new() { Value = "Expired", Label = "Expired" }
@@ -779,9 +823,11 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             "today" => (today, today),
             "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
             "this week" or "week" => (today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday), today.AddDays(7 - (int)today.DayOfWeek)),
-            "last 7 days" or "7 days" => (today.AddDays(-6), today),
+            "past 7 days" or "last 7 days" or "7 days" => (today.AddDays(-6), today),
             "this month" or "month" => (new DateOnly(today.Year, today.Month, 1), new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month))),
-            "last 30 days" or "30 days" => (today.AddDays(-29), today),
+            "past 30 days" or "last 30 days" or "30 days" => (today.AddDays(-29), today),
+            "past dates" or "past" => (null, today.AddDays(-1)),
+            "upcoming" or "future" => (today.AddDays(1), null),
             _ => (null, null)
         };
     }
