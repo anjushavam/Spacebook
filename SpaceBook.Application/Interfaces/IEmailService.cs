@@ -23,4 +23,25 @@ public interface IEmailService
         Booking booking,
         Employee employee,
         Room room);
+
+    Task SendHotseatBookingConfirmationAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat,
+        IEnumerable<string>? adminEmails = null);
+
+    Task SendHotseatCheckInReminderAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat);
+
+    Task SendHotseatBookingExpiredAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat);
+
+    Task SendHotseatBookingCancelledAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat);
 }

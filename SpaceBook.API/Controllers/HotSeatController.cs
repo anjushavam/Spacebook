@@ -16,6 +16,7 @@ public class HotseatController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly INotificationRepository _notificationRepository;
+    private readonly IEmailService _emailService;
 
     private static readonly TimeZoneInfo IndiaTimeZone = GetIndiaTimeZone();
 
@@ -23,14 +24,12 @@ public class HotseatController : ControllerBase
     {
         try
         {
-            // Linux / Render
             return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
         }
         catch (TimeZoneNotFoundException)
         {
             try
             {
-                // Windows
                 return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
             }
             catch
@@ -42,7 +41,6 @@ public class HotseatController : ControllerBase
         {
             try
             {
-                // Windows fallback
                 return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
             }
             catch
@@ -66,10 +64,12 @@ public class HotseatController : ControllerBase
 
     public HotseatController(
         ApplicationDbContext context,
-        INotificationRepository notificationRepository)
+        INotificationRepository notificationRepository,
+        IEmailService emailService)
     {
         _context = context;
         _notificationRepository = notificationRepository;
+        _emailService = emailService;
     }
 
     private async Task AutoExpireOverdueHotseatBookingsAsync()
@@ -676,16 +676,43 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // NOTIFICATION
+        // NOTIFICATIONS & EMAIL
         // --------------------------------------------------------
 
+        var startTimeStr = expectedCheckInTime.ToString("hh:mm tt");
         await CreateHotseatNotificationAsync(
             employeeId,
             booking.HotseatBookingId,
+            $"Your hotseat booking for {seat.SeatNumber} in {seat.Module?.ModuleName} on {booking.BookingDate:dd-MMM-yyyy} starting at {startTimeStr} has been confirmed. Booking ID: #{booking.HotseatBookingId}.");
 
-            $"Your hotseat booking for {seat.SeatNumber} " +
-            $"on {booking.BookingDate:dd-MMM-yyyy} " +
-            $"has been confirmed.");
+        var employee = await _context.Employees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+
+        var adminEmails = await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Role)
+            .Where(e => e.Role != null &&
+                        (e.Role.RoleName == "Admin" || e.Role.RoleName == "ADMIN" || e.Role.RoleName == "admin") &&
+                        !string.IsNullOrWhiteSpace(e.Email))
+            .Select(e => e.Email)
+            .ToListAsync();
+
+        if (employee != null && !string.IsNullOrWhiteSpace(employee.Email))
+        {
+            try
+            {
+                await _emailService.SendHotseatBookingConfirmationAsync(
+                    booking,
+                    employee,
+                    seat,
+                    adminEmails);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[HotseatController] Confirmation email failed: {ex.Message}");
+            }
+        }
 
         // --------------------------------------------------------
         // RESPONSE
@@ -1183,6 +1210,28 @@ public class HotseatController : ControllerBase
             booking.RecordModifiedOn = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
+            var seatObj = booking.Seat ?? new Seat { SeatId = booking.SeatId, SeatNumber = $"Seat {booking.SeatId}" };
+            var empObj = await _context.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+
+            if (empObj != null && !string.IsNullOrWhiteSpace(empObj.Email))
+            {
+                try
+                {
+                    await _emailService.SendHotseatBookingExpiredAsync(booking, empObj, seatObj);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[HotseatController] Expiration email failed: {ex.Message}");
+                }
+            }
+
+            var sNum = seatObj.SeatNumber;
+            var modName = seatObj.Module?.ModuleName ?? "Module";
+            await CreateHotseatNotificationAsync(
+                employeeId,
+                booking.HotseatBookingId,
+                $"Hotseat Booking Expired: You did not check in within the permitted time for {sNum} in {modName}. Your reservation has expired and the seat has been released.");
+
             return BadRequest(new
             {
                 message = "Check-in window has expired. Your booking has been marked as Expired and the seat released."
@@ -1480,11 +1529,27 @@ public class HotseatController : ControllerBase
         await CreateHotseatNotificationAsync(
             employeeId,
             booking.HotseatBookingId,
+            $"Your hotseat booking for {seatNumber} on {booking.BookingDate:dd-MMM-yyyy} has been cancelled. Reason: You cancelled the booking.");
 
-            $"Your hotseat booking for {seatNumber} " +
-            $"on {booking.BookingDate:dd-MMM-yyyy} " +
-            $"has been cancelled. " +
-            $"Reason: You cancelled the booking.");
+        var cancelSeat = booking.Seat ?? new Seat { SeatId = booking.SeatId, SeatNumber = seatNumber };
+        var cancelEmp = await _context.Employees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+
+        if (cancelEmp != null && !string.IsNullOrWhiteSpace(cancelEmp.Email))
+        {
+            try
+            {
+                await _emailService.SendHotseatBookingCancelledAsync(
+                    booking,
+                    cancelEmp,
+                    cancelSeat);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[HotseatController] Cancellation email failed: {ex.Message}");
+            }
+        }
 
         return Ok(new
         {

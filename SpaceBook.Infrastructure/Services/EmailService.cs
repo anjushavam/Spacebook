@@ -1206,4 +1206,582 @@ public class EmailService : IEmailService
         </html>
         """;
     }
+
+    // =========================================================
+    // HOTSEAT NOTIFICATION 1: CONFIRMATION
+    // =========================================================
+
+    public async Task SendHotseatBookingConfirmationAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat,
+        IEnumerable<string>? adminEmails = null)
+    {
+        var employeeName = !string.IsNullOrWhiteSpace(employee?.Name) ? employee.Name : "Colleague";
+        var employeeEmail = employee?.Email;
+
+        if (string.IsNullOrWhiteSpace(employeeEmail))
+        {
+            throw new InvalidOperationException($"Employee email is missing for HotseatBookingId={booking.HotseatBookingId}.");
+        }
+
+        var seatNumber = seat?.SeatNumber ?? $"Seat {booking.SeatId}";
+        var moduleName = seat?.Module?.ModuleName ?? "Module";
+        var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
+        var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
+
+        DateTime localStartTime = booking.CheckInDeadline.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
+            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+
+        var startTimeFormatted = localStartTime.ToString("hh:mm tt");
+        var checkInOpensFormatted = localStartTime.AddHours(-1).ToString("hh:mm tt");
+
+        var employeeSubject = $"SpaceBook Hotseat Booking Confirmed - Seat {seatNumber}";
+        var employeeBody = BuildHotseatConfirmationEmailHtml(
+            employeeName,
+            booking.HotseatBookingId,
+            seatNumber,
+            moduleName,
+            officeName,
+            cityName,
+            booking.BookingDate,
+            startTimeFormatted,
+            checkInOpensFormatted);
+
+        await SendEmailAsync(employeeEmail, employeeSubject, employeeBody, true);
+
+        // Admin Alert
+        var adminList = ResolveAdminEmails(adminEmails);
+        if (adminList.Count > 0)
+        {
+            var adminSubject = $"[Admin Alert] SpaceBook Hotseat Booking Confirmed - {employeeName} (Seat {seatNumber})";
+            var adminBody = BuildAdminHotseatConfirmationEmailHtml(
+                employeeName,
+                employeeEmail,
+                employee?.Department ?? string.Empty,
+                booking.HotseatBookingId,
+                seatNumber,
+                moduleName,
+                officeName,
+                cityName,
+                booking.BookingDate,
+                startTimeFormatted);
+
+            await SendEmailsAsync(adminList, adminSubject, adminBody, true);
+        }
+    }
+
+    // =========================================================
+    // HOTSEAT NOTIFICATION 2: 1-HOUR CHECK-IN REMINDER
+    // =========================================================
+
+    public async Task SendHotseatCheckInReminderAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat)
+    {
+        var employeeName = !string.IsNullOrWhiteSpace(employee?.Name) ? employee.Name : "Colleague";
+        var employeeEmail = employee?.Email;
+
+        if (string.IsNullOrWhiteSpace(employeeEmail))
+        {
+            throw new InvalidOperationException($"Employee email is missing for HotseatBookingId={booking.HotseatBookingId}.");
+        }
+
+        var seatNumber = seat?.SeatNumber ?? $"Seat {booking.SeatId}";
+        var moduleName = seat?.Module?.ModuleName ?? "Module";
+        var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
+        var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
+
+        DateTime localStartTime = booking.CheckInDeadline.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
+            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+
+        var startTimeFormatted = localStartTime.ToString("hh:mm tt");
+
+        var subject = $"SpaceBook Reminder - Hotseat Check-In Window Open (Seat {seatNumber})";
+        var body = BuildHotseatReminderEmailHtml(
+            employeeName,
+            booking.HotseatBookingId,
+            seatNumber,
+            moduleName,
+            officeName,
+            cityName,
+            booking.BookingDate,
+            startTimeFormatted);
+
+        await SendEmailAsync(employeeEmail, subject, body, true);
+    }
+
+    // =========================================================
+    // HOTSEAT NOTIFICATION 3: EXPIRED & SEAT RELEASED
+    // =========================================================
+
+    public async Task SendHotseatBookingExpiredAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat)
+    {
+        var employeeName = !string.IsNullOrWhiteSpace(employee?.Name) ? employee.Name : "Colleague";
+        var employeeEmail = employee?.Email;
+
+        if (string.IsNullOrWhiteSpace(employeeEmail))
+        {
+            throw new InvalidOperationException($"Employee email is missing for HotseatBookingId={booking.HotseatBookingId}.");
+        }
+
+        var seatNumber = seat?.SeatNumber ?? $"Seat {booking.SeatId}";
+        var moduleName = seat?.Module?.ModuleName ?? "Module";
+        var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
+        var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
+
+        DateTime localStartTime = booking.CheckInDeadline.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
+            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+
+        var startTimeFormatted = localStartTime.ToString("hh:mm tt");
+
+        const string subject = "Hotseat Booking Expired – Seat Released";
+        var body = BuildHotseatExpiredEmailHtml(
+            employeeName,
+            booking.HotseatBookingId,
+            seatNumber,
+            moduleName,
+            officeName,
+            cityName,
+            booking.BookingDate,
+            startTimeFormatted);
+
+        await SendEmailAsync(employeeEmail, subject, body, true);
+    }
+
+    // =========================================================
+    // HOTSEAT NOTIFICATION 4: CANCELLED
+    // =========================================================
+
+    public async Task SendHotseatBookingCancelledAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat)
+    {
+        var employeeName = !string.IsNullOrWhiteSpace(employee?.Name) ? employee.Name : "Colleague";
+        var employeeEmail = employee?.Email;
+
+        if (string.IsNullOrWhiteSpace(employeeEmail))
+        {
+            throw new InvalidOperationException($"Employee email is missing for HotseatBookingId={booking.HotseatBookingId}.");
+        }
+
+        var seatNumber = seat?.SeatNumber ?? $"Seat {booking.SeatId}";
+        var moduleName = seat?.Module?.ModuleName ?? "Module";
+        var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
+        var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
+
+        DateTime localStartTime = booking.CheckInDeadline.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
+            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+
+        var startTimeFormatted = localStartTime.ToString("hh:mm tt");
+
+        var subject = $"SpaceBook Hotseat Booking Cancelled - Seat {seatNumber}";
+        var body = BuildHotseatCancelledEmailHtml(
+            employeeName,
+            booking.HotseatBookingId,
+            seatNumber,
+            moduleName,
+            officeName,
+            cityName,
+            booking.BookingDate,
+            startTimeFormatted);
+
+        await SendEmailAsync(employeeEmail, subject, body, true);
+    }
+
+    // =========================================================
+    // HTML BUILDERS FOR HOTSEAT EMAILS
+    // =========================================================
+
+    private static string BuildHotseatConfirmationEmailHtml(
+        string employeeName,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted,
+        string checkInOpensFormatted)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>SpaceBook Hotseat Booking Confirmed</title></head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #059669; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Booking Confirmed</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Hello {employeeName},</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            Your hotseat reservation has been confirmed successfully.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / City:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Check-In Window:</strong></td>
+                                <td style="padding: 6px 10px; color: #059669; font-weight: 600;">Opens at {checkInOpensFormatted} (1 hr before start)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
+                                <td style="padding: 6px 10px; color: #059669; font-weight: bold;">Confirmed</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 6px 0; font-size: 12px; color: #475569;">
+                            <strong>Important Check-In Notice:</strong> Check-in is available only within 1 hour before the booking start time. Please ensure you check in before {startTimeFormatted} to retain your reservation.
+                        </p>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Team</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        This is an automated notification from SpaceBook.
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildAdminHotseatConfirmationEmailHtml(
+        string employeeName,
+        string employeeEmail,
+        string department,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>[Admin Alert] SpaceBook Hotseat Booking</title></head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #0284c7; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook Admin Alert</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">New Hotseat Reservation Confirmed</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Administrator,</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            An employee has confirmed a hotseat reservation on SpaceBook.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Employee:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{employeeName} ({employeeEmail})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Department:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{department}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / Location:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Start Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Notification Service</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        SpaceBook Workspace Administration
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildHotseatReminderEmailHtml(
+        string employeeName,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>SpaceBook Hotseat Check-In Reminder</title></head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #eab308; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook Reminder</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Check-In Window Is Now Open</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Hello {employeeName},</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            Your hotseat booking starts at <strong>{startTimeFormatted}</strong>. Please check in within the permitted check-in window to retain your seat.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #fefce8; border: 1px solid #fef08a; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #854d0e; width: 35%;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #713f12; font-weight: bold;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #854d0e;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #713f12;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #854d0e;"><strong>Office / City:</strong></td>
+                                <td style="padding: 6px 10px; color: #713f12;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #854d0e;"><strong>Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #713f12;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #854d0e;"><strong>Booking Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #713f12; font-weight: bold;">{startTimeFormatted}</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 6px 0; font-size: 12px; color: #713f12;">
+                            <strong>Note:</strong> If you do not check in by the scheduled start time, your reservation will automatically expire and the seat will be released for other colleagues.
+                        </p>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Team</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        This is an automated notification from SpaceBook.
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildHotseatExpiredEmailHtml(
+        string employeeName,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Hotseat Booking Expired – Seat Released</title></head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #dc2626; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook Alert</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Booking Expired – Seat Released</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Hello {employeeName},</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            Your hotseat reservation was not checked in within the permitted time. The reservation has now expired and the seat has been released.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #fef2f2; border: 1px solid #fee2e2; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #991b1b; width: 35%;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #7f1d1d;">#{bookingId}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #991b1b;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #7f1d1d; font-weight: bold;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #991b1b;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #7f1d1d;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #991b1b;"><strong>Office:</strong></td>
+                                <td style="padding: 6px 10px; color: #7f1d1d;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #991b1b;"><strong>Booking Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #7f1d1d;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #991b1b;"><strong>Booking Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #7f1d1d;">{startTimeFormatted}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #991b1b;"><strong>Status:</strong></td>
+                                <td style="padding: 6px 10px; color: #dc2626; font-weight: bold;">Expired</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 6px 0; font-size: 12px; color: #475569;">
+                            Please make a new hotseat reservation if you still require a workspace.
+                        </p>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Team</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        This is an automated notification from SpaceBook.
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildHotseatCancelledEmailHtml(
+        string employeeName,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>SpaceBook Hotseat Booking Cancelled</title></head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #64748b; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Booking Cancelled</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Hello {employeeName},</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            Your hotseat reservation has been cancelled.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
+                                <td style="padding: 6px 10px; color: #64748b; font-weight: bold;">Cancelled</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Team</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        This is an automated notification from SpaceBook.
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
+    private static TimeZoneInfo IndiaTimeZone
+    {
+        get
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+        }
+    }
 }

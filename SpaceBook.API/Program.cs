@@ -201,6 +201,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 
 builder.Services.AddScoped<IBookingReminderRepository, BookingReminderRepository>();
 builder.Services.AddScoped<IBookingReminderService, BookingReminderService>();
+builder.Services.AddScoped<IHotseatReminderService, HotseatReminderService>();
 builder.Services.AddHostedService<BookingReminderBackgroundService>();
 
 // =====================================================

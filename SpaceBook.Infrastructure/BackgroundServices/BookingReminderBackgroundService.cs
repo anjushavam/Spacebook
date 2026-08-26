@@ -49,14 +49,43 @@ public class BookingReminderBackgroundService : BackgroundService
                 using var scope =
                     _scopeFactory.CreateScope();
 
-                var reminderService =
-                    scope.ServiceProvider
-                        .GetRequiredService<
-                            IBookingReminderService>();
+                // 1. Room Booking Reminders
+                try
+                {
+                    var reminderService =
+                        scope.ServiceProvider
+                            .GetRequiredService<
+                                IBookingReminderService>();
 
-                await reminderService
-                    .ProcessBookingRemindersAsync(
-                        stoppingToken);
+                    await reminderService
+                        .ProcessBookingRemindersAsync(
+                            stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Error while processing room booking reminders.");
+                }
+
+                // 2. Hotseat Reminders & Expirations
+                try
+                {
+                    var hotseatReminderService =
+                        scope.ServiceProvider
+                            .GetRequiredService<
+                                IHotseatReminderService>();
+
+                    await hotseatReminderService
+                        .ProcessHotseatRemindersAndExpirationsAsync(
+                            stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Error while processing hotseat reminders and expirations.");
+                }
 
                 _logger.LogInformation(
                     "Booking reminder background check completed.");
