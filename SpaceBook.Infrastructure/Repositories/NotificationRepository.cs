@@ -76,7 +76,7 @@ public class NotificationRepository
                 .Include(n => n.Booking)
                     .ThenInclude(b => b!.Employee)
 
-                // Admin notifications should relate to
+                // Admin notifications are only for
                 // normal room bookings.
                 .Where(n =>
                     n.BookingId != null &&
@@ -113,6 +113,10 @@ public class NotificationRepository
                         EF.Functions.ILike(
                             n.Message,
                             "%approved%") ||
+
+                        EF.Functions.ILike(
+                            n.Message,
+                            "%rejected%") ||
 
                         EF.Functions.ILike(
                             n.Message,
@@ -443,16 +447,26 @@ public class NotificationRepository
                 "canceled",
                 StringComparison.OrdinalIgnoreCase);
 
-        var isApprovedOrNew =
+        var isRejected =
+            n.Message.Contains(
+                "rejected",
+                StringComparison.OrdinalIgnoreCase);
+
+        var isApproved =
             n.Message.Contains(
                 "approved",
-                StringComparison.OrdinalIgnoreCase)
-            ||
+                StringComparison.OrdinalIgnoreCase);
+
+        var isBooked =
             n.Message.Contains(
                 "booked",
                 StringComparison.OrdinalIgnoreCase);
 
         string title;
+
+        // -----------------------------------------------------
+        // PRIORITY
+        // -----------------------------------------------------
 
         if (isRescheduled)
         {
@@ -464,18 +478,34 @@ public class NotificationRepository
             title =
                 "Booking Cancelled";
         }
-        else if (isApprovedOrNew)
+        else if (isRejected)
         {
+            title =
+                "Booking Rejected";
+        }
+        else if (isApproved)
+        {
+            title =
+                "Booking Approved";
+        }
+        else if (isBooked)
+        {
+            // AUTO-APPROVAL FLOW
             title =
                 "New Booking";
         }
         else
         {
+            // Legacy notifications
             title =
                 "Booking Request";
         }
 
         string message;
+
+        // -----------------------------------------------------
+        // RESCHEDULED
+        // -----------------------------------------------------
 
         if (isRescheduled)
         {
@@ -483,28 +513,73 @@ public class NotificationRepository
                 $"{employeeName} rescheduled a booking for " +
                 $"{roomName}.";
         }
+
+        // -----------------------------------------------------
+        // CANCELLED
+        // -----------------------------------------------------
+
         else if (isCancelled)
         {
             message =
                 $"{employeeName} cancelled a booking for " +
                 $"{roomName}.";
         }
-        else if (isApprovedOrNew)
+
+        // -----------------------------------------------------
+        // REJECTED
+        // -----------------------------------------------------
+
+        else if (isRejected)
+        {
+            message =
+                $"{employeeName}'s booking for " +
+                $"{roomName} was rejected.";
+        }
+
+        // -----------------------------------------------------
+        // APPROVED
+        // -----------------------------------------------------
+
+        else if (isApproved)
+        {
+            message =
+                $"{employeeName}'s booking for " +
+                $"{roomName} was approved.";
+        }
+
+        // -----------------------------------------------------
+        // NEW BOOKING
+        // AUTO-APPROVAL FLOW
+        // -----------------------------------------------------
+
+        else if (isBooked)
         {
             var meetingTitle =
-                !string.IsNullOrWhiteSpace(booking?.MeetingTitle)
+                !string.IsNullOrWhiteSpace(
+                    booking?.MeetingTitle)
                     ? $" for '{booking.MeetingTitle}'"
                     : "";
 
             message =
-                $"{employeeName} booked {roomName}{meetingTitle}.";
+                $"{employeeName} booked " +
+                $"{roomName}{meetingTitle}.";
         }
+
+        // -----------------------------------------------------
+        // LEGACY REQUEST
+        // -----------------------------------------------------
+
         else if (booking != null)
         {
             message =
                 $"{employeeName} submitted a booking request " +
                 $"for {roomName}.";
         }
+
+        // -----------------------------------------------------
+        // GENERAL NOTIFICATION
+        // -----------------------------------------------------
+
         else
         {
             message =
@@ -597,6 +672,14 @@ public class NotificationRepository
         }
 
         if (message.Contains(
+                "booked",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            // AUTO-APPROVAL FLOW
+            return "Booked";
+        }
+
+        if (message.Contains(
                 "confirmed",
                 StringComparison.OrdinalIgnoreCase))
         {
@@ -616,6 +699,10 @@ public class NotificationRepository
         {
             return "Expired";
         }
+
+        // -----------------------------------------------------
+        // LEGACY REQUEST NOTIFICATIONS
+        // -----------------------------------------------------
 
         if (message.Contains(
                 "request",
@@ -654,6 +741,10 @@ public class NotificationRepository
                 : "Notification";
         }
 
+        // -----------------------------------------------------
+        // HOTSEAT CHECK-IN
+        // -----------------------------------------------------
+
         if (message.Contains(
                 "checked in",
                 StringComparison.OrdinalIgnoreCase))
@@ -661,12 +752,33 @@ public class NotificationRepository
             return "Hotseat Check-in";
         }
 
+        // -----------------------------------------------------
+        // HOTSEAT EXPIRED
+        // -----------------------------------------------------
+
         if (message.Contains(
                 "expired",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Hotseat Booking Expired";
         }
+
+        // -----------------------------------------------------
+        // BOOKED
+        // -----------------------------------------------------
+
+        if (message.Contains(
+                "booked",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return isHotseat
+                ? "Hotseat Booking Confirmed"
+                : "Booking Confirmed";
+        }
+
+        // -----------------------------------------------------
+        // CONFIRMED
+        // -----------------------------------------------------
 
         if (message.Contains(
                 "confirmed",
@@ -677,12 +789,20 @@ public class NotificationRepository
                 : "Booking Confirmed";
         }
 
+        // -----------------------------------------------------
+        // RESCHEDULED
+        // -----------------------------------------------------
+
         if (message.Contains(
                 "rescheduled",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Booking Rescheduled";
         }
+
+        // -----------------------------------------------------
+        // APPROVED
+        // -----------------------------------------------------
 
         if (message.Contains(
                 "approved",
@@ -695,6 +815,10 @@ public class NotificationRepository
             return "Booking Approved";
         }
 
+        // -----------------------------------------------------
+        // REJECTED
+        // -----------------------------------------------------
+
         if (message.Contains(
                 "rejected",
                 StringComparison.OrdinalIgnoreCase)
@@ -705,6 +829,10 @@ public class NotificationRepository
         {
             return "Booking Rejected";
         }
+
+        // -----------------------------------------------------
+        // CANCELLED
+        // -----------------------------------------------------
 
         if (message.Contains(
                 "cancelled",
@@ -723,12 +851,20 @@ public class NotificationRepository
                 : "Booking Cancelled";
         }
 
+        // -----------------------------------------------------
+        // MISSED CHECK-IN
+        // -----------------------------------------------------
+
         if (message.Contains(
                 "missed",
                 StringComparison.OrdinalIgnoreCase))
         {
             return "Missed Check-in";
         }
+
+        // -----------------------------------------------------
+        // LEGACY REQUEST
+        // -----------------------------------------------------
 
         if (message.Contains(
                 "request",
@@ -748,6 +884,10 @@ public class NotificationRepository
         {
             return "Booking Request";
         }
+
+        // -----------------------------------------------------
+        // REMINDER
+        // -----------------------------------------------------
 
         if (message.Contains(
                 "reminder",
