@@ -496,9 +496,8 @@ public class NotificationRepository
         }
         else
         {
-            // Legacy notifications
             title =
-                "Booking Request";
+                "New Booking";
         }
 
         string message;
@@ -548,11 +547,10 @@ public class NotificationRepository
         }
 
         // -----------------------------------------------------
-        // NEW BOOKING
-        // AUTO-APPROVAL FLOW
+        // NEW BOOKING (AUTO-APPROVAL FLOW)
         // -----------------------------------------------------
 
-        else if (isBooked)
+        else if (isBooked || booking != null)
         {
             var meetingTitle =
                 !string.IsNullOrWhiteSpace(
@@ -563,17 +561,6 @@ public class NotificationRepository
             message =
                 $"{employeeName} booked " +
                 $"{roomName}{meetingTitle}.";
-        }
-
-        // -----------------------------------------------------
-        // LEGACY REQUEST
-        // -----------------------------------------------------
-
-        else if (booking != null)
-        {
-            message =
-                $"{employeeName} submitted a booking request " +
-                $"for {roomName}.";
         }
 
         // -----------------------------------------------------
