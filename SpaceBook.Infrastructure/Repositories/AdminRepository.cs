@@ -289,31 +289,34 @@ public class AdminRepository : IAdminRepository
             return (today, today);
         }
 
-        // 1. Explicit StartDate / EndDate takes absolute top priority
-        if (filter.StartDate.HasValue || filter.EndDate.HasValue)
-        {
-            return (filter.StartDate ?? today, filter.EndDate ?? filter.StartDate ?? today);
-        }
-
         var tf = filter.Timeframe?.Trim().ToLowerInvariant();
 
-        // 2. Named Timeframes
-        if (!string.IsNullOrWhiteSpace(tf) && tf != "all" && tf != "all time")
+        // 1. Timeframe takes precedence when specified and not empty
+        if (!string.IsNullOrWhiteSpace(tf) && tf != "custom")
         {
             return tf switch
             {
-                "daily" or "today" or "day" => (today, today),
+                "daily" or "today" or "day" => (filter.StartDate ?? today, filter.EndDate ?? filter.StartDate ?? today),
                 "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
-                "past 7 days" or "last 7 days" or "7 days" or "weekly" or "week" or "this week" => (today.AddDays(-6), today),
+                "past 7 days" or "last 7 days" or "7 days" => (today.AddDays(-6), today),
+                "weekly" or "week" or "this week" => (today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday), today.AddDays(7 - (int)today.DayOfWeek)),
                 "past 30 days" or "last 30 days" or "30 days" => (today.AddDays(-29), today),
-                "this month" or "monthly" or "month" => (new DateOnly(today.Year, today.Month, 1), new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month))),
+                "this month" or "monthly" or "month" => (new DateOnly(filter.Year ?? today.Year, filter.Month ?? today.Month, 1), new DateOnly(filter.Year ?? today.Year, filter.Month ?? today.Month, DateTime.DaysInMonth(filter.Year ?? today.Year, filter.Month ?? today.Month))),
+                "this year" or "yearly" or "year" or "annual" => (new DateOnly(filter.Year ?? today.Year, 1, 1), new DateOnly(filter.Year ?? today.Year, 12, 31)),
                 "past dates" or "past" => (null, today.AddDays(-1)),
                 "upcoming" or "future" => (today.AddDays(1), null),
+                "all" or "all time" => (null, null),
                 _ => (null, null)
             };
         }
 
-        // 3. Specific Month / Year provided
+        // 2. Explicit custom date range if StartDate != EndDate
+        if (filter.StartDate.HasValue && filter.EndDate.HasValue && filter.StartDate.Value != filter.EndDate.Value)
+        {
+            return (filter.StartDate.Value, filter.EndDate.Value);
+        }
+
+        // 3. Explicit Month / Year provided
         if (filter.Month.HasValue || filter.Year.HasValue)
         {
             int year = filter.Year ?? today.Year;
@@ -329,10 +332,10 @@ public class AdminRepository : IAdminRepository
             }
         }
 
-        // If module or status filter is passed with "all time", return null
-        if (tf == "all" || tf == "all time")
+        // 4. Explicit StartDate / EndDate fallback
+        if (filter.StartDate.HasValue || filter.EndDate.HasValue)
         {
-            return (null, null);
+            return (filter.StartDate ?? today, filter.EndDate ?? filter.StartDate ?? today);
         }
 
         return (today, today);

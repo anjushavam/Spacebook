@@ -753,24 +753,45 @@ public class ReportRepository : IReportRepository
 
     private static (DateOnly? Start, DateOnly? End) ResolveDateRange(ReportFilterDto filter, DateOnly today)
     {
-        if (filter.StartDate.HasValue || filter.EndDate.HasValue)
+        if (filter == null)
         {
-            return (filter.StartDate, filter.EndDate);
+            return (today, today);
         }
 
-        var tf = filter.Timeframe?.Trim().ToLowerInvariant() ?? "all time";
+        var tf = filter.Timeframe?.Trim().ToLowerInvariant();
 
-        return tf switch
+        // 1. Timeframe takes precedence when specified and not empty
+        if (!string.IsNullOrWhiteSpace(tf) && tf != "custom")
         {
-            "today" => (today, today),
-            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
-            "this week" or "week" => (today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday), today.AddDays(7 - (int)today.DayOfWeek)),
-            "past 7 days" or "last 7 days" or "7 days" => (today.AddDays(-6), today),
-            "past 30 days" or "last 30 days" or "30 days" or "this month" or "month" => (today.AddDays(-29), today),
-            "past dates" or "past" => (null, today.AddDays(-1)),
-            "upcoming" or "future" => (today.AddDays(1), null),
-            _ => (null, null)
-        };
+            return tf switch
+            {
+                "daily" or "today" or "day" => (filter.StartDate ?? today, filter.EndDate ?? filter.StartDate ?? today),
+                "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
+                "past 7 days" or "last 7 days" or "7 days" => (today.AddDays(-6), today),
+                "weekly" or "week" or "this week" => (today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday), today.AddDays(7 - (int)today.DayOfWeek)),
+                "past 30 days" or "last 30 days" or "30 days" => (today.AddDays(-29), today),
+                "this month" or "monthly" or "month" => (new DateOnly(today.Year, today.Month, 1), new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month))),
+                "this year" or "yearly" or "year" or "annual" => (new DateOnly(today.Year, 1, 1), new DateOnly(today.Year, 12, 31)),
+                "past dates" or "past" => (null, today.AddDays(-1)),
+                "upcoming" or "future" => (today.AddDays(1), null),
+                "all" or "all time" => (null, null),
+                _ => (null, null)
+            };
+        }
+
+        // 2. Explicit custom date range if StartDate != EndDate
+        if (filter.StartDate.HasValue && filter.EndDate.HasValue && filter.StartDate.Value != filter.EndDate.Value)
+        {
+            return (filter.StartDate.Value, filter.EndDate.Value);
+        }
+
+        // 3. Explicit StartDate / EndDate fallback
+        if (filter.StartDate.HasValue || filter.EndDate.HasValue)
+        {
+            return (filter.StartDate ?? today, filter.EndDate ?? filter.StartDate ?? today);
+        }
+
+        return (today, today);
     }
 
     // =========================================================
