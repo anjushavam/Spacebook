@@ -72,6 +72,38 @@ public class HotseatController : ControllerBase
         _notificationRepository = notificationRepository;
     }
 
+    private async Task AutoExpireOverdueHotseatBookingsAsync()
+    {
+        try
+        {
+            var nowUtc = DateTime.UtcNow;
+            var today = GetIndiaToday();
+
+            var overdueBookings = await _context.HotseatBookings
+                .Where(b => b.BookingStatus == "Confirmed" &&
+                            b.CheckInTime == null &&
+                            (b.BookingDate < today ||
+                             (b.BookingDate == today && b.CheckInDeadline.HasValue && b.CheckInDeadline.Value < nowUtc)))
+                .ToListAsync();
+
+            if (overdueBookings.Any())
+            {
+                foreach (var b in overdueBookings)
+                {
+                    b.BookingStatus = "Expired";
+                    b.RecordModifiedBy = "System (Auto-Expired)";
+                    b.RecordModifiedOn = nowUtc;
+                }
+
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[HotseatController] AutoExpire error: {ex.Message}");
+        }
+    }
+
     // ============================================================
     // CREATE HOTSEAT NOTIFICATION
     // ============================================================
@@ -134,6 +166,8 @@ public class HotseatController : ControllerBase
         [FromQuery] string? building,
         [FromQuery] string? module)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         // --------------------------------------------------------
         // 1. PARSE DATE
         // --------------------------------------------------------
@@ -272,6 +306,8 @@ public class HotseatController : ControllerBase
     [HttpGet("my-bookings")]
     public async Task<IActionResult> GetMyBookings()
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         var employeeIdClaim =
             User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -388,6 +424,8 @@ public class HotseatController : ControllerBase
     public async Task<IActionResult> CreateBooking(
         [FromBody] CreateHotseatBookingDto request)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         if (request == null)
         {
             return BadRequest(new
@@ -717,6 +755,8 @@ public class HotseatController : ControllerBase
         int id,
         [FromBody] UpdateHotseatBookingDto request)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         if (request == null)
         {
             return BadRequest(new
@@ -1000,6 +1040,8 @@ public class HotseatController : ControllerBase
     [HttpPost("{id:int}/check-in")]
     public async Task<IActionResult> CheckIn(int id)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         var employeeIdClaim =
             User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -1093,13 +1135,57 @@ public class HotseatController : ControllerBase
         }
 
         var today = GetIndiaToday();
+        var nowIst = GetIndiaNow();
 
-        if (booking.BookingDate != today)
+        if (booking.BookingDate < today)
+        {
+            booking.BookingStatus = "Expired";
+            booking.RecordModifiedBy = "System (Auto-Expired)";
+            booking.RecordModifiedOn = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return BadRequest(new
+            {
+                message = "Check-in window has expired. Your booking has been marked as Expired and the seat released."
+            });
+        }
+
+        if (booking.BookingDate > today)
         {
             return BadRequest(new
             {
                 message =
                     "You can only check in on the booking date."
+            });
+        }
+
+        // Booking start/check-in time in IST
+        DateTime bookingStartIst = booking.CheckInDeadline.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
+            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+
+        DateTime checkInWindowStart = bookingStartIst.AddHours(-1);
+
+        // Requirement 2: Reject if employee tries to check in before the check-in window opens (1 hr before start)
+        if (nowIst < checkInWindowStart)
+        {
+            return BadRequest(new
+            {
+                message = "Check-in is available only within 1 hour before the booking start time."
+            });
+        }
+
+        // Requirement 3: Reject and Auto-Expire if employee missed the check-in window
+        if (nowIst > bookingStartIst)
+        {
+            booking.BookingStatus = "Expired";
+            booking.RecordModifiedBy = "System (Auto-Expired)";
+            booking.RecordModifiedOn = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return BadRequest(new
+            {
+                message = "Check-in window has expired. Your booking has been marked as Expired and the seat released."
             });
         }
 
@@ -1172,6 +1258,118 @@ public class HotseatController : ControllerBase
     }
 
     // ============================================================
+    // POST: api/Hotseat/{id}/release
+    // RELEASE HOTSEAT (CHECK-OUT / RELEASE SEAT)
+    // ============================================================
+
+    [HttpPost("{id:int}/release")]
+    public async Task<IActionResult> ReleaseSeat(int id)
+    {
+        var employeeIdClaim =
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(employeeIdClaim) ||
+            !int.TryParse(employeeIdClaim, out int employeeId))
+        {
+            return Unauthorized(new
+            {
+                message = "Employee information could not be determined."
+            });
+        }
+
+        var booking =
+            await _context.HotseatBookings
+                .Include(b => b.Seat)
+                    .ThenInclude(s => s!.Module)
+                .FirstOrDefaultAsync(b =>
+                    b.HotseatBookingId == id);
+
+        if (booking == null)
+        {
+            return NotFound(new
+            {
+                message = "Hotseat booking not found."
+            });
+        }
+
+        if (booking.EmployeeId != employeeId)
+        {
+            return Forbid();
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Released",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "This hotseat booking is already released."
+            });
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "Cancelled bookings cannot be released."
+            });
+        }
+
+        if (string.Equals(
+                booking.BookingStatus,
+                "Expired",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "Expired bookings cannot be released."
+            });
+        }
+
+        booking.BookingStatus = "Released";
+        booking.ReleasedOn = DateTime.UtcNow;
+        booking.RecordModifiedBy = employeeId.ToString();
+        booking.RecordModifiedOn = DateTime.UtcNow;
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "An error occurred while releasing the hotseat booking.",
+                detail = ex.InnerException?.Message ?? ex.Message
+            });
+        }
+
+        var seatNumber =
+            booking.Seat?.SeatNumber ??
+            $"Seat {booking.SeatId}";
+
+        await CreateHotseatNotificationAsync(
+            employeeId,
+            booking.HotseatBookingId,
+            $"Your hotseat booking for {seatNumber} has been released successfully.");
+
+        return Ok(new
+        {
+            message = "Hotseat booking released successfully.",
+            bookingId = booking.HotseatBookingId,
+            seatId = booking.SeatId,
+            employeeId = booking.EmployeeId,
+            bookingDate = booking.BookingDate,
+            bookingStatus = booking.BookingStatus,
+            releasedOn = GetIndiaNow().ToString("yyyy-MM-ddTHH:mm:ss")
+        });
+    }
+
+    // ============================================================
     // DELETE: api/Hotseat/{id}
     // CANCEL HOTSEAT BOOKING
     // ============================================================
@@ -1179,6 +1377,8 @@ public class HotseatController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> CancelBooking(int id)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         var employeeIdClaim =
             User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -1318,6 +1518,8 @@ public class HotseatController : ControllerBase
     [HttpGet("stats")]
     public async Task<ActionResult<HotseatStatsDto>> GetStats()
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         var today = GetIndiaToday();
 
         // --------------------------------------------------------

@@ -57,6 +57,39 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         return DateOnly.FromDateTime(GetIndiaNow());
     }
 
+    private async Task AutoExpireOverdueHotseatBookingsAsync()
+    {
+        try
+        {
+            var nowUtc = DateTime.UtcNow;
+            var today = GetIndiaToday();
+
+            // Find Confirmed bookings where CheckInTime is null and check-in window has expired
+            var overdueBookings = await _context.HotseatBookings
+                .Where(b => b.BookingStatus == "Confirmed" &&
+                            b.CheckInTime == null &&
+                            (b.BookingDate < today ||
+                             (b.BookingDate == today && b.CheckInDeadline.HasValue && b.CheckInDeadline.Value < nowUtc)))
+                .ToListAsync();
+
+            if (overdueBookings.Any())
+            {
+                foreach (var b in overdueBookings)
+                {
+                    b.BookingStatus = "Expired";
+                    b.RecordModifiedBy = "System (Auto-Expired)";
+                    b.RecordModifiedOn = nowUtc;
+                }
+
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AdminHotseatRepository] AutoExpire error: {ex.Message}");
+        }
+    }
+
     // =========================================================
     // 1. DASHBOARD ANALYTICS (Strictly Hotseat Bookings Only)
     // =========================================================
@@ -64,10 +97,13 @@ public class AdminHotseatRepository : IAdminHotseatRepository
     public async Task<HotseatManagementDashboardDto> GetHotseatDashboardAnalyticsAsync(
         HotseatFilterDto filter)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         var today = GetIndiaToday();
         var (startDate, endDate) = ResolveDateRange(filter, today);
 
         // Base query for hotseat bookings (strictly HotseatBookings only)
+        // NOTE: Excludes Status filter so TotalReservations is independent of Status filter
         var query = _context.HotseatBookings
             .AsNoTracking()
             .Include(h => h.Employee)
@@ -102,35 +138,12 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     h.Seat.Module.ModuleName.ToLower().Contains(targetModule) ||
                     (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName).ToLower() == targetModule) ||
-                    (h.Seat.Module.Office != null && h.Seat.Module.Office.Location != null &&
+                    (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName + " - " + h.Seat.Module.Office.Location.LocationName).ToLower() == targetModule) ||
                     (h.Seat.Module.Office != null &&
                      targetModule.Contains(h.Seat.Module.ModuleName.ToLower()) &&
                      targetModule.Contains(h.Seat.Module.Office.OfficeName.ToLower()))
                 ));
-        }
-
-        // Apply Status filter
-        if (!string.IsNullOrWhiteSpace(filter.Status) &&
-            !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
-            !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
-            !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
-        {
-            var targetStatus = filter.Status.Trim();
-            if (string.Equals(targetStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase))
-            {
-                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
-            }
-            else if (string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
-            {
-                query = query.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled");
-            }
-            else
-            {
-                query = query.Where(h => h.BookingStatus.ToLower() == targetStatus.ToLower());
-            }
         }
 
         // Apply Section filter
@@ -146,7 +159,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                  ("Section " + h.Seat.Section).ToLower() == filter.Section.Trim().ToLower()));
         }
 
-        var scopeBookings = await query.ToListAsync();
+        var baseBookings = await query.ToListAsync();
 
         // -----------------------------------------------------
         // Active Seats Capacity Query (Strictly Hotseat Seats)
@@ -184,22 +197,30 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         int activeHotseatsCount = activeSeats.Count;
 
         // -----------------------------------------------------
-        // KPI Calculations (Total Scope for Date Range & Module)
+        // KPI Calculations (Calculated from Base Dataset - NEVER changed by Status Filter!)
         // -----------------------------------------------------
-        int totalReservations = scopeBookings.Count;
+        int totalReservations = baseBookings.Count;
 
-        int confirmedBookings = scopeBookings.Count(b =>
-            string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+        int confirmedBookings = baseBookings.Count(b =>
+            string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase));
+
+        int checkedInBookings = baseBookings.Count(b =>
             string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase));
 
-        double confirmedRate = totalReservations > 0
-            ? Math.Round(confirmedBookings * 100.0 / totalReservations, 1)
-            : 0.0;
-
-        int cancelledBookings = scopeBookings.Count(b =>
+        int cancelledBookings = baseBookings.Count(b =>
             string.Equals(b.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase));
+
+        int releasedBookings = baseBookings.Count(b =>
+            string.Equals(b.BookingStatus, "Released", StringComparison.OrdinalIgnoreCase));
+
+        int expiredBookings = baseBookings.Count(b =>
+            string.Equals(b.BookingStatus, "Expired", StringComparison.OrdinalIgnoreCase));
+
+        double confirmedRate = totalReservations > 0
+            ? Math.Round((confirmedBookings + checkedInBookings) * 100.0 / totalReservations, 1)
+            : 0.0;
 
         double cancelledRate = totalReservations > 0
             ? Math.Round(cancelledBookings * 100.0 / totalReservations, 1)
@@ -213,18 +234,20 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         }
         else
         {
-            var distinctDates = scopeBookings.Select(b => b.BookingDate).Distinct().Count();
+            var distinctDates = baseBookings.Select(b => b.BookingDate).Distinct().Count();
             daysCount = Math.Max(1, distinctDates > 0 ? distinctDates : 1);
         }
 
         double totalAvailableSeatDays = activeHotseatsCount * daysCount;
         double utilization = totalAvailableSeatDays > 0
-            ? Math.Round((confirmedBookings / totalAvailableSeatDays) * 100.0, 1)
+            ? Math.Round(((confirmedBookings + checkedInBookings) / totalAvailableSeatDays) * 100.0, 1)
             : 0.0;
         utilization = Math.Min(100.0, utilization);
 
-        // Filter bookings by status for the detailed charts if status filter is active
-        var bookings = scopeBookings;
+        // -----------------------------------------------------
+        // Status-Filtered Dataset (Used for Status-Specific Charts)
+        // -----------------------------------------------------
+        var bookings = baseBookings;
         if (!string.IsNullOrWhiteSpace(filter.Status) &&
             !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
             !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
@@ -234,21 +257,29 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             if (string.Equals(targetStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = scopeBookings.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In").ToList();
+                bookings = baseBookings.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In").ToList();
             }
             else if (string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = scopeBookings.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled").ToList();
+                bookings = baseBookings.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled").ToList();
             }
             else if (string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = scopeBookings.Where(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In").ToList();
+                bookings = baseBookings.Where(h => h.BookingStatus == "Confirmed").ToList();
+            }
+            else if (string.Equals(targetStatus, "Released", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = baseBookings.Where(h => h.BookingStatus == "Released").ToList();
+            }
+            else if (string.Equals(targetStatus, "Expired", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = baseBookings.Where(h => h.BookingStatus == "Expired").ToList();
             }
             else
             {
-                bookings = scopeBookings.Where(h => string.Equals(h.BookingStatus, targetStatus, StringComparison.OrdinalIgnoreCase)).ToList();
+                bookings = baseBookings.Where(h => string.Equals(h.BookingStatus, targetStatus, StringComparison.OrdinalIgnoreCase)).ToList();
             }
         }
 
@@ -503,6 +534,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
     public async Task<HotseatAuditPagedResultDto> GetHotseatAuditRecordsAsync(
         HotseatFilterDto filter)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         var today = GetIndiaToday();
         var (startDate, endDate) = ResolveDateRange(filter, today);
 
@@ -514,8 +547,6 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     .ThenInclude(m => m!.Office)
                         .ThenInclude(o => o!.Location)
             .AsQueryable();
-
-        int totalCount = await query.CountAsync();
 
         // Apply Date filter
         if (startDate.HasValue)
@@ -542,13 +573,16 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     h.Seat.Module.ModuleName.ToLower().Contains(targetModule) ||
                     (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName).ToLower() == targetModule) ||
-                    (h.Seat.Module.Office != null && h.Seat.Module.Office.Location != null &&
+                    (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName + " - " + h.Seat.Module.Office.Location.LocationName).ToLower() == targetModule) ||
                     (h.Seat.Module.Office != null &&
                      targetModule.Contains(h.Seat.Module.ModuleName.ToLower()) &&
                      targetModule.Contains(h.Seat.Module.Office.OfficeName.ToLower()))
                 ));
         }
+
+        // Total count before status/search filters (Base population for Date & Module)
+        int totalCount = await query.CountAsync();
 
         // Apply Status filter
         if (!string.IsNullOrWhiteSpace(filter.Status) &&
@@ -566,6 +600,19 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                      string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
             {
                 query = query.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled");
+            }
+            else if (string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "Confirmed");
+            }
+            else if (string.Equals(targetStatus, "Released", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "Released");
+            }
+            else if (string.Equals(targetStatus, "Expired", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "Expired");
             }
             else
             {
@@ -668,6 +715,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
 
     public async Task<byte[]> ExportHotseatsCsvAsync(HotseatFilterDto filter)
     {
+        await AutoExpireOverdueHotseatBookingsAsync();
+
         var today = GetIndiaToday();
         var (startDate, endDate) = ResolveDateRange(filter, today);
 
@@ -705,7 +754,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                     h.Seat.Module.ModuleName.ToLower().Contains(targetModule) ||
                     (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName).ToLower() == targetModule) ||
-                    (h.Seat.Module.Office != null && h.Seat.Module.Office.Location != null &&
+                    (h.Seat.Module.Office != null &&
                      (h.Seat.Module.ModuleName + " - " + h.Seat.Module.Office.OfficeName + " - " + h.Seat.Module.Office.Location.LocationName).ToLower() == targetModule) ||
                     (h.Seat.Module.Office != null &&
                      targetModule.Contains(h.Seat.Module.ModuleName.ToLower()) &&
@@ -729,6 +778,19 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                      string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
             {
                 query = query.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled");
+            }
+            else if (string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "Confirmed");
+            }
+            else if (string.Equals(targetStatus, "Released", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "Released");
+            }
+            else if (string.Equals(targetStatus, "Expired", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(h => h.BookingStatus == "Expired");
             }
             else
             {
