@@ -172,6 +172,8 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IAdminRepository, AdminRepository>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IAdminHotseatRepository, AdminHotseatRepository>();
+builder.Services.AddScoped<IAdminHotseatService, AdminHotseatService>();
 
 // =====================================================
 // Room
