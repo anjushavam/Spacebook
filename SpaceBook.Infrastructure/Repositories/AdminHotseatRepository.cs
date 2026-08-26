@@ -146,7 +146,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                  ("Section " + h.Seat.Section).ToLower() == filter.Section.Trim().ToLower()));
         }
 
-        var bookings = await query.ToListAsync();
+        var scopeBookings = await query.ToListAsync();
 
         // -----------------------------------------------------
         // Active Seats Capacity Query (Strictly Hotseat Seats)
@@ -184,11 +184,11 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         int activeHotseatsCount = activeSeats.Count;
 
         // -----------------------------------------------------
-        // KPI Calculations
+        // KPI Calculations (Total Scope for Date Range & Module)
         // -----------------------------------------------------
-        int totalReservations = bookings.Count;
+        int totalReservations = scopeBookings.Count;
 
-        int confirmedBookings = bookings.Count(b =>
+        int confirmedBookings = scopeBookings.Count(b =>
             string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase));
@@ -197,7 +197,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             ? Math.Round(confirmedBookings * 100.0 / totalReservations, 1)
             : 0.0;
 
-        int cancelledBookings = bookings.Count(b =>
+        int cancelledBookings = scopeBookings.Count(b =>
             string.Equals(b.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase));
 
@@ -213,7 +213,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         }
         else
         {
-            var distinctDates = bookings.Select(b => b.BookingDate).Distinct().Count();
+            var distinctDates = scopeBookings.Select(b => b.BookingDate).Distinct().Count();
             daysCount = Math.Max(1, distinctDates > 0 ? distinctDates : 1);
         }
 
@@ -222,6 +222,35 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             ? Math.Round((confirmedBookings / totalAvailableSeatDays) * 100.0, 1)
             : 0.0;
         utilization = Math.Min(100.0, utilization);
+
+        // Filter bookings by status for the detailed charts if status filter is active
+        var bookings = scopeBookings;
+        if (!string.IsNullOrWhiteSpace(filter.Status) &&
+            !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetStatus = filter.Status.Trim();
+            if (string.Equals(targetStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = scopeBookings.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In").ToList();
+            }
+            else if (string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = scopeBookings.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled").ToList();
+            }
+            else if (string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = scopeBookings.Where(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In").ToList();
+            }
+            else
+            {
+                bookings = scopeBookings.Where(h => string.Equals(h.BookingStatus, targetStatus, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+        }
 
         // -----------------------------------------------------
         // Chart 1: Hotseat Volume by Facility & Zone (Donut Chart)

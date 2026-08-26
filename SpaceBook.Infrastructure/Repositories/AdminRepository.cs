@@ -142,40 +142,17 @@ public class AdminRepository : IAdminRepository
                 ));
         }
 
-        if (filter != null &&
-            !string.IsNullOrWhiteSpace(filter.Status) &&
-            !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
-            !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
-            !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
-        {
-            var targetStatus = filter.Status.Trim();
-            if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "Approved", StringComparison.OrdinalIgnoreCase))
-            {
-                bookingsQuery = bookingsQuery.Where(b => b.Status == "Approved" || b.Status == "Confirmed");
-            }
-            else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
-            {
-                bookingsQuery = bookingsQuery.Where(b => b.Status == "Cancelled" || b.Status == "Canceled");
-            }
-            else
-            {
-                bookingsQuery = bookingsQuery.Where(b => b.Status.ToLower() == targetStatus.ToLower());
-            }
-        }
+        var scopeBookings = await bookingsQuery.ToListAsync();
 
-        var bookings = await bookingsQuery.ToListAsync();
-
-        dashboard.TodayBookings = bookings.Count;
+        dashboard.TodayBookings = scopeBookings.Count;
+        dashboard.TotalReservations = scopeBookings.Count;
+        dashboard.TotalBookings = scopeBookings.Count;
 
         // =========================================================
         // PENDING APPROVALS
         // =========================================================
 
-        dashboard.PendingApprovals = bookings.Count(x => x.Status == "Pending");
+        dashboard.PendingApprovals = scopeBookings.Count(x => x.Status == "Pending");
 
         // =========================================================
         // DYNAMIC UTILIZATION
@@ -194,23 +171,23 @@ public class AdminRepository : IAdminRepository
         }
         else if (startDate.HasValue && !endDate.HasValue)
         {
-            var maxDate = bookings.Any() ? bookings.Max(b => b.BookingDate) : today.AddDays(30);
+            var maxDate = scopeBookings.Any() ? scopeBookings.Max(b => b.BookingDate) : today.AddDays(30);
             daysCount = Math.Max(1, maxDate.DayNumber - startDate.Value.DayNumber + 1);
         }
         else if (!startDate.HasValue && endDate.HasValue)
         {
-            var minDate = bookings.Any() ? bookings.Min(b => b.BookingDate) : today.AddDays(-30);
+            var minDate = scopeBookings.Any() ? scopeBookings.Min(b => b.BookingDate) : today.AddDays(-30);
             daysCount = Math.Max(1, endDate.Value.DayNumber - minDate.DayNumber + 1);
         }
         else
         {
-            var distinctDates = bookings.Select(b => b.BookingDate).Distinct().Count();
+            var distinctDates = scopeBookings.Select(b => b.BookingDate).Distinct().Count();
             daysCount = Math.Max(1, distinctDates > 0 ? distinctDates : 1);
         }
 
         double availableRoomHours = dashboard.TotalRooms * daysCount * officeHoursPerDay;
 
-        var approvedBookings = bookings
+        var approvedBookings = scopeBookings
             .Where(x => x.Status == "Approved" || x.Status == "Confirmed")
             .ToList();
 
@@ -223,18 +200,43 @@ public class AdminRepository : IAdminRepository
 
         dashboard.ActiveRoomsCount = dashboard.TotalRooms;
         dashboard.ActiveRooms = dashboard.TotalRooms;
-        dashboard.TotalReservations = bookings.Count;
-        dashboard.TotalBookings = bookings.Count;
         dashboard.ConfirmedBookings = approvedBookings.Count;
-        dashboard.ConfirmedRate = bookings.Count > 0 ? Math.Round(approvedBookings.Count * 100.0 / bookings.Count, 1) : 0.0;
-        dashboard.CancelledBookings = bookings.Count(x => x.Status == "Cancelled" || x.Status == "Canceled");
-        dashboard.CancelledRate = bookings.Count > 0 ? Math.Round(dashboard.CancelledBookings * 100.0 / bookings.Count, 1) : 0.0;
+        dashboard.ConfirmedRate = scopeBookings.Count > 0 ? Math.Round(approvedBookings.Count * 100.0 / scopeBookings.Count, 1) : 0.0;
+        dashboard.CancelledBookings = scopeBookings.Count(x => x.Status == "Cancelled" || x.Status == "Canceled");
+        dashboard.CancelledRate = scopeBookings.Count > 0 ? Math.Round(dashboard.CancelledBookings * 100.0 / scopeBookings.Count, 1) : 0.0;
         dashboard.Utilization = Math.Round(utilization, 2);
         dashboard.OccupancyRate = Math.Round(utilization, 2);
         dashboard.UtilizationRate = Math.Round(utilization, 2);
         dashboard.UtilizationPercentage = Math.Round(utilization, 2);
         dashboard.Occupancy = Math.Round(utilization, 2);
         dashboard.TotalVolumePercentage = 100.0;
+
+        // Filter bookings by status for the recent bookings list if status filter is active
+        var bookings = scopeBookings;
+        if (filter != null &&
+            !string.IsNullOrWhiteSpace(filter.Status) &&
+            !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetStatus = filter.Status.Trim();
+            if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = scopeBookings.Where(b => b.Status == "Approved" || b.Status == "Confirmed").ToList();
+            }
+            else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = scopeBookings.Where(b => b.Status == "Cancelled" || b.Status == "Canceled").ToList();
+            }
+            else
+            {
+                bookings = scopeBookings.Where(b => string.Equals(b.Status, targetStatus, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+        }
 
         // =========================================================
         // PENDING APPROVAL LIST

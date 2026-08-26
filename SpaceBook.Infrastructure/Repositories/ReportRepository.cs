@@ -500,31 +500,7 @@ public class ReportRepository : IReportRepository
             roomQuery = roomQuery.Where(b => b.Room != null && b.Room.RoomTypeId == filter.RoomTypeId.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(filter.Status) &&
-            !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
-            !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
-            !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
-        {
-            var targetStatus = filter.Status.Trim();
-            if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "Approved", StringComparison.OrdinalIgnoreCase))
-            {
-                roomQuery = roomQuery.Where(b => b.Status == "Approved" || b.Status == "Confirmed");
-            }
-            else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
-            {
-                roomQuery = roomQuery.Where(b => b.Status == "Cancelled" || b.Status == "Canceled");
-            }
-            else
-            {
-                roomQuery = roomQuery.Where(b => b.Status.ToLower() == targetStatus.ToLower());
-            }
-        }
-
-        var bookings = await roomQuery.ToListAsync();
+        var scopeBookings = await roomQuery.ToListAsync();
 
         // -----------------------------------------------------
         // Active Rooms in Scope Query
@@ -555,20 +531,20 @@ public class ReportRepository : IReportRepository
         }
 
         var totalRoomsInScope = await roomsCapacityQuery.CountAsync();
-        int activeRoomsCount = totalRoomsInScope > 0 ? totalRoomsInScope : bookings.Select(b => b.RoomId).Distinct().Count();
+        int activeRoomsCount = totalRoomsInScope > 0 ? totalRoomsInScope : scopeBookings.Select(b => b.RoomId).Distinct().Count();
         if (activeRoomsCount == 0) activeRoomsCount = 1;
 
-        // 1. Total Reservations
-        int totalReservations = bookings.Count;
+        // 1. Total Reservations (Overall for Date Range & Module)
+        int totalReservations = scopeBookings.Count;
 
         // 2. Confirmed Bookings (Approved)
-        int confirmedBookings = bookings.Count(b => b.Status == "Approved" || b.Status == "Confirmed");
+        int confirmedBookings = scopeBookings.Count(b => b.Status == "Approved" || b.Status == "Confirmed");
         double confirmedRate = totalReservations > 0
             ? Math.Round(confirmedBookings * 100.0 / totalReservations, 1)
             : 0;
 
         // 3. Cancelled Bookings
-        int cancelledBookings = bookings.Count(b => b.Status == "Cancelled" || b.Status == "Canceled");
+        int cancelledBookings = scopeBookings.Count(b => b.Status == "Cancelled" || b.Status == "Canceled");
         double cancelledRate = totalReservations > 0
             ? Math.Round(cancelledBookings * 100.0 / totalReservations, 1)
             : 0;
@@ -581,24 +557,24 @@ public class ReportRepository : IReportRepository
         }
         else if (startDate.HasValue && !endDate.HasValue)
         {
-            var maxDate = bookings.Any() ? bookings.Max(b => b.BookingDate) : today.AddDays(30);
+            var maxDate = scopeBookings.Any() ? scopeBookings.Max(b => b.BookingDate) : today.AddDays(30);
             daysCount = Math.Max(1, maxDate.DayNumber - startDate.Value.DayNumber + 1);
         }
         else if (!startDate.HasValue && endDate.HasValue)
         {
-            var minDate = bookings.Any() ? bookings.Min(b => b.BookingDate) : today.AddDays(-30);
+            var minDate = scopeBookings.Any() ? scopeBookings.Min(b => b.BookingDate) : today.AddDays(-30);
             daysCount = Math.Max(1, endDate.Value.DayNumber - minDate.DayNumber + 1);
         }
         else
         {
-            var distinctDates = bookings.Select(b => b.BookingDate).Distinct().Count();
+            var distinctDates = scopeBookings.Select(b => b.BookingDate).Distinct().Count();
             daysCount = Math.Max(1, distinctDates > 0 ? distinctDates : 1);
         }
 
         const double officeHoursPerDay = 12.0; // 10:00 AM to 10:00 PM
         double totalAvailableRoomHours = activeRoomsCount * daysCount * officeHoursPerDay;
 
-        var approvedBookings = bookings
+        var approvedBookings = scopeBookings
             .Where(b => b.Status == "Approved" || b.Status == "Confirmed")
             .ToList();
 
@@ -612,10 +588,36 @@ public class ReportRepository : IReportRepository
         utilization = Math.Min(100.0, utilization);
 
         // 5. Workforce Engagement
-        int activeTeamMembers = bookings.Select(b => b.EmployeeId).Distinct().Count();
+        int activeTeamMembers = scopeBookings.Select(b => b.EmployeeId).Distinct().Count();
         double avgPerPerson = activeTeamMembers > 0
             ? Math.Round((double)totalReservations / activeTeamMembers, 1)
             : 0;
+
+        // Filter bookings by status for the detailed charts if status filter is active
+        var bookings = scopeBookings;
+        if (!string.IsNullOrWhiteSpace(filter.Status) &&
+            !filter.Status.Equals("All", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Status", StringComparison.OrdinalIgnoreCase) &&
+            !filter.Status.Equals("All Statuses", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetStatus = filter.Status.Trim();
+            if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = scopeBookings.Where(b => b.Status == "Approved" || b.Status == "Confirmed").ToList();
+            }
+            else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                bookings = scopeBookings.Where(b => b.Status == "Cancelled" || b.Status == "Canceled").ToList();
+            }
+            else
+            {
+                bookings = scopeBookings.Where(b => string.Equals(b.Status, targetStatus, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+        }
 
         // 6. Employee Booking vs Cancellation Ratio
         var employeeRatios = bookings
