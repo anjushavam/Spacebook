@@ -1604,10 +1604,7 @@ public class EmailService : IEmailService
                                 <td style="padding: 6px 10px; color: #059669; font-weight: 600;">Opens at {checkInOpensFormatted} (1 hr before start)</td>
                             </tr>
 
-                            <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
-                            </tr>
+                            
 
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
@@ -1688,10 +1685,7 @@ public class EmailService : IEmailService
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Department:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{department}</td>
                             </tr>
-                            <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
-                            </tr>
+                            
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
@@ -1823,10 +1817,7 @@ public class EmailService : IEmailService
                             Your hotseat reservation was not checked in within the permitted time. The reservation has now expired and the seat has been released.
                         </p>
                         <table width="100%" cellpadding="0" cellspacing="0" style="background: #fef2f2; border: 1px solid #fee2e2; border-radius: 6px; margin: 10px 0; font-size: 13px;">
-                            <tr>
-                                <td style="padding: 6px 10px; color: #991b1b; width: 35%;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #7f1d1d;">#{bookingId}</td>
-                            </tr>
+                            
                             <tr>
                                 <td style="padding: 6px 10px; color: #991b1b;"><strong>Seat:</strong></td>
                                 <td style="padding: 6px 10px; color: #7f1d1d; font-weight: bold;">{seatNumber}</td>
@@ -1930,10 +1921,7 @@ public class EmailService : IEmailService
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Check-In Window:</strong></td>
                                 <td style="padding: 6px 10px; color: #2563eb; font-weight: 600;">Opens at {checkInOpensFormatted} (1 hr before start)</td>
                             </tr>
-                            <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
-                            </tr>
+                            
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
                                 <td style="padding: 6px 10px; color: #2563eb; font-weight: bold;">Confirmed (Rescheduled)</td>
@@ -1995,10 +1983,7 @@ public class EmailService : IEmailService
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Department:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{department}</td>
                             </tr>
-                            <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
-                            </tr>
+                            
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
@@ -2048,63 +2033,134 @@ public class EmailService : IEmailService
         return $"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>SpaceBook Hotseat Booking Cancelled</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
-            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Hotseat Booking Cancelled</title>
+        </head>
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 12px;
+            color: #1e293b;
+            margin: 0;">
+
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width: 520px;
+                    background: #ffffff;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+
                 <tr>
-                    <td style="background: #64748b; padding: 14px 18px; text-align: center; color: #ffffff;">
-                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook</h1>
-                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Booking Cancelled</p>
+                    <td style="
+                        background: #dc2626;
+                        padding: 14px 18px;
+                        text-align: center;
+                        color: #ffffff;">
+
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">
+                            SpaceBook
+                        </h1>
+
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">
+                            Hotseat Booking Cancelled
+                        </p>
                     </td>
                 </tr>
+
                 <tr>
                     <td style="padding: 16px 20px;">
-                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Hello {employeeName},</h2>
+
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">
+                            Hello {employeeName},
+                        </h2>
+
                         <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
                             Your hotseat reservation has been cancelled.
                         </p>
-                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
-                            <tr>
-                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
-                            </tr>
+
+                        <table
+                            width="100%"
+                            cellpadding="0"
+                            cellspacing="0"
+                            style="
+                                background: #f8fafc;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 6px;
+                                margin: 10px 0;
+                                font-size: 13px;">
+
+                        
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">{seatNumber}</td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
                             </tr>
+
                             <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office:</strong></td>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / Location:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Date:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Scheduled Time:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Reason:</strong></td>
-                                <td style="padding: 6px 10px; color: #64748b;">{cancellationReason}</td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{cancellationReason}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
-                                <td style="padding: 6px 10px; color: #64748b; font-weight: bold;">Cancelled</td>
+                                <td style="padding: 6px 10px; color: #dc2626; font-weight: bold;">
+                                    Cancelled
+                                </td>
                             </tr>
+
                         </table>
-                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Team</strong></p>
+
+                        <p style="margin: 8px 0 6px 0; font-size: 12px; color: #64748b;">
+                            If this was a mistake, please make a new booking in SpaceBook.
+                        </p>
+
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">
+                            Regards,<br>
+                            <strong>SpaceBook</strong>
+                        </p>
+
                     </td>
                 </tr>
+
                 <tr>
-                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                    <td style="
+                        text-align: center;
+                        padding: 8px 14px;
+                        background: #f1f5f9;
+                        color: #64748b;
+                        font-size: 11px;">
+
                         This is an automated notification from SpaceBook.
+
                     </td>
                 </tr>
+
             </table>
         </body>
         </html>
@@ -2127,71 +2183,140 @@ public class EmailService : IEmailService
         return $"""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>[Admin Alert] SpaceBook Hotseat Cancelled</title></head>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
-            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+        <head>
+            <meta charset="utf-8">
+            <title>[Admin Alert] SpaceBook Hotseat Cancelled</title>
+        </head>
+        <body style="
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            padding: 12px;
+            color: #1e293b;
+            margin: 0;">
+
+            <table
+                align="center"
+                width="100%"
+                cellpadding="0"
+                cellspacing="0"
+                style="
+                    max-width: 520px;
+                    background: #ffffff;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+
                 <tr>
-                    <td style="background: #e11d48; padding: 14px 18px; text-align: center; color: #ffffff;">
-                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook Admin Alert</h1>
-                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Reservation Cancelled</p>
+                    <td style="
+                        background: #dc2626;
+                        padding: 14px 18px;
+                        text-align: center;
+                        color: #ffffff;">
+
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">
+                            SpaceBook Admin Alert
+                        </h1>
+
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">
+                            Hotseat Reservation Cancelled
+                        </p>
                     </td>
                 </tr>
+
                 <tr>
                     <td style="padding: 16px 20px;">
-                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Administrator,</h2>
+
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">
+                            Administrator,
+                        </h2>
+
                         <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
                             A hotseat reservation has been cancelled by an employee.
                         </p>
-                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+
+                        <table
+                            width="100%"
+                            cellpadding="0"
+                            cellspacing="0"
+                            style="
+                                background: #f8fafc;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 6px;
+                                margin: 10px 0;
+                                font-size: 13px;">
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Employee:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{employeeName} ({employeeEmail})</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Department:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{department}</td>
                             </tr>
-                            <tr>
-                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
-                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
-                            </tr>
+
+                            
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Office / Location:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Booking Date:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Scheduled Time:</strong></td>
                                 <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Reason:</strong></td>
-                                <td style="padding: 6px 10px; color: #e11d48; font-weight: 600;">{cancellationReason}</td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{cancellationReason}</td>
                             </tr>
+
                             <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
-                                <td style="padding: 6px 10px; color: #e11d48; font-weight: bold;">Cancelled</td>
+                                <td style="padding: 6px 10px; color: #dc2626; font-weight: bold;">
+                                    Cancelled
+                                </td>
                             </tr>
+
                         </table>
-                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Notification Service</strong></p>
+
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">
+                            Regards,<br>
+                            <strong>SpaceBook Notification Service</strong>
+                        </p>
+
                     </td>
                 </tr>
+
                 <tr>
-                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                    <td style="
+                        text-align: center;
+                        padding: 8px 14px;
+                        background: #f1f5f9;
+                        color: #64748b;
+                        font-size: 11px;">
+
                         SpaceBook Workspace Administration
+
                     </td>
                 </tr>
+
             </table>
         </body>
         </html>
