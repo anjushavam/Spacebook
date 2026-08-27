@@ -100,4 +100,45 @@ public class CopilotService : ICopilotService
         return await _copilotRepository
             .GetRecommendationsAsync(request);
     }
+
+    // =========================================================
+    // HOTSEATS - AVAILABILITY & SUMMARY
+    // =========================================================
+
+    public async Task<HotseatSummaryCopilotDto> GetHotseatSummaryAsync(
+        DateOnly? date,
+        string? location,
+        string? office,
+        string? module)
+    {
+        return await _copilotRepository.GetHotseatSummaryAsync(
+            date,
+            location,
+            office,
+            module);
+    }
+
+    // =========================================================
+    // HOTSEATS - SEARCH & DETAILS
+    // =========================================================
+
+    public async Task<List<HotseatCopilotDto>> GetHotseatsAsync(
+        HotseatSearchFilterCopilotDto filter)
+    {
+        if (filter == null)
+        {
+            filter = new HotseatSearchFilterCopilotDto();
+        }
+
+        return await _copilotRepository.GetHotseatsAsync(filter);
+    }
+
+    // =========================================================
+    // HOTSEATS - LOCATIONS
+    // =========================================================
+
+    public async Task<List<HotseatLocationCopilotDto>> GetHotseatLocationsAsync()
+    {
+        return await _copilotRepository.GetHotseatLocationsAsync();
+    }
 }

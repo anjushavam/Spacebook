@@ -36,4 +36,27 @@ public interface ICopilotRepository
 
     Task<List<CopilotRecommendationDto>> GetRecommendationsAsync(
         CopilotRecommendationRequestDto request);
+
+    // =========================================================
+    // HOTSEATS - AVAILABILITY & SUMMARY
+    // =========================================================
+
+    Task<HotseatSummaryCopilotDto> GetHotseatSummaryAsync(
+        DateOnly? date,
+        string? location,
+        string? office,
+        string? module);
+
+    // =========================================================
+    // HOTSEATS - SEARCH & DETAILS
+    // =========================================================
+
+    Task<List<HotseatCopilotDto>> GetHotseatsAsync(
+        HotseatSearchFilterCopilotDto filter);
+
+    // =========================================================
+    // HOTSEATS - LOCATIONS
+    // =========================================================
+
+    Task<List<HotseatLocationCopilotDto>> GetHotseatLocationsAsync();
 }

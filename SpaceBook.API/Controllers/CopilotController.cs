@@ -192,6 +192,178 @@ public class CopilotController : ControllerBase
     // }
     // =========================================================
 
-    
-    
+    [HttpPost("recommendations")]
+    public async Task<IActionResult> GetRecommendations(
+        [FromBody] CopilotRecommendationRequestDto request)
+    {
+        try
+        {
+            var result =
+                await _copilotService.GetRecommendationsAsync(request);
+
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // GET HOTSEAT SUMMARY & AVAILABILITY
+    // =========================================================
+    //
+    // Prompt:
+    // How many hotseats are available today in Coimbatore?
+    // What is the hotseat summary (available, booked, cancelled)?
+    // In what locations are hotseats available?
+    //
+    // Examples:
+    // GET /api/copilot/hotseats/summary
+    // GET /api/copilot/hotseats/summary?date=2026-08-27&location=Coimbatore
+    // GET /api/copilot/hotseats/summary?module=Module%201
+    // =========================================================
+
+    [HttpGet("hotseats/summary")]
+    [HttpGet("hotseats/availability")]
+    public async Task<IActionResult> GetHotseatSummary(
+        [FromQuery] DateOnly? date,
+        [FromQuery] string? location,
+        [FromQuery] string? office,
+        [FromQuery] string? module)
+    {
+        try
+        {
+            var result =
+                await _copilotService.GetHotseatSummaryAsync(
+                    date,
+                    location,
+                    office,
+                    module);
+
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // GET / SEARCH HOTSEATS
+    // =========================================================
+    //
+    // Examples:
+    // GET /api/copilot/hotseats
+    // GET /api/copilot/hotseats?search=WS-05
+    // GET /api/copilot/hotseats?location=Coimbatore&status=Available
+    // GET /api/copilot/hotseats?module=Module%201&section=Section%20A
+    // =========================================================
+
+    [HttpGet("hotseats")]
+    public async Task<IActionResult> GetHotseats(
+        [FromQuery] string? search,
+        [FromQuery] DateOnly? date,
+        [FromQuery] string? location,
+        [FromQuery] int? officeId,
+        [FromQuery] string? office,
+        [FromQuery] string? module,
+        [FromQuery] string? section,
+        [FromQuery] string? status)
+    {
+        try
+        {
+            var filter = new HotseatSearchFilterCopilotDto
+            {
+                Search = search,
+                Date = date,
+                Location = location,
+                OfficeId = officeId,
+                Office = office,
+                Module = module,
+                Section = section,
+                Status = status
+            };
+
+            var result =
+                await _copilotService.GetHotseatsAsync(filter);
+
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // GET HOTSEAT LOCATIONS
+    // =========================================================
+    //
+    // Prompt:
+    // In what locations are hotseats available?
+    //
+    // Example:
+    // GET /api/copilot/hotseats/locations
+    // =========================================================
+
+    [HttpGet("hotseats/locations")]
+    public async Task<IActionResult> GetHotseatLocations()
+    {
+        try
+        {
+            var result =
+                await _copilotService.GetHotseatLocationsAsync();
+
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
 }

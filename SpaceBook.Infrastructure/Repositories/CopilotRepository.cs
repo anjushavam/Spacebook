@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SpaceBook.Application.DTOs.Copilot;
 using SpaceBook.Application.Interfaces;
+using SpaceBook.Domain.Entities;
 using SpaceBook.Infrastructure.Data;
 
 namespace SpaceBook.Infrastructure.Repositories;
@@ -672,5 +673,396 @@ public class CopilotRepository : ICopilotRepository
             .ThenBy(r =>
                 r.RoomName)
             .ToList();
+    }
+
+    // =========================================================
+    // TIMEZONE HELPER
+    // =========================================================
+
+    private static TimeZoneInfo IndiaTimeZone
+    {
+        get
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+            }
+        }
+    }
+
+    private static DateTime GetIndiaNow()
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, IndiaTimeZone);
+    }
+
+    // =========================================================
+    // HOTSEATS - AVAILABILITY & SUMMARY
+    // =========================================================
+
+    public async Task<HotseatSummaryCopilotDto> GetHotseatSummaryAsync(
+        DateOnly? date,
+        string? location,
+        string? office,
+        string? module)
+    {
+        var targetDate = date ?? DateOnly.FromDateTime(GetIndiaNow());
+
+        // 1. Get all active seats with Module, Office, Location
+        var seatsQuery = _context.Seats
+            .AsNoTracking()
+            .Include(s => s.Module)
+                .ThenInclude(m => m!.Office)
+                    .ThenInclude(o => o!.Location)
+            .Where(s => s.IsActive)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(location))
+        {
+            var loc = location.Trim().ToLower();
+            seatsQuery = seatsQuery.Where(s =>
+                s.Module != null &&
+                s.Module.Office != null &&
+                s.Module.Office.Location != null &&
+                (s.Module.Office.Location.LocationName.ToLower().Contains(loc) ||
+                 loc.Contains(s.Module.Office.Location.LocationName.ToLower())));
+        }
+
+        if (!string.IsNullOrWhiteSpace(office))
+        {
+            var off = office.Trim().ToLower();
+            seatsQuery = seatsQuery.Where(s =>
+                s.Module != null &&
+                s.Module.Office != null &&
+                (s.Module.Office.OfficeName.ToLower().Contains(off) ||
+                 off.Contains(s.Module.Office.OfficeName.ToLower())));
+        }
+
+        if (!string.IsNullOrWhiteSpace(module))
+        {
+            var mod = module.Trim().ToLower();
+            seatsQuery = seatsQuery.Where(s =>
+                s.Module != null &&
+                (s.Module.ModuleName.ToLower().Contains(mod) ||
+                 mod.Contains(s.Module.ModuleName.ToLower())));
+        }
+
+        var allSeats = await seatsQuery.ToListAsync();
+        var seatIds = allSeats.Select(s => s.SeatId).ToList();
+
+        // 2. Get bookings for the target date
+        var bookings = seatIds.Count == 0
+            ? new List<HotseatBooking>()
+            : await _context.HotseatBookings
+                .AsNoTracking()
+                .Where(b =>
+                    seatIds.Contains(b.SeatId) &&
+                    b.BookingDate == targetDate)
+                .ToListAsync();
+
+        // 3. Aggregate totals
+        var confirmedOrCheckedInBookings = bookings
+            .Where(b =>
+                string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var bookedSeatIds = confirmedOrCheckedInBookings
+            .Select(b => b.SeatId)
+            .ToHashSet();
+
+        int totalSeats = allSeats.Count;
+        int bookedSeats = bookedSeatIds.Count;
+        int availableSeats = Math.Max(0, totalSeats - bookedSeats);
+
+        int checkedInCount = bookings.Count(b =>
+            string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase));
+
+        int cancelledCount = bookings.Count(b =>
+            string.Equals(b.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Rejected", StringComparison.OrdinalIgnoreCase));
+
+        int expiredCount = bookings.Count(b =>
+            string.Equals(b.BookingStatus, "Expired", StringComparison.OrdinalIgnoreCase));
+
+        int releasedCount = bookings.Count(b =>
+            string.Equals(b.BookingStatus, "Released", StringComparison.OrdinalIgnoreCase));
+
+        // Group by Location -> Office -> Module
+        var locationGroups = allSeats
+            .GroupBy(s => s.Module?.Office?.Location?.LocationName ?? "General")
+            .Select(locGroup =>
+            {
+                var locSeats = locGroup.ToList();
+                var locSeatIds = locSeats.Select(s => s.SeatId).ToHashSet();
+                var locBookings = bookings.Where(b => locSeatIds.Contains(b.SeatId)).ToList();
+                var locBookedSeatIds = locBookings
+                    .Where(b =>
+                        string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase))
+                    .Select(b => b.SeatId)
+                    .ToHashSet();
+
+                var officeDtos = locSeats
+                    .GroupBy(s => new { OfficeId = s.Module?.OfficeId ?? 0, OfficeName = s.Module?.Office?.OfficeName ?? "Office" })
+                    .Select(offGroup =>
+                    {
+                        var offSeats = offGroup.ToList();
+                        var offSeatIds = offSeats.Select(s => s.SeatId).ToHashSet();
+                        var offBookings = bookings.Where(b => offSeatIds.Contains(b.SeatId)).ToList();
+                        var offBookedSeatIds = offBookings
+                            .Where(b =>
+                                string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase))
+                            .Select(b => b.SeatId)
+                            .ToHashSet();
+
+                        var moduleDtos = offSeats
+                            .GroupBy(s => new { ModuleId = s.ModuleId, ModuleName = s.Module?.ModuleName ?? "Module" })
+                            .Select(modGroup =>
+                            {
+                                var modSeats = modGroup.ToList();
+                                var modSeatIds = modSeats.Select(s => s.SeatId).ToHashSet();
+                                var modBookings = bookings.Where(b => modSeatIds.Contains(b.SeatId)).ToList();
+                                var modBookedSeatIds = modBookings
+                                    .Where(b =>
+                                        string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase))
+                                    .Select(b => b.SeatId)
+                                    .ToHashSet();
+
+                                return new HotseatModuleSummaryDto
+                                {
+                                    ModuleId = modGroup.Key.ModuleId,
+                                    ModuleName = modGroup.Key.ModuleName,
+                                    Sections = modSeats.Select(s => s.Section ?? "").Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList(),
+                                    TotalSeats = modSeats.Count,
+                                    AvailableSeats = Math.Max(0, modSeats.Count - modBookedSeatIds.Count),
+                                    BookedSeats = modBookedSeatIds.Count,
+                                    CheckedInSeats = modBookings.Count(b => string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase)),
+                                    CancelledBookings = modBookings.Count(b => string.Equals(b.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Rejected", StringComparison.OrdinalIgnoreCase)),
+                                    ExpiredBookings = modBookings.Count(b => string.Equals(b.BookingStatus, "Expired", StringComparison.OrdinalIgnoreCase))
+                                };
+                            })
+                            .OrderBy(m => m.ModuleName)
+                            .ToList();
+
+                        return new HotseatOfficeSummaryDto
+                        {
+                            OfficeId = offGroup.Key.OfficeId,
+                            OfficeName = offGroup.Key.OfficeName,
+                            Modules = moduleDtos,
+                            TotalSeats = offSeats.Count,
+                            AvailableSeats = Math.Max(0, offSeats.Count - offBookedSeatIds.Count),
+                            BookedSeats = offBookedSeatIds.Count,
+                            CancelledBookings = offBookings.Count(b => string.Equals(b.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Rejected", StringComparison.OrdinalIgnoreCase)),
+                            ExpiredBookings = offBookings.Count(b => string.Equals(b.BookingStatus, "Expired", StringComparison.OrdinalIgnoreCase))
+                        };
+                    })
+                    .OrderBy(o => o.OfficeName)
+                    .ToList();
+
+                return new HotseatLocationCopilotDto
+                {
+                    LocationName = locGroup.Key,
+                    Offices = officeDtos,
+                    TotalSeats = locSeats.Count,
+                    AvailableSeats = Math.Max(0, locSeats.Count - locBookedSeatIds.Count),
+                    BookedSeats = locBookedSeatIds.Count,
+                    CancelledBookings = locBookings.Count(b => string.Equals(b.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase) || string.Equals(b.BookingStatus, "Rejected", StringComparison.OrdinalIgnoreCase)),
+                    ExpiredBookings = locBookings.Count(b => string.Equals(b.BookingStatus, "Expired", StringComparison.OrdinalIgnoreCase))
+                };
+            })
+            .OrderBy(l => l.LocationName)
+            .ToList();
+
+        return new HotseatSummaryCopilotDto
+        {
+            Date = targetDate,
+            TotalSeats = totalSeats,
+            AvailableSeats = availableSeats,
+            BookedSeats = bookedSeats,
+            CheckedInSeats = checkedInCount,
+            CancelledBookings = cancelledCount,
+            ExpiredBookings = expiredCount,
+            ReleasedBookings = releasedCount,
+            Locations = locationGroups
+        };
+    }
+
+    // =========================================================
+    // HOTSEATS - SEARCH & DETAILS
+    // =========================================================
+
+    public async Task<List<HotseatCopilotDto>> GetHotseatsAsync(
+        HotseatSearchFilterCopilotDto filter)
+    {
+        var targetDate = filter.Date ?? DateOnly.FromDateTime(GetIndiaNow());
+
+        var query = _context.Seats
+            .AsNoTracking()
+            .Include(s => s.Module)
+                .ThenInclude(m => m!.Office)
+                    .ThenInclude(o => o!.Location)
+            .Where(s => s.IsActive)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim().ToLower();
+            query = query.Where(s =>
+                s.SeatNumber.ToLower().Contains(search) ||
+                (s.Section != null && s.Section.ToLower().Contains(search)) ||
+                (s.Module != null && s.Module.ModuleName.ToLower().Contains(search)) ||
+                (s.Module != null && s.Module.Office != null && s.Module.Office.OfficeName.ToLower().Contains(search)) ||
+                (s.Module != null && s.Module.Office != null && s.Module.Office.Location != null && s.Module.Office.Location.LocationName.ToLower().Contains(search)));
+        }
+
+        if (filter.OfficeId.HasValue)
+        {
+            query = query.Where(s => s.Module != null && s.Module.OfficeId == filter.OfficeId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Location))
+        {
+            var loc = filter.Location.Trim().ToLower();
+            query = query.Where(s =>
+                s.Module != null &&
+                s.Module.Office != null &&
+                s.Module.Office.Location != null &&
+                (s.Module.Office.Location.LocationName.ToLower().Contains(loc) ||
+                 loc.Contains(s.Module.Office.Location.LocationName.ToLower())));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Office))
+        {
+            var off = filter.Office.Trim().ToLower();
+            query = query.Where(s =>
+                s.Module != null &&
+                s.Module.Office != null &&
+                (s.Module.Office.OfficeName.ToLower().Contains(off) ||
+                 off.Contains(s.Module.Office.OfficeName.ToLower())));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Module))
+        {
+            var mod = filter.Module.Trim().ToLower();
+            query = query.Where(s =>
+                s.Module != null &&
+                (s.Module.ModuleName.ToLower().Contains(mod) ||
+                 mod.Contains(s.Module.ModuleName.ToLower())));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Section))
+        {
+            var sec = filter.Section.Trim().ToLower();
+            query = query.Where(s =>
+                s.Section != null &&
+                (s.Section.ToLower() == sec || s.Section.ToLower().Contains(sec)));
+        }
+
+        var seats = await query
+            .OrderBy(s => s.ModuleId)
+            .ThenBy(s => s.Section)
+            .ThenBy(s => s.RowNumber)
+            .ThenBy(s => s.ColumnNumber)
+            .ToListAsync();
+
+        var seatIds = seats.Select(s => s.SeatId).ToList();
+
+        var bookings = seatIds.Count == 0
+            ? new List<HotseatBooking>()
+            : await _context.HotseatBookings
+                .AsNoTracking()
+                .Include(b => b.Employee)
+                .Where(b =>
+                    seatIds.Contains(b.SeatId) &&
+                    b.BookingDate == targetDate &&
+                    b.BookingStatus != "Cancelled" &&
+                    b.BookingStatus != "Canceled" &&
+                    b.BookingStatus != "Rejected" &&
+                    b.BookingStatus != "Expired")
+                .ToListAsync();
+
+        var bookingMap = bookings
+            .GroupBy(b => b.SeatId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(b => b.BookedOn).First());
+
+        var result = new List<HotseatCopilotDto>();
+
+        foreach (var s in seats)
+        {
+            bookingMap.TryGetValue(s.SeatId, out var b);
+            var isBooked = b != null &&
+                (string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase));
+
+            var status = isBooked ? "Booked" : "Available";
+
+            if (!string.IsNullOrWhiteSpace(filter.Status))
+            {
+                var targetStatus = filter.Status.Trim();
+                if (string.Equals(targetStatus, "Available", StringComparison.OrdinalIgnoreCase) && isBooked)
+                    continue;
+                if (string.Equals(targetStatus, "Vacant", StringComparison.OrdinalIgnoreCase) && isBooked)
+                    continue;
+                if (string.Equals(targetStatus, "Booked", StringComparison.OrdinalIgnoreCase) && !isBooked)
+                    continue;
+            }
+
+            string? checkInTimeFormatted = null;
+            if (b?.CheckInDeadline.HasValue == true)
+            {
+                var deadlineIst = TimeZoneInfo.ConvertTimeFromUtc(b.CheckInDeadline.Value, IndiaTimeZone);
+                var startTimeIst = deadlineIst.AddHours(-1);
+                checkInTimeFormatted = startTimeIst.ToString("hh:mm tt");
+            }
+
+            result.Add(new HotseatCopilotDto
+            {
+                SeatId = s.SeatId,
+                SeatNumber = s.SeatNumber,
+                Section = s.Section ?? "",
+                RowNumber = s.RowNumber,
+                ColumnNumber = s.ColumnNumber,
+                ModuleId = s.ModuleId,
+                ModuleName = s.Module?.ModuleName ?? "",
+                OfficeName = s.Module?.Office?.OfficeName ?? "",
+                LocationName = s.Module?.Office?.Location?.LocationName ?? "",
+                Status = status,
+                BookingStatus = b?.BookingStatus,
+                CurrentBookingId = b?.HotseatBookingId,
+                BookedByEmployeeName = b?.Employee?.Name,
+                ExpectedCheckInTime = checkInTimeFormatted
+            });
+        }
+
+        return result;
+    }
+
+    // =========================================================
+    // HOTSEATS - LOCATIONS
+    // =========================================================
+
+    public async Task<List<HotseatLocationCopilotDto>> GetHotseatLocationsAsync()
+    {
+        var summary = await GetHotseatSummaryAsync(null, null, null, null);
+        return summary.Locations;
     }
 }
