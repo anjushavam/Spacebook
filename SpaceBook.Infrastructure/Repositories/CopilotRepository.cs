@@ -270,8 +270,7 @@ public class CopilotRepository : ICopilotRepository
 
             .Where(r =>
                 !r.IsBlocked &&
-                r.Status != "Blocked" &&
-                r.Status != "Maintenance");
+                r.Status != "Blocked");
 
         // -----------------------------------------------------
         // ROOM TYPE FILTER
@@ -334,6 +333,7 @@ public class CopilotRepository : ICopilotRepository
 
         foreach (var room in rooms)
         {
+            var isMaintenance = string.Equals(room.Status, "Maintenance", StringComparison.OrdinalIgnoreCase);
             var roomBookings = bookings
                 .Where(b => b.RoomId == room.RoomId)
                 .ToList();
@@ -341,7 +341,7 @@ public class CopilotRepository : ICopilotRepository
             var slots = timeSlots
                 .Select(slot =>
                 {
-                    var booked = roomBookings.Any(b =>
+                    var booked = isMaintenance || roomBookings.Any(b =>
                         b.StartTime < slot.End &&
                         b.EndTime > slot.Start);
 
@@ -385,10 +385,10 @@ public class CopilotRepository : ICopilotRepository
                                 rf.Facility!.FacilityName)
                             .ToList(),
 
-                    Status = room.Status,
+                    Status = isMaintenance ? "Maintenance" : room.Status,
 
                     AvailableSlots =
-                        slots.Count(s => !s.IsBooked),
+                        isMaintenance ? 0 : slots.Count(s => !s.IsBooked),
 
                     TimeSlots = slots,
 

@@ -469,10 +469,22 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
             // ROOM STATUS
             // =================================================
 
-            string roomStatus =
-                "Available";
+            var isMaintenance = string.Equals(
+                room.Status,
+                "Maintenance",
+                StringComparison.OrdinalIgnoreCase);
 
-            if (date == today)
+            string roomStatus = "Available";
+
+            if (isMaintenance)
+            {
+                roomStatus = "Maintenance";
+                foreach (var slot in slots)
+                {
+                    slot.IsBooked = true;
+                }
+            }
+            else if (date == today)
             {
                 var activeBooking =
                     bookings
@@ -528,8 +540,10 @@ public class EmployeeDashboardRepository : IEmployeeDashboardRepository
                         roomStatus,
 
                     AvailableSlots =
-                        slots.Count(x =>
-                            !x.IsBooked),
+                        isMaintenance
+                            ? 0
+                            : slots.Count(x =>
+                                !x.IsBooked),
 
                     TimeSlots =
                         slots,
