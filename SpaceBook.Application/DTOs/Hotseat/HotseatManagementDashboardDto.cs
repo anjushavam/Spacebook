@@ -18,6 +18,18 @@ public class HotseatManagementDashboardDto
 
     public double ConfirmedRate { get; set; }
 
+    public int CheckedInBookings { get; set; }
+
+    public double CheckedInRate { get; set; }
+
+    public int ReleasedBookings { get; set; }
+
+    public double ReleasedRate { get; set; }
+
+    public int ExpiredBookings { get; set; }
+
+    public double ExpiredRate { get; set; }
+
     public int CancelledBookings { get; set; }
 
     public double CancelledRate { get; set; }

@@ -227,6 +227,18 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             ? Math.Round(((double)confirmedBookings / totalReservations) * 100.0, 1)
             : 0.0;
 
+        double checkedInRate = totalReservations > 0
+            ? Math.Round(((double)checkedInBookings / totalReservations) * 100.0, 1)
+            : 0.0;
+
+        double releasedRate = totalReservations > 0
+            ? Math.Round(((double)releasedBookings / totalReservations) * 100.0, 1)
+            : 0.0;
+
+        double expiredRate = totalReservations > 0
+            ? Math.Round(((double)expiredBookings / totalReservations) * 100.0, 1)
+            : 0.0;
+
         double cancelledRate = totalReservations > 0
             ? Math.Round(((double)cancelledBookings / totalReservations) * 100.0, 1)
             : 0.0;
@@ -535,6 +547,12 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             Utilization = utilization,
             ConfirmedBookings = confirmedBookings,
             ConfirmedRate = confirmedRate,
+            CheckedInBookings = checkedInBookings,
+            CheckedInRate = checkedInRate,
+            ReleasedBookings = releasedBookings,
+            ReleasedRate = releasedRate,
+            ExpiredBookings = expiredBookings,
+            ExpiredRate = expiredRate,
             CancelledBookings = cancelledBookings,
             CancelledRate = cancelledRate,
             TotalBookingsAnalyzed = totalReservations,
