@@ -106,12 +106,14 @@ public class ReportRepository : IReportRepository
             if (string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase))
             {
-                hotseatQuery = hotseatQuery.Where(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+                hotseatQuery = hotseatQuery.Where(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In" || h.BookingStatus == "Checked-In");
             }
             else if (string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Rejected", StringComparison.OrdinalIgnoreCase))
             {
-                hotseatQuery = hotseatQuery.Where(h => h.BookingStatus == "Cancelled");
+                hotseatQuery = hotseatQuery.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled" || h.BookingStatus == "Rejected");
             }
             else
             {
@@ -187,9 +189,9 @@ public class ReportRepository : IReportRepository
             var hotseats = await hotseatQuery.ToListAsync();
             int total = hotseats.Count;
             int unique = hotseats.Select(h => h.SeatId).Distinct().Count();
-            int confirmedCount = hotseats.Count(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+            int confirmedCount = hotseats.Count(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In" || h.BookingStatus == "Checked-In");
             double confirmedRate = total == 0 ? 0 : Math.Round(confirmedCount * 100.0 / total, 1);
-            int cancelledCount = hotseats.Count(h => h.BookingStatus == "Cancelled");
+            int cancelledCount = hotseats.Count(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled" || h.BookingStatus == "Rejected");
             double cancelledRate = total == 0 ? 0 : Math.Round(cancelledCount * 100.0 / total, 1);
 
             int daysCount = startDate.HasValue && endDate.HasValue

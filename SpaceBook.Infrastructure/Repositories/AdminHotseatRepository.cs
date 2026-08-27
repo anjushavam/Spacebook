@@ -202,15 +202,20 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         int totalReservations = baseBookings.Count;
 
         int confirmedBookings = baseBookings.Count(b =>
-            string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase));
+            string.Equals(b.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase));
 
         int checkedInBookings = baseBookings.Count(b =>
             string.Equals(b.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase));
+            string.Equals(b.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase));
 
         int cancelledBookings = baseBookings.Count(b =>
             string.Equals(b.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase));
+            string.Equals(b.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(b.BookingStatus, "Rejected", StringComparison.OrdinalIgnoreCase));
 
         int releasedBookings = baseBookings.Count(b =>
             string.Equals(b.BookingStatus, "Released", StringComparison.OrdinalIgnoreCase));
@@ -219,11 +224,11 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             string.Equals(b.BookingStatus, "Expired", StringComparison.OrdinalIgnoreCase));
 
         double confirmedRate = totalReservations > 0
-            ? Math.Round((confirmedBookings + checkedInBookings) * 100.0 / totalReservations, 1)
+            ? Math.Round(((double)confirmedBookings / totalReservations) * 100.0, 1)
             : 0.0;
 
         double cancelledRate = totalReservations > 0
-            ? Math.Round(cancelledBookings * 100.0 / totalReservations, 1)
+            ? Math.Round(((double)cancelledBookings / totalReservations) * 100.0, 1)
             : 0.0;
 
         // Utilization Calculation
@@ -240,7 +245,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
 
         double totalAvailableSeatDays = activeHotseatsCount * daysCount;
         double utilization = totalAvailableSeatDays > 0
-            ? Math.Round(((confirmedBookings + checkedInBookings) / totalAvailableSeatDays) * 100.0, 1)
+            ? Math.Round(((double)confirmedBookings / totalAvailableSeatDays) * 100.0, 1)
             : 0.0;
         utilization = Math.Min(100.0, utilization);
 
@@ -255,27 +260,40 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         {
             var targetStatus = filter.Status.Trim();
             if (string.Equals(targetStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase))
+                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Checked-In", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = baseBookings.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In").ToList();
+                bookings = baseBookings.Where(h =>
+                    string.Equals(h.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(h.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(h.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase)).ToList();
             }
             else if (string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Rejected", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = baseBookings.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled").ToList();
+                bookings = baseBookings.Where(h =>
+                    string.Equals(h.BookingStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(h.BookingStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(h.BookingStatus, "Rejected", StringComparison.OrdinalIgnoreCase)).ToList();
             }
             else if (string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = baseBookings.Where(h => h.BookingStatus == "Confirmed").ToList();
+                bookings = baseBookings.Where(h =>
+                    string.Equals(h.BookingStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(h.BookingStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(h.BookingStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(h.BookingStatus, "Checked-In", StringComparison.OrdinalIgnoreCase)).ToList();
             }
             else if (string.Equals(targetStatus, "Released", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = baseBookings.Where(h => h.BookingStatus == "Released").ToList();
+                bookings = baseBookings.Where(h => string.Equals(h.BookingStatus, "Released", StringComparison.OrdinalIgnoreCase)).ToList();
             }
             else if (string.Equals(targetStatus, "Expired", StringComparison.OrdinalIgnoreCase))
             {
-                bookings = baseBookings.Where(h => h.BookingStatus == "Expired").ToList();
+                bookings = baseBookings.Where(h => string.Equals(h.BookingStatus, "Expired", StringComparison.OrdinalIgnoreCase)).ToList();
             }
             else
             {
@@ -390,8 +408,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                 {
                     Date = g.Key,
                     Label = $"Week {g.Key.Split("-W").Last()}",
-                    CheckInsCount = g.Count(b => b.CheckInTime.HasValue || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In"),
-                    TotalBookingsCount = g.Count(b => b.BookingStatus == "Confirmed" || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In")
+                    CheckInsCount = g.Count(b => b.CheckInTime.HasValue || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In" || b.BookingStatus == "Checked-In"),
+                    TotalBookingsCount = g.Count(b => b.BookingStatus == "Confirmed" || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In" || b.BookingStatus == "Checked-In")
                 });
             }
         }
@@ -411,8 +429,8 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             {
                 var targetDate = d;
                 var dayBookings = bookings.Where(b => b.BookingDate == targetDate).ToList();
-                int checkIns = dayBookings.Count(b => b.CheckInTime.HasValue || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In");
-                int totalDay = dayBookings.Count(b => b.BookingStatus == "Confirmed" || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In");
+                int checkIns = dayBookings.Count(b => b.CheckInTime.HasValue || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In" || b.BookingStatus == "Checked-In");
+                int totalDay = dayBookings.Count(b => b.BookingStatus == "Confirmed" || b.BookingStatus == "CheckedIn" || b.BookingStatus == "Checked In" || b.BookingStatus == "Checked-In");
 
                 occupancyTrendline.Add(new DailyHotseatOccupancyTrendDto
                 {
@@ -592,19 +610,22 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         {
             var targetStatus = filter.Status.Trim();
             if (string.Equals(targetStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase))
+                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Checked-In", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In" || h.BookingStatus == "Checked-In");
             }
             else if (string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Rejected", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled");
+                query = query.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled" || h.BookingStatus == "Rejected");
             }
             else if (string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(h => h.BookingStatus == "Confirmed");
+                query = query.Where(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In" || h.BookingStatus == "Checked-In");
             }
             else if (string.Equals(targetStatus, "Released", StringComparison.OrdinalIgnoreCase))
             {
@@ -770,19 +791,22 @@ public class AdminHotseatRepository : IAdminHotseatRepository
         {
             var targetStatus = filter.Status.Trim();
             if (string.Equals(targetStatus, "Checked In", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase))
+                string.Equals(targetStatus, "CheckedIn", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetStatus, "Checked-In", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In");
+                query = query.Where(h => h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In" || h.BookingStatus == "Checked-In");
             }
             else if (string.Equals(targetStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+                     string.Equals(targetStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Cancelled Bookings", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(targetStatus, "Rejected", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled");
+                query = query.Where(h => h.BookingStatus == "Cancelled" || h.BookingStatus == "Canceled" || h.BookingStatus == "Rejected");
             }
             else if (string.Equals(targetStatus, "Confirmed", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(targetStatus, "Confirmed Bookings", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(h => h.BookingStatus == "Confirmed");
+                query = query.Where(h => h.BookingStatus == "Confirmed" || h.BookingStatus == "CheckedIn" || h.BookingStatus == "Checked In" || h.BookingStatus == "Checked-In");
             }
             else if (string.Equals(targetStatus, "Released", StringComparison.OrdinalIgnoreCase))
             {

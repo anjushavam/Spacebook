@@ -89,7 +89,9 @@ public class HotseatRepository : IHotseatRepository
                         h.BookingDate == date.Value &&
                         (
                             h.BookingStatus == "Confirmed" ||
-                            h.BookingStatus == "CheckedIn"
+                            h.BookingStatus == "CheckedIn" ||
+                            h.BookingStatus == "Checked In" ||
+                            h.BookingStatus == "Checked-In"
                         ))
                         ? "Booked"
                         : "Vacant"
