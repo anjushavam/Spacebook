@@ -1230,9 +1230,11 @@ public class EmailService : IEmailService
         var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
         var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
 
-        DateTime localStartTime = booking.CheckInDeadline.HasValue
+        DateTime localDeadline = booking.CheckInDeadline.HasValue
             ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
-            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+            : booking.BookingDate.ToDateTime(new TimeOnly(10, 0, 0));
+
+        DateTime localStartTime = localDeadline.AddHours(-1);
 
         var startTimeFormatted = localStartTime.ToString("hh:mm tt");
         var checkInOpensFormatted = localStartTime.AddHours(-1).ToString("hh:mm tt");
@@ -1294,9 +1296,11 @@ public class EmailService : IEmailService
         var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
         var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
 
-        DateTime localStartTime = booking.CheckInDeadline.HasValue
+        DateTime localDeadline = booking.CheckInDeadline.HasValue
             ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
-            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+            : booking.BookingDate.ToDateTime(new TimeOnly(10, 0, 0));
+
+        DateTime localStartTime = localDeadline.AddHours(-1);
 
         var startTimeFormatted = localStartTime.ToString("hh:mm tt");
 
@@ -1336,9 +1340,11 @@ public class EmailService : IEmailService
         var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
         var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
 
-        DateTime localStartTime = booking.CheckInDeadline.HasValue
+        DateTime localDeadline = booking.CheckInDeadline.HasValue
             ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
-            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+            : booking.BookingDate.ToDateTime(new TimeOnly(10, 0, 0));
+
+        DateTime localStartTime = localDeadline.AddHours(-1);
 
         var startTimeFormatted = localStartTime.ToString("hh:mm tt");
 
@@ -1379,9 +1385,11 @@ public class EmailService : IEmailService
         var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
         var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
 
-        DateTime localStartTime = booking.CheckInDeadline.HasValue
+        DateTime localDeadline = booking.CheckInDeadline.HasValue
             ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
-            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+            : booking.BookingDate.ToDateTime(new TimeOnly(10, 0, 0));
+
+        DateTime localStartTime = localDeadline.AddHours(-1);
 
         var startTimeFormatted = localStartTime.ToString("hh:mm tt");
         var checkInOpensFormatted = localStartTime.AddHours(-1).ToString("hh:mm tt");
@@ -1445,9 +1453,11 @@ public class EmailService : IEmailService
         var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
         var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
 
-        DateTime localStartTime = booking.CheckInDeadline.HasValue
+        DateTime localDeadline = booking.CheckInDeadline.HasValue
             ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
-            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+            : booking.BookingDate.ToDateTime(new TimeOnly(10, 0, 0));
+
+        DateTime localStartTime = localDeadline.AddHours(-1);
 
         var startTimeFormatted = localStartTime.ToString("hh:mm tt");
         var reason = !string.IsNullOrWhiteSpace(cancellationReason) ? cancellationReason : "Cancelled by user";

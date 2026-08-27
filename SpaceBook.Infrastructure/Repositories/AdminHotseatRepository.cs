@@ -492,8 +492,9 @@ public class AdminHotseatRepository : IAdminHotseatRepository
             {
                 if (b.CheckInDeadline.HasValue)
                 {
-                    var istTime = TimeZoneInfo.ConvertTimeFromUtc(b.CheckInDeadline.Value, IndiaTimeZone);
-                    var timeOfDay = istTime.TimeOfDay;
+                    var istDeadline = TimeZoneInfo.ConvertTimeFromUtc(b.CheckInDeadline.Value, IndiaTimeZone);
+                    var istStartTime = istDeadline.AddHours(-1);
+                    var timeOfDay = istStartTime.TimeOfDay;
                     return timeOfDay >= slot.Start && timeOfDay < slot.End;
                 }
                 return false;
@@ -683,6 +684,10 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                 ? TimeZoneInfo.ConvertTimeFromUtc(h.CheckInDeadline.Value, IndiaTimeZone)
                 : null;
 
+            DateTime? localStartTime = localDeadline.HasValue
+                ? localDeadline.Value.AddHours(-1)
+                : null;
+
             DateTime? localBookedOn = TimeZoneInfo.ConvertTimeFromUtc(h.BookedOn, IndiaTimeZone);
             DateTime? localCheckInTime = h.CheckInTime.HasValue
                 ? TimeZoneInfo.ConvertTimeFromUtc(h.CheckInTime.Value, IndiaTimeZone)
@@ -708,7 +713,7 @@ public class AdminHotseatRepository : IAdminHotseatRepository
                 Department = h.Employee?.Department ?? string.Empty,
                 BookingDate = h.BookingDate,
                 BookingStatus = h.BookingStatus,
-                ExpectedCheckInTime = localDeadline?.ToString("hh:mm tt"),
+                ExpectedCheckInTime = localStartTime?.ToString("hh:mm tt"),
                 CheckInDeadline = localDeadline?.ToString("yyyy-MM-dd HH:mm:ss"),
                 CheckInTime = localCheckInTime?.ToString("yyyy-MM-dd HH:mm:ss"),
                 BookedOn = localBookedOn?.ToString("yyyy-MM-dd HH:mm:ss"),

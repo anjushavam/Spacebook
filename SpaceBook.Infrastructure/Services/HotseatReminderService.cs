@@ -86,10 +86,11 @@ public class HotseatReminderService : IHotseatReminderService
             {
                 if (cancellationToken.IsCancellationRequested) break;
 
-                DateTime localStartTime = booking.CheckInDeadline.HasValue
+                DateTime localDeadline = booking.CheckInDeadline.HasValue
                     ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
-                    : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+                    : booking.BookingDate.ToDateTime(new TimeOnly(10, 0, 0));
 
+                DateTime localStartTime = localDeadline.AddHours(-1);
                 DateTime reminderWindowStart = localStartTime.AddHours(-1);
 
                 // Reminder window: within 1 hour before booking start time

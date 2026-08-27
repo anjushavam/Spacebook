@@ -340,8 +340,12 @@ public class HotseatController : ControllerBase
                 ? TimeZoneInfo.ConvertTimeFromUtc(b.CheckInDeadline.Value, IndiaTimeZone)
                 : null;
 
-            TimeOnly? expectedTimeOnly = localDeadline.HasValue
-                ? TimeOnly.FromDateTime(localDeadline.Value)
+            DateTime? localStartTime = localDeadline.HasValue
+                ? localDeadline.Value.AddHours(-1)
+                : null;
+
+            TimeOnly? expectedTimeOnly = localStartTime.HasValue
+                ? TimeOnly.FromDateTime(localStartTime.Value)
                 : null;
 
             DateTime? localBookedOn = TimeZoneInfo.ConvertTimeFromUtc(b.BookedOn, IndiaTimeZone);
@@ -396,9 +400,9 @@ public class HotseatController : ControllerBase
                 expectedCheckInTime = expectedTimeOnly.HasValue ? expectedTimeOnly.Value.ToString("HH:mm") : null,
                 expectedCheckInTimeFormatted = expectedTimeOnly.HasValue ? expectedTimeOnly.Value.ToString("hh:mm tt") : null,
 
-                expectedCheckIn = localDeadline.HasValue ? localDeadline.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
+                expectedCheckIn = localStartTime.HasValue ? localStartTime.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
                 checkInDeadline = localDeadline.HasValue ? localDeadline.Value.ToString("yyyy-MM-ddTHH:mm:ss") : null,
-                expectedCheckInLocal = localDeadline,
+                expectedCheckInLocal = localStartTime,
                 checkInDeadlineLocal = localDeadline,
 
                 status = b.BookingStatus,
@@ -606,19 +610,22 @@ public class HotseatController : ControllerBase
         }
 
         // --------------------------------------------------------
-        // CHECK-IN DEADLINE
+        // CHECK-IN DEADLINE (1 hour after expected check-in / start time)
         // --------------------------------------------------------
 
         var expectedCheckInTime =
             request.ExpectedCheckInTime ??
             new TimeOnly(9, 0, 0);
 
-        var localCheckInDateTime =
+        var localStartTime =
             request.BookingDate.ToDateTime(expectedCheckInTime);
+
+        var localCheckInDeadline =
+            localStartTime.AddHours(1);
 
         var checkInDeadlineUtc =
             TimeZoneInfo.ConvertTimeToUtc(
-                localCheckInDateTime,
+                localCheckInDeadline,
                 IndiaTimeZone);
 
         // --------------------------------------------------------
@@ -775,16 +782,16 @@ public class HotseatController : ControllerBase
                 expectedCheckInTime.ToString("hh:mm tt"),
 
             expectedCheckIn =
-                localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
+                localStartTime.ToString("yyyy-MM-ddTHH:mm:ss"),
 
             expectedCheckInLocal =
-                localCheckInDateTime,
+                localStartTime,
 
             checkInDeadline =
-                localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
+                localCheckInDeadline.ToString("yyyy-MM-ddTHH:mm:ss"),
 
             checkInDeadlineLocal =
-                localCheckInDateTime,
+                localCheckInDeadline,
 
             bookingStatus =
                 booking.BookingStatus,
@@ -1007,25 +1014,26 @@ public class HotseatController : ControllerBase
             var existingLocalDeadline = TimeZoneInfo.ConvertTimeFromUtc(
                 booking.CheckInDeadline.Value,
                 IndiaTimeZone);
-            newCheckInTime = TimeOnly.FromDateTime(existingLocalDeadline);
+            newCheckInTime = TimeOnly.FromDateTime(existingLocalDeadline.AddHours(-1));
         }
         else
         {
             newCheckInTime = new TimeOnly(9, 0, 0);
         }
 
-        var localCheckInDateTime = targetBookingDate.ToDateTime(newCheckInTime);
+        var localStartTime = targetBookingDate.ToDateTime(newCheckInTime);
+        var localCheckInDeadline = localStartTime.AddHours(1);
 
         var checkInDeadlineUtc = TimeZoneInfo.ConvertTimeToUtc(
-            localCheckInDateTime,
+            localCheckInDeadline,
             IndiaTimeZone);
 
-        // If updating for today, new check-in deadline must not be in the past
+        // If updating for today, check-in deadline (1 hr after start) must not be in the past
         if (targetBookingDate == today && checkInDeadlineUtc < DateTime.UtcNow)
         {
             return BadRequest(new
             {
-                message = "New expected check-in time cannot be in the past."
+                message = "The check-in deadline for this time slot has already passed."
             });
         }
 
@@ -1121,10 +1129,10 @@ public class HotseatController : ControllerBase
             bookingDate = booking.BookingDate,
             expectedCheckInTime = newCheckInTime.ToString("HH:mm"),
             expectedCheckInTimeFormatted = newCheckInTime.ToString("hh:mm tt"),
-            expectedCheckIn = localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
-            expectedCheckInLocal = localCheckInDateTime,
-            checkInDeadline = localCheckInDateTime.ToString("yyyy-MM-ddTHH:mm:ss"),
-            checkInDeadlineLocal = localCheckInDateTime,
+            expectedCheckIn = localStartTime.ToString("yyyy-MM-ddTHH:mm:ss"),
+            expectedCheckInLocal = localStartTime,
+            checkInDeadline = localCheckInDeadline.ToString("yyyy-MM-ddTHH:mm:ss"),
+            checkInDeadlineLocal = localCheckInDeadline,
             bookingStatus = booking.BookingStatus,
             modifiedOn = GetIndiaNow().ToString("yyyy-MM-ddTHH:mm:ss")
         });
@@ -1256,11 +1264,12 @@ public class HotseatController : ControllerBase
             });
         }
 
-        // Booking start/check-in time in IST
-        DateTime bookingStartIst = booking.CheckInDeadline.HasValue
+        // Booking check-in deadline in IST (1 hour after booking start time)
+        DateTime checkInDeadlineIst = booking.CheckInDeadline.HasValue
             ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
-            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+            : booking.BookingDate.ToDateTime(new TimeOnly(10, 0, 0));
 
+        DateTime bookingStartIst = checkInDeadlineIst.AddHours(-1);
         DateTime checkInWindowStart = bookingStartIst.AddHours(-1);
 
         // Requirement 2: Reject if employee tries to check in before the check-in window opens (1 hr before start)
@@ -1268,12 +1277,12 @@ public class HotseatController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "Check-in is available only within 1 hour before the booking start time."
+                message = $"Check-in is available only from {checkInWindowStart:hh:mm tt} (1 hour before the booking start time)."
             });
         }
 
-        // Requirement 3: Reject and Auto-Expire if employee missed the check-in window
-        if (nowIst > bookingStartIst)
+        // Requirement 3: Reject and Auto-Expire if employee missed the check-in deadline (1 hr after start)
+        if (nowIst > checkInDeadlineIst)
         {
             booking.BookingStatus = "Expired";
             booking.RecordModifiedBy = "System (Auto-Expired)";
