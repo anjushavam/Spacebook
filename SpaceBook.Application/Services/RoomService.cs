@@ -128,6 +128,16 @@ public class RoomService : IRoomService
         else
         {
             dto.Status = dto.Status.Trim();
+            if (!string.Equals(dto.Status, "Available", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(dto.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Room status must be either 'Available' or 'Maintenance'.");
+            }
+
+            dto.Status = string.Equals(dto.Status, "Maintenance", StringComparison.OrdinalIgnoreCase)
+                ? "Maintenance"
+                : "Available";
         }
 
         // =====================================================
@@ -232,6 +242,29 @@ public class RoomService : IRoomService
         {
             throw new ArgumentException(
                 "Module is required.");
+        }
+
+        // =====================================================
+        // VALIDATE STATUS
+        // =====================================================
+
+        if (string.IsNullOrWhiteSpace(dto.Status))
+        {
+            dto.Status = "Available";
+        }
+        else
+        {
+            dto.Status = dto.Status.Trim();
+            if (!string.Equals(dto.Status, "Available", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(dto.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Room status must be either 'Available' or 'Maintenance'.");
+            }
+
+            dto.Status = string.Equals(dto.Status, "Maintenance", StringComparison.OrdinalIgnoreCase)
+                ? "Maintenance"
+                : "Available";
         }
 
         // =====================================================
@@ -345,6 +378,22 @@ public class RoomService : IRoomService
         // Replace this logic if your business format is different.
         // =====================================================
 
+        var roomStatus = "Available";
+        if (!string.IsNullOrWhiteSpace(dto.Status))
+        {
+            var trimmedStatus = dto.Status.Trim();
+            if (!string.Equals(trimmedStatus, "Available", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(trimmedStatus, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Room status must be either 'Available' or 'Maintenance'.");
+            }
+
+            roomStatus = string.Equals(trimmedStatus, "Maintenance", StringComparison.OrdinalIgnoreCase)
+                ? "Maintenance"
+                : "Available";
+        }
+
         for (int i = 1; i <= dto.Count; i++)
         {
             var room = new Room
@@ -359,9 +408,7 @@ public class RoomService : IRoomService
 
                 ModuleId = dto.ModuleId,
 
-                Status = string.IsNullOrWhiteSpace(dto.Status)
-                    ? "Available"
-                    : dto.Status.Trim(),
+                Status = roomStatus,
 
                 IsBlocked = false
             };

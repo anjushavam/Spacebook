@@ -270,7 +270,8 @@ public class CopilotRepository : ICopilotRepository
 
             .Where(r =>
                 !r.IsBlocked &&
-                r.Status != "Blocked");
+                r.Status != "Blocked" &&
+                r.Status != "Maintenance");
 
         // -----------------------------------------------------
         // ROOM TYPE FILTER
@@ -459,7 +460,8 @@ public class CopilotRepository : ICopilotRepository
 
             .Where(r =>
                 !r.IsBlocked &&
-                r.Status != "Blocked");
+                r.Status != "Blocked" &&
+                r.Status != "Maintenance");
 
         // =====================================================
         // OFFICE FILTER

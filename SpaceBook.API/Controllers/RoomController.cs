@@ -163,6 +163,15 @@ public class RoomController : ControllerBase
             });
         }
 
+        if (!string.Equals(dto.Status.Trim(), "Available", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(dto.Status.Trim(), "Maintenance", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "Room status must be either 'Available' or 'Maintenance'."
+            });
+        }
+
 
         // -----------------------------------------------------
         // Create only after validation succeeds
@@ -290,6 +299,15 @@ public class RoomController : ControllerBase
             return BadRequest(new
             {
                 message = "Room status is required."
+            });
+        }
+
+        if (!string.Equals(dto.Status.Trim(), "Available", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(dto.Status.Trim(), "Maintenance", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "Room status must be either 'Available' or 'Maintenance'."
             });
         }
 
@@ -529,6 +547,15 @@ public class RoomController : ControllerBase
             return BadRequest(new
             {
                 message = "Room status is required."
+            });
+        }
+
+        if (!string.Equals(dto.Status.Trim(), "Available", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(dto.Status.Trim(), "Maintenance", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "Room status must be either 'Available' or 'Maintenance'."
             });
         }
 

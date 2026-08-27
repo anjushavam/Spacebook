@@ -243,10 +243,16 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             string.Equals(
                 room.Status,
                 "Blocked",
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                room.Status,
+                "Maintenance",
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new Exception(
-                "Selected room is currently blocked.");
+                string.Equals(room.Status, "Maintenance", StringComparison.OrdinalIgnoreCase)
+                    ? "Selected room is currently under maintenance."
+                    : "Selected room is currently blocked.");
         }
 
         // -----------------------------------------------------
@@ -777,10 +783,16 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             string.Equals(
                 room.Status,
                 "Blocked",
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                room.Status,
+                "Maintenance",
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new Exception(
-                "Selected room is currently blocked.");
+                string.Equals(room.Status, "Maintenance", StringComparison.OrdinalIgnoreCase)
+                    ? "Selected room is currently under maintenance."
+                    : "Selected room is currently blocked.");
         }
 
         // -----------------------------------------------------
@@ -1096,7 +1108,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
                 .Where(r =>
                     !r.IsBlocked &&
-                    r.Status != "Blocked")
+                    r.Status != "Blocked" &&
+                    r.Status != "Maintenance")
 
                 .AsQueryable();
 
@@ -1253,7 +1266,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
                 .AsNoTracking()
                 .Where(r =>
                     !r.IsBlocked &&
-                    r.Status != "Blocked")
+                    r.Status != "Blocked" &&
+                    r.Status != "Maintenance")
                 .AsQueryable();
 
         // -----------------------------------------------------
@@ -1340,6 +1354,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked" &&
+                r.Status != "Maintenance" &&
 
                 r.Module != null &&
                 r.Module.ModuleName == moduleName)
@@ -1394,6 +1409,7 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
             .Where(r =>
                 !r.IsBlocked &&
                 r.Status != "Blocked" &&
+                r.Status != "Maintenance" &&
                 r.RoomType != null);
 
         if (!string.IsNullOrWhiteSpace(module))
@@ -1473,7 +1489,8 @@ public class EmployeeBookingRepository : IEmployeeBookingRepository
 
                 !r.IsBlocked &&
 
-                r.Status != "Blocked")
+                r.Status != "Blocked" &&
+                r.Status != "Maintenance")
 
             .Select(r =>
                 (int?)r.Capacity)
