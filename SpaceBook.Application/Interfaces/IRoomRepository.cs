@@ -41,5 +41,6 @@ public interface IRoomRepository
     // Update status
     Task<bool> UpdateRoomStatusAsync(
         int roomId,
-        bool isBlocked);
+        string? status = null,
+        bool? isBlocked = null);
 }

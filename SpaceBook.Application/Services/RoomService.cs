@@ -327,16 +327,29 @@ public class RoomService : IRoomService
     }
 
     // =========================================================
-    // BLOCK / UNBLOCK ROOM
+    // UPDATE ROOM STATUS / BLOCK
     // =========================================================
 
     public async Task<bool> UpdateRoomStatusAsync(
         int roomId,
-        bool isBlocked)
+        string? status = null,
+        bool? isBlocked = null)
     {
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var trimmed = status.Trim();
+            if (!string.Equals(trimmed, "Available", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(trimmed, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Room status must be either 'Available' or 'Maintenance'.");
+            }
+        }
+
         return await _roomRepository
             .UpdateRoomStatusAsync(
                 roomId,
+                status,
                 isBlocked);
     }
 

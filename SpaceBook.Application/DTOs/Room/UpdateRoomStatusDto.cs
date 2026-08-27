@@ -2,5 +2,7 @@ namespace SpaceBook.Application.DTOs.Room;
 
 public class UpdateRoomStatusDto
 {
-    public bool IsBlocked { get; set; }
+    public string? Status { get; set; }
+
+    public bool? IsBlocked { get; set; }
 }

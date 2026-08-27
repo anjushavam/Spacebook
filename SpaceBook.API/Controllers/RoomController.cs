@@ -435,32 +435,61 @@ public class RoomController : ControllerBase
             });
         }
 
+        if (string.IsNullOrWhiteSpace(dto.Status) && !dto.IsBlocked.HasValue)
+        {
+            return BadRequest(new
+            {
+                message = "Either status ('Available' or 'Maintenance') or isBlocked must be provided."
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Status) &&
+            !string.Equals(dto.Status.Trim(), "Available", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(dto.Status.Trim(), "Maintenance", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                message = "Room status must be either 'Available' or 'Maintenance'."
+            });
+        }
 
         // -----------------------------------------------------
         // Update room status
         // -----------------------------------------------------
 
-        var result =
-            await _roomService.UpdateRoomStatusAsync(
-                id,
-                dto.IsBlocked);
-
-
-        if (!result)
+        try
         {
-            return NotFound(new
+            var result =
+                await _roomService.UpdateRoomStatusAsync(
+                    id,
+                    dto.Status,
+                    dto.IsBlocked);
+
+            if (!result)
             {
-                message = "Room not found."
+                return NotFound(new
+                {
+                    message = "Room not found."
+                });
+            }
+
+            var updatedRoom = await _roomService.GetByIdAsync(id);
+
+            return Ok(new
+            {
+                message = "Room status updated successfully.",
+                roomId = id,
+                status = updatedRoom?.Status,
+                isBlocked = updatedRoom?.IsBlocked
             });
         }
-
-
-        return Ok(new
+        catch (ArgumentException ex)
         {
-            message = dto.IsBlocked
-                ? "Room blocked successfully."
-                : "Room unblocked successfully."
-        });
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
     }
 
 

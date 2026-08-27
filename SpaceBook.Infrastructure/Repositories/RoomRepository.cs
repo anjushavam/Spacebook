@@ -526,12 +526,13 @@ public class RoomRepository : IRoomRepository
     }
 
     // =========================================================
-    // BLOCK / UNBLOCK ROOM
+    // UPDATE ROOM STATUS / BLOCK
     // =========================================================
 
     public async Task<bool> UpdateRoomStatusAsync(
         int roomId,
-        bool isBlocked)
+        string? status = null,
+        bool? isBlocked = null)
     {
         var room =
             await _context.Rooms
@@ -543,15 +544,30 @@ public class RoomRepository : IRoomRepository
             return false;
         }
 
-        room.IsBlocked = isBlocked;
-
-        if (isBlocked)
+        if (isBlocked.HasValue)
         {
-            room.Status = "Blocked";
+            room.IsBlocked = isBlocked.Value;
+            if (isBlocked.Value)
+            {
+                room.Status = "Blocked";
+            }
+            else if (string.IsNullOrWhiteSpace(status))
+            {
+                room.Status = "Available";
+            }
         }
-        else
+
+        if (!string.IsNullOrWhiteSpace(status))
         {
-            room.Status = "Available";
+            var normalizedStatus = string.Equals(status.Trim(), "Maintenance", StringComparison.OrdinalIgnoreCase)
+                ? "Maintenance"
+                : "Available";
+
+            room.Status = normalizedStatus;
+            if (normalizedStatus == "Available" || normalizedStatus == "Maintenance")
+            {
+                room.IsBlocked = false;
+            }
         }
 
         await _context.SaveChangesAsync();

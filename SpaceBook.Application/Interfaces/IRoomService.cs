@@ -19,10 +19,9 @@ public interface IRoomService
     Task DeleteAsync(int roomId);
  
     Task<bool> UpdateRoomStatusAsync(
-
         int roomId,
-
-        bool isBlocked);
+        string? status = null,
+        bool? isBlocked = null);
  
     // Add this
 
