@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using SpaceBook.Application.DTOs.Copilot;
 using SpaceBook.Application.Interfaces;
@@ -356,6 +357,197 @@ public class CopilotController : ControllerBase
             {
                 message = ex.Message
             });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // GET CURRENT USER IDENTITY
+    // =========================================================
+    //
+    // Prompt:
+    // Who am I? / What is my profile?
+    //
+    // Supports:
+    // 1. Authorization: Bearer <jwt> (JWT claims: sub/nameid, email, name)
+    // 2. Query param: ?email=amirtha@valuemomentum.com or ?employeeId=5
+    // 3. Header: X-User-Email or X-Employee-Id
+    //
+    // Examples:
+    // GET /api/copilot/me
+    // GET /api/copilot/me?email=amirtha.govindasamy@valuemomentum.com
+    // GET /api/copilot/user?email=amirtha.govindasamy@valuemomentum.com
+    // =========================================================
+
+    [HttpGet("me")]
+    [HttpGet("user")]
+    public async Task<IActionResult> GetCurrentUser(
+        [FromQuery] string? email,
+        [FromQuery] int? employeeId,
+        [FromHeader(Name = "X-User-Email")] string? headerEmail,
+        [FromHeader(Name = "X-Employee-Id")] int? headerEmployeeId)
+    {
+        try
+        {
+            // 1. Try JWT Claims
+            var claimEmpIdStr =
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("employeeId")?.Value
+                ?? User.FindFirst("sub")?.Value;
+
+            var claimEmail =
+                User.FindFirst(ClaimTypes.Email)?.Value
+                ?? User.FindFirst("email")?.Value;
+
+            int? targetEmpId = employeeId ?? headerEmployeeId;
+            if (!targetEmpId.HasValue && !string.IsNullOrWhiteSpace(claimEmpIdStr) && int.TryParse(claimEmpIdStr, out int parsedId))
+            {
+                targetEmpId = parsedId;
+            }
+
+            var targetEmail = !string.IsNullOrWhiteSpace(email)
+                ? email
+                : (!string.IsNullOrWhiteSpace(headerEmail) ? headerEmail : claimEmail);
+
+            if (!targetEmpId.HasValue && string.IsNullOrWhiteSpace(targetEmail))
+            {
+                return BadRequest(new
+                {
+                    message = "User identity could not be determined. Please provide a Bearer token, ?email=, ?employeeId=, or X-User-Email header."
+                });
+            }
+
+            var userProfile =
+                await _copilotService.GetUserProfileAsync(targetEmpId, targetEmail);
+
+            if (userProfile == null)
+            {
+                return NotFound(new
+                {
+                    message = "Employee not found in SpaceBook."
+                });
+            }
+
+            return Ok(userProfile);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // GET USER'S ACTIVE & UPCOMING BOOKINGS
+    // =========================================================
+    //
+    // Prompt:
+    // What are my bookings? / What reservations do I have today?
+    //
+    // Supports:
+    // 1. Authorization: Bearer <jwt>
+    // 2. Query param: ?email=amirtha@valuemomentum.com or ?employeeId=5
+    // 3. Header: X-User-Email
+    //
+    // Examples:
+    // GET /api/copilot/my-bookings
+    // GET /api/copilot/my-bookings?email=amirtha.govindasamy@valuemomentum.com
+    // GET /api/copilot/me/bookings
+    // =========================================================
+
+    [HttpGet("my-bookings")]
+    [HttpGet("me/bookings")]
+    public async Task<IActionResult> GetUserBookings(
+        [FromQuery] string? email,
+        [FromQuery] int? employeeId,
+        [FromQuery] DateOnly? date,
+        [FromHeader(Name = "X-User-Email")] string? headerEmail,
+        [FromHeader(Name = "X-Employee-Id")] int? headerEmployeeId)
+    {
+        try
+        {
+            var claimEmpIdStr =
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("employeeId")?.Value
+                ?? User.FindFirst("sub")?.Value;
+
+            var claimEmail =
+                User.FindFirst(ClaimTypes.Email)?.Value
+                ?? User.FindFirst("email")?.Value;
+
+            int? targetEmpId = employeeId ?? headerEmployeeId;
+            if (!targetEmpId.HasValue && !string.IsNullOrWhiteSpace(claimEmpIdStr) && int.TryParse(claimEmpIdStr, out int parsedId))
+            {
+                targetEmpId = parsedId;
+            }
+
+            var targetEmail = !string.IsNullOrWhiteSpace(email)
+                ? email
+                : (!string.IsNullOrWhiteSpace(headerEmail) ? headerEmail : claimEmail);
+
+            if (!targetEmpId.HasValue && string.IsNullOrWhiteSpace(targetEmail))
+            {
+                return BadRequest(new
+                {
+                    message = "User identity could not be determined. Please provide a Bearer token, ?email=, ?employeeId=, or X-User-Email header."
+                });
+            }
+
+            var result =
+                await _copilotService.GetUserBookingsAsync(targetEmpId, targetEmail, date);
+
+            if (result == null)
+            {
+                return NotFound(new
+                {
+                    message = "Employee not found in SpaceBook."
+                });
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Something went wrong.",
+                error = ex.Message
+            });
+        }
+    }
+
+    // =========================================================
+    // SEARCH EMPLOYEES
+    // =========================================================
+    //
+    // Prompt:
+    // Find employee Amirtha / Search colleague by email or name
+    //
+    // Examples:
+    // GET /api/copilot/employees?search=Amirtha
+    // GET /api/copilot/employees?search=valuemomentum.com
+    // =========================================================
+
+    [HttpGet("employees")]
+    public async Task<IActionResult> GetEmployees(
+        [FromQuery] string? search)
+    {
+        try
+        {
+            var result =
+                await _copilotService.GetEmployeesAsync(search);
+
+            return Ok(result);
         }
         catch (Exception ex)
         {

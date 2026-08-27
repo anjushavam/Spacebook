@@ -1065,4 +1065,171 @@ public class CopilotRepository : ICopilotRepository
         var summary = await GetHotseatSummaryAsync(null, null, null, null);
         return summary.Locations;
     }
+
+    // =========================================================
+    // USER PROFILE & BOOKINGS
+    // =========================================================
+
+    public async Task<CopilotUserProfileDto?> GetUserProfileAsync(
+        int? employeeId,
+        string? email)
+    {
+        var query = _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Role)
+            .AsQueryable();
+
+        if (employeeId.HasValue && employeeId.Value > 0)
+        {
+            query = query.Where(e => e.EmployeeId == employeeId.Value);
+        }
+        else if (!string.IsNullOrWhiteSpace(email))
+        {
+            var trimmedEmail = email.Trim().ToLower();
+            query = query.Where(e => e.Email.ToLower() == trimmedEmail);
+        }
+        else
+        {
+            return null;
+        }
+
+        var employee = await query.FirstOrDefaultAsync();
+        if (employee == null) return null;
+
+        return new CopilotUserProfileDto
+        {
+            EmployeeId = employee.EmployeeId,
+            Name = employee.Name,
+            Email = employee.Email,
+            Department = employee.Department,
+            Role = employee.Role?.RoleName ?? "Employee",
+            IsActive = employee.IsActive
+        };
+    }
+
+    public async Task<CopilotUserBookingsDto?> GetUserBookingsAsync(
+        int? employeeId,
+        string? email,
+        DateOnly? date)
+    {
+        var profile = await GetUserProfileAsync(employeeId, email);
+        if (profile == null) return null;
+
+        var targetDate = date ?? DateOnly.FromDateTime(GetIndiaNow());
+
+        // Room Bookings
+        var roomBookings = await _context.Bookings
+            .AsNoTracking()
+            .Include(b => b.Room)
+                .ThenInclude(r => r!.Module)
+                    .ThenInclude(m => m!.Office)
+                        .ThenInclude(o => o!.Location)
+            .Where(b =>
+                b.EmployeeId == profile.EmployeeId &&
+                b.BookingDate >= targetDate &&
+                b.Status != "Cancelled" &&
+                b.Status != "Rejected")
+            .OrderBy(b => b.BookingDate)
+            .ThenBy(b => b.StartTime)
+            .Take(20)
+            .Select(b => new CopilotUserRoomBookingDto
+            {
+                BookingId = b.BookingId,
+                RoomId = b.RoomId,
+                RoomName = b.Room != null ? b.Room.RoomName : "",
+                ModuleName = b.Room != null && b.Room.Module != null ? b.Room.Module.ModuleName : "",
+                OfficeName = b.Room != null && b.Room.Module != null && b.Room.Module.Office != null ? b.Room.Module.Office.OfficeName : "",
+                LocationName = b.Room != null && b.Room.Module != null && b.Room.Module.Office != null && b.Room.Module.Office.Location != null ? b.Room.Module.Office.Location.LocationName : "",
+                MeetingTitle = b.MeetingTitle,
+                BookingDate = b.BookingDate,
+                StartTime = b.StartTime,
+                EndTime = b.EndTime,
+                Status = b.Status
+            })
+            .ToListAsync();
+
+        // Hotseat Bookings
+        var hotseatBookings = await _context.HotseatBookings
+            .AsNoTracking()
+            .Include(h => h.Seat)
+                .ThenInclude(s => s!.Module)
+                    .ThenInclude(m => m!.Office)
+                        .ThenInclude(o => o!.Location)
+            .Where(h =>
+                h.EmployeeId == profile.EmployeeId &&
+                h.BookingDate >= targetDate &&
+                h.BookingStatus != "Cancelled" &&
+                h.BookingStatus != "Expired")
+            .OrderBy(h => h.BookingDate)
+            .Take(20)
+            .ToListAsync();
+
+        var hotseatDtos = hotseatBookings.Select(h =>
+        {
+            string? checkInTimeFormatted = null;
+            if (h.CheckInDeadline.HasValue)
+            {
+                var deadlineIst = TimeZoneInfo.ConvertTimeFromUtc(h.CheckInDeadline.Value, IndiaTimeZone);
+                var startTimeIst = deadlineIst.AddHours(-1);
+                checkInTimeFormatted = startTimeIst.ToString("hh:mm tt");
+            }
+
+            return new CopilotUserHotseatBookingDto
+            {
+                HotseatBookingId = h.HotseatBookingId,
+                SeatId = h.SeatId,
+                SeatNumber = h.Seat?.SeatNumber ?? "",
+                Section = h.Seat?.Section ?? "",
+                ModuleName = h.Seat?.Module?.ModuleName ?? "",
+                OfficeName = h.Seat?.Module?.Office?.OfficeName ?? "",
+                LocationName = h.Seat?.Module?.Office?.Location?.LocationName ?? "",
+                BookingDate = h.BookingDate,
+                ExpectedCheckInTime = checkInTimeFormatted,
+                Status = h.BookingStatus,
+                CheckInTime = h.CheckInTime
+            };
+        }).ToList();
+
+        return new CopilotUserBookingsDto
+        {
+            EmployeeId = profile.EmployeeId,
+            EmployeeName = profile.Name,
+            EmployeeEmail = profile.Email,
+            RoomBookings = roomBookings,
+            HotseatBookings = hotseatDtos
+        };
+    }
+
+    public async Task<List<CopilotUserProfileDto>> GetEmployeesAsync(
+        string? search)
+    {
+        var query = _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Role)
+            .Where(e => e.IsActive)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            query = query.Where(e =>
+                e.Name.ToLower().Contains(s) ||
+                e.Email.ToLower().Contains(s) ||
+                e.Department.ToLower().Contains(s));
+        }
+
+        return await query
+            .OrderBy(e => e.Name)
+            .Take(50)
+            .Select(e => new CopilotUserProfileDto
+            {
+                EmployeeId = e.EmployeeId,
+                Name = e.Name,
+                Email = e.Email,
+                Department = e.Department,
+                Role = e.Role != null ? e.Role.RoleName : "Employee",
+                IsActive = e.IsActive
+            })
+            .ToListAsync();
+    }
 }

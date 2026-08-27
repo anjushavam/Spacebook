@@ -74,7 +74,6 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:5173",
-                "https://spacebookss.netlify.app",
                 "https://spacebook211-fcms-1bpe04jye-dvikash211-5241s-projects.vercel.app",
                 "https://spacebook-frontend-v64o.onrender.com",
                 "https://spacebooks.duckdns.org",

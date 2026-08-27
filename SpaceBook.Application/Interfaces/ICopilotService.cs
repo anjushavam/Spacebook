@@ -59,4 +59,20 @@ public interface ICopilotService
     // =========================================================
 
     Task<List<HotseatLocationCopilotDto>> GetHotseatLocationsAsync();
+
+    // =========================================================
+    // USER PROFILE & BOOKINGS
+    // =========================================================
+
+    Task<CopilotUserProfileDto?> GetUserProfileAsync(
+        int? employeeId,
+        string? email);
+
+    Task<CopilotUserBookingsDto?> GetUserBookingsAsync(
+        int? employeeId,
+        string? email,
+        DateOnly? date);
+
+    Task<List<CopilotUserProfileDto>> GetEmployeesAsync(
+        string? search);
 }

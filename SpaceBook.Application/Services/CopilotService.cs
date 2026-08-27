@@ -141,4 +141,34 @@ public class CopilotService : ICopilotService
     {
         return await _copilotRepository.GetHotseatLocationsAsync();
     }
+
+    // =========================================================
+    // USER PROFILE & BOOKINGS
+    // =========================================================
+
+    public async Task<CopilotUserProfileDto?> GetUserProfileAsync(
+        int? employeeId,
+        string? email)
+    {
+        return await _copilotRepository.GetUserProfileAsync(
+            employeeId,
+            email);
+    }
+
+    public async Task<CopilotUserBookingsDto?> GetUserBookingsAsync(
+        int? employeeId,
+        string? email,
+        DateOnly? date)
+    {
+        return await _copilotRepository.GetUserBookingsAsync(
+            employeeId,
+            email,
+            date);
+    }
+
+    public async Task<List<CopilotUserProfileDto>> GetEmployeesAsync(
+        string? search)
+    {
+        return await _copilotRepository.GetEmployeesAsync(search);
+    }
 }
