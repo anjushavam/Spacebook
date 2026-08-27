@@ -1357,13 +1357,14 @@ public class EmailService : IEmailService
     }
 
     // =========================================================
-    // HOTSEAT NOTIFICATION 4: CANCELLED
+    // HOTSEAT NOTIFICATION 3: RESCHEDULED
     // =========================================================
 
-    public async Task SendHotseatBookingCancelledAsync(
+    public async Task SendHotseatBookingRescheduledAsync(
         HotseatBooking booking,
         Employee employee,
-        Seat seat)
+        Seat seat,
+        IEnumerable<string>? adminEmails = null)
     {
         var employeeName = !string.IsNullOrWhiteSpace(employee?.Name) ? employee.Name : "Colleague";
         var employeeEmail = employee?.Email;
@@ -1383,6 +1384,73 @@ public class EmailService : IEmailService
             : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
 
         var startTimeFormatted = localStartTime.ToString("hh:mm tt");
+        var checkInOpensFormatted = localStartTime.AddHours(-1).ToString("hh:mm tt");
+
+        var employeeSubject = $"SpaceBook Hotseat Booking Rescheduled - Seat {seatNumber}";
+        var employeeBody = BuildHotseatRescheduledEmailHtml(
+            employeeName,
+            booking.HotseatBookingId,
+            seatNumber,
+            moduleName,
+            officeName,
+            cityName,
+            booking.BookingDate,
+            startTimeFormatted,
+            checkInOpensFormatted);
+
+        await SendEmailAsync(employeeEmail, employeeSubject, employeeBody, true);
+
+        // Admin Alert
+        var adminList = ResolveAdminEmails(adminEmails);
+        if (adminList.Count > 0)
+        {
+            var adminSubject = $"[Admin Alert] SpaceBook Hotseat Booking Rescheduled - {employeeName} (Seat {seatNumber})";
+            var adminBody = BuildAdminHotseatRescheduledEmailHtml(
+                employeeName,
+                employeeEmail,
+                employee?.Department ?? string.Empty,
+                booking.HotseatBookingId,
+                seatNumber,
+                moduleName,
+                officeName,
+                cityName,
+                booking.BookingDate,
+                startTimeFormatted);
+
+            await SendEmailsAsync(adminList, adminSubject, adminBody, true);
+        }
+    }
+
+    // =========================================================
+    // HOTSEAT NOTIFICATION 4: CANCELLED
+    // =========================================================
+
+    public async Task SendHotseatBookingCancelledAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat,
+        IEnumerable<string>? adminEmails = null,
+        string? cancellationReason = null)
+    {
+        var employeeName = !string.IsNullOrWhiteSpace(employee?.Name) ? employee.Name : "Colleague";
+        var employeeEmail = employee?.Email;
+
+        if (string.IsNullOrWhiteSpace(employeeEmail))
+        {
+            throw new InvalidOperationException($"Employee email is missing for HotseatBookingId={booking.HotseatBookingId}.");
+        }
+
+        var seatNumber = seat?.SeatNumber ?? $"Seat {booking.SeatId}";
+        var moduleName = seat?.Module?.ModuleName ?? "Module";
+        var officeName = seat?.Module?.Office?.OfficeName ?? "Office";
+        var cityName = seat?.Module?.Office?.Location?.LocationName ?? "Location";
+
+        DateTime localStartTime = booking.CheckInDeadline.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(booking.CheckInDeadline.Value, IndiaTimeZone)
+            : booking.BookingDate.ToDateTime(new TimeOnly(9, 0, 0));
+
+        var startTimeFormatted = localStartTime.ToString("hh:mm tt");
+        var reason = !string.IsNullOrWhiteSpace(cancellationReason) ? cancellationReason : "Cancelled by user";
 
         var subject = $"SpaceBook Hotseat Booking Cancelled - Seat {seatNumber}";
         var body = BuildHotseatCancelledEmailHtml(
@@ -1393,9 +1461,31 @@ public class EmailService : IEmailService
             officeName,
             cityName,
             booking.BookingDate,
-            startTimeFormatted);
+            startTimeFormatted,
+            reason);
 
         await SendEmailAsync(employeeEmail, subject, body, true);
+
+        // Admin Alert
+        var adminList = ResolveAdminEmails(adminEmails);
+        if (adminList.Count > 0)
+        {
+            var adminSubject = $"[Admin Alert] SpaceBook Hotseat Booking Cancelled - {employeeName} (Seat {seatNumber})";
+            var adminBody = BuildAdminHotseatCancelledEmailHtml(
+                employeeName,
+                employeeEmail,
+                employee?.Department ?? string.Empty,
+                booking.HotseatBookingId,
+                seatNumber,
+                moduleName,
+                officeName,
+                cityName,
+                booking.BookingDate,
+                startTimeFormatted,
+                reason);
+
+            await SendEmailsAsync(adminList, adminSubject, adminBody, true);
+        }
     }
 
     // =========================================================
@@ -1779,6 +1869,171 @@ public class EmailService : IEmailService
         """;
     }
 
+    private static string BuildHotseatRescheduledEmailHtml(
+        string employeeName,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted,
+        string checkInOpensFormatted)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>SpaceBook Hotseat Booking Rescheduled</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #2563eb; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Booking Rescheduled</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Hello {employeeName},</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            Your SpaceBook hotseat booking has been successfully rescheduled.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Space Type:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">Hot Seat</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / Location:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Rescheduled Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Start Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{startTimeFormatted}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Check-In Window:</strong></td>
+                                <td style="padding: 6px 10px; color: #2563eb; font-weight: 600;">Opens at {checkInOpensFormatted} (1 hr before start)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
+                                <td style="padding: 6px 10px; color: #2563eb; font-weight: bold;">Confirmed (Rescheduled)</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 6px 0; font-size: 12px; color: #475569;">
+                            Please check in to your workspace during the check-in window on your rescheduled booking date.
+                        </p>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Team</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        This is an automated notification from SpaceBook.
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildAdminHotseatRescheduledEmailHtml(
+        string employeeName,
+        string employeeEmail,
+        string department,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>[Admin Alert] SpaceBook Hotseat Rescheduled</title></head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #2563eb; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook Admin Alert</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Reservation Rescheduled</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Administrator,</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            An employee has rescheduled a hotseat reservation on SpaceBook.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Employee:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{employeeName} ({employeeEmail})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Department:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{department}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / Location:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Rescheduled Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Start Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Notification Service</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        SpaceBook Workspace Administration
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
     private static string BuildHotseatCancelledEmailHtml(
         string employeeName,
         int bookingId,
@@ -1787,7 +2042,8 @@ public class EmailService : IEmailService
         string officeName,
         string cityName,
         DateOnly bookingDate,
-        string startTimeFormatted)
+        string startTimeFormatted,
+        string cancellationReason)
     {
         return $"""
         <!DOCTYPE html>
@@ -1829,6 +2085,14 @@ public class EmailService : IEmailService
                                 <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
                             </tr>
                             <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Scheduled Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Reason:</strong></td>
+                                <td style="padding: 6px 10px; color: #64748b;">{cancellationReason}</td>
+                            </tr>
+                            <tr>
                                 <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
                                 <td style="padding: 6px 10px; color: #64748b; font-weight: bold;">Cancelled</td>
                             </tr>
@@ -1839,6 +2103,93 @@ public class EmailService : IEmailService
                 <tr>
                     <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
                         This is an automated notification from SpaceBook.
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        """;
+    }
+
+    private static string BuildAdminHotseatCancelledEmailHtml(
+        string employeeName,
+        string employeeEmail,
+        string department,
+        int bookingId,
+        string seatNumber,
+        string moduleName,
+        string officeName,
+        string cityName,
+        DateOnly bookingDate,
+        string startTimeFormatted,
+        string cancellationReason)
+    {
+        return $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>[Admin Alert] SpaceBook Hotseat Cancelled</title></head>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 12px; color: #1e293b; margin: 0;">
+            <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+                <tr>
+                    <td style="background: #e11d48; padding: 14px 18px; text-align: center; color: #ffffff;">
+                        <h1 style="margin:0;font-size:19px;font-weight:700;">SpaceBook Admin Alert</h1>
+                        <p style="margin:3px 0 0;font-size:13px;opacity:0.95;">Hotseat Reservation Cancelled</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <h2 style="margin: 0 0 6px 0; font-size: 16px; color: #0f172a;">Administrator,</h2>
+                        <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.4; color: #334155;">
+                            A hotseat reservation has been cancelled by an employee.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 10px 0; font-size: 13px;">
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b; width: 35%;"><strong>Employee:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{employeeName} ({employeeEmail})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Department:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{department}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">#{bookingId}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Seat:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a; font-weight: bold;">{seatNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Module:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{moduleName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Office / Location:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{officeName} ({cityName})</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Booking Date:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{bookingDate:MMMM dd, yyyy}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Scheduled Time:</strong></td>
+                                <td style="padding: 6px 10px; color: #0f172a;">{startTimeFormatted}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Reason:</strong></td>
+                                <td style="padding: 6px 10px; color: #e11d48; font-weight: 600;">{cancellationReason}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 6px 10px; color: #64748b;"><strong>Status:</strong></td>
+                                <td style="padding: 6px 10px; color: #e11d48; font-weight: bold;">Cancelled</td>
+                            </tr>
+                        </table>
+                        <p style="margin: 8px 0 0 0; font-size: 13px; color: #334155;">Regards,<br><strong>SpaceBook Notification Service</strong></p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; padding: 8px 14px; background: #f1f5f9; color: #64748b; font-size: 11px;">
+                        SpaceBook Workspace Administration
                     </td>
                 </tr>
             </table>

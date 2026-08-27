@@ -30,6 +30,12 @@ public interface IEmailService
         Seat seat,
         IEnumerable<string>? adminEmails = null);
 
+    Task SendHotseatBookingRescheduledAsync(
+        HotseatBooking booking,
+        Employee employee,
+        Seat seat,
+        IEnumerable<string>? adminEmails = null);
+
     Task SendHotseatCheckInReminderAsync(
         HotseatBooking booking,
         Employee employee,
@@ -43,5 +49,7 @@ public interface IEmailService
     Task SendHotseatBookingCancelledAsync(
         HotseatBooking booking,
         Employee employee,
-        Seat seat);
+        Seat seat,
+        IEnumerable<string>? adminEmails = null,
+        string? cancellationReason = null);
 }

@@ -1061,6 +1061,54 @@ public class HotseatController : ControllerBase
             $"Your hotseat booking has been updated for {seat.SeatNumber} " +
             $"on {booking.BookingDate:dd-MMM-yyyy} (Check-in time: {newCheckInTime:HH:mm}).");
 
+        var updatedBookingId = booking.HotseatBookingId;
+        var updatedSeatId = booking.SeatId;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                var employee = await context.Employees
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+
+                var seatDetails = await context.Seats
+                    .Include(s => s.Module)
+                        .ThenInclude(m => m!.Office)
+                            .ThenInclude(o => o!.Location)
+                    .FirstOrDefaultAsync(s => s.SeatId == updatedSeatId);
+
+                var bookingEntity = await context.HotseatBookings
+                    .FirstOrDefaultAsync(b => b.HotseatBookingId == updatedBookingId);
+
+                var adminEmails = await context.Employees
+                    .AsNoTracking()
+                    .Include(e => e.Role)
+                    .Where(e => e.Role != null &&
+                                (e.Role.RoleName == "Admin" || e.Role.RoleName == "ADMIN" || e.Role.RoleName == "admin") &&
+                                !string.IsNullOrWhiteSpace(e.Email))
+                    .Select(e => e.Email)
+                    .ToListAsync();
+
+                if (employee != null && !string.IsNullOrWhiteSpace(employee.Email) && bookingEntity != null)
+                {
+                    await emailService.SendHotseatBookingRescheduledAsync(
+                        bookingEntity,
+                        employee,
+                        seatDetails ?? new Seat { SeatId = updatedSeatId, SeatNumber = $"Seat {updatedSeatId}" },
+                        adminEmails);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[HotseatController] Background reschedule email failed: {ex.Message}");
+            }
+        });
+
         return Ok(new
         {
             message = "Hotseat booking updated successfully.",
@@ -1553,25 +1601,55 @@ public class HotseatController : ControllerBase
             booking.HotseatBookingId,
             $"Your hotseat booking for {seatNumber} on {booking.BookingDate:dd-MMM-yyyy} has been cancelled. Reason: You cancelled the booking.");
 
-        var cancelSeat = booking.Seat ?? new Seat { SeatId = booking.SeatId, SeatNumber = seatNumber };
-        var cancelEmp = await _context.Employees
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+        var cancelBookingId = booking.HotseatBookingId;
+        var cancelSeatId = booking.SeatId;
+        var cancelSeatNumber = seatNumber;
 
-        if (cancelEmp != null && !string.IsNullOrWhiteSpace(cancelEmp.Email))
+        _ = Task.Run(async () =>
         {
             try
             {
-                await _emailService.SendHotseatBookingCancelledAsync(
-                    booking,
-                    cancelEmp,
-                    cancelSeat);
+                using var scope = _scopeFactory.CreateScope();
+                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                var empObj = await context.Employees
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+
+                var seatObj = await context.Seats
+                    .Include(s => s.Module)
+                        .ThenInclude(m => m!.Office)
+                            .ThenInclude(o => o!.Location)
+                    .FirstOrDefaultAsync(s => s.SeatId == cancelSeatId);
+
+                var bookingObj = await context.HotseatBookings
+                    .FirstOrDefaultAsync(b => b.HotseatBookingId == cancelBookingId);
+
+                var adminEmails = await context.Employees
+                    .AsNoTracking()
+                    .Include(e => e.Role)
+                    .Where(e => e.Role != null &&
+                                (e.Role.RoleName == "Admin" || e.Role.RoleName == "ADMIN" || e.Role.RoleName == "admin") &&
+                                !string.IsNullOrWhiteSpace(e.Email))
+                    .Select(e => e.Email)
+                    .ToListAsync();
+
+                if (empObj != null && !string.IsNullOrWhiteSpace(empObj.Email) && bookingObj != null)
+                {
+                    await emailService.SendHotseatBookingCancelledAsync(
+                        bookingObj,
+                        empObj,
+                        seatObj ?? new Seat { SeatId = cancelSeatId, SeatNumber = cancelSeatNumber },
+                        adminEmails,
+                        "Cancelled by user");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[HotseatController] Cancellation email failed: {ex.Message}");
+                Console.WriteLine($"[HotseatController] Background cancellation email failed: {ex.Message}");
             }
-        }
+        });
 
         return Ok(new
         {
