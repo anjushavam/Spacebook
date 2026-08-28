@@ -63,7 +63,7 @@ public class JwtService : IJwtService
                 claims,
 
             expires:
-                DateTime.UtcNow.AddHours(24),
+                DateTime.UtcNow.AddMinutes(15),
 
             signingCredentials:
                 credentials
